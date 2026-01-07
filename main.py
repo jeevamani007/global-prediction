@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
+from financial import FinancialDomainDetector
 import os
 
 from bank import BankingDomainDetector  # your banking domain detector class
@@ -61,15 +62,25 @@ async def upload_file(file: UploadFile = File(...)):
         with open(file_path, "wb") as f:
             f.write(content)
 
-        # Run banking domain detection
+        # Run domain detection for both banking and financial
         try:
-            detector = BankingDomainDetector()
-            result = detector.predict(file_path)
+            # Banking domain detection
+            banking_detector = BankingDomainDetector()
+            banking_result = banking_detector.predict(file_path)
             
             # Check if result contains an error
-            if isinstance(result, dict) and "error" in result:
-                raise HTTPException(status_code=500, detail=f"Analysis error: {result['error']}")
+            if isinstance(banking_result, dict) and "error" in banking_result:
+                raise HTTPException(status_code=500, detail=f"Banking analysis error: {banking_result['error']}")
+            
+            # Financial domain detection
+            financial_detector = FinancialDomainDetector()
+            financial_result = financial_detector.predict(file_path)
+
+            if isinstance(financial_result, dict) and "error" in financial_result:
+                raise HTTPException(status_code=500, detail=f"Financial analysis error: {financial_result['error']}")
                 
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error during analysis: {str(e)}")
 
@@ -77,7 +88,8 @@ async def upload_file(file: UploadFile = File(...)):
             content={
                 "message": "File analyzed successfully",
                 "filename": file.filename,
-                "analysis": result
+                "banking": banking_result,
+                "financial": financial_result
             }
         )
     except HTTPException:
