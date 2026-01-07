@@ -9,6 +9,7 @@ from government import GovernmentDomainDetector
 from bank import BankingDomainDetector  # your banking domain detector class
 from database import engine
 from sqlalchemy import text
+from health_care import HealthcareDomainDetector
 
 app = FastAPI(title="Domain Detection API")
 
@@ -92,6 +93,13 @@ async def upload_file(file: UploadFile = File(...)):
                     status_code=500,
                     detail=f"Government analysis error: {government_result['error']}",
                 )
+            healthcare_detector = HealthcareDomainDetector()
+            healthcare_result = healthcare_detector.predict(file_path)
+            if isinstance(healthcare_result, dict) and "error" in healthcare_result:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Healthcare analysis error: {healthcare_result['error']}",
+                )
         except HTTPException:
             raise
         except Exception as e:
@@ -104,7 +112,8 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking": banking_result,
                 "financial": financial_result,
                 "insurance": insurance_result,
-                "government": government_result
+                "government": government_result,
+                "healthcare": healthcare_result
             }
         )
     except HTTPException:

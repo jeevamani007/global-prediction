@@ -107,6 +107,11 @@
             border-left-color: #9c27b0;
         }
 
+        .domain-section.healthcare {
+            background: #e8f5e9;
+            border-left-color: #1b5e20;
+        }
+
         .domain-title {
             font-size: 1.3em;
             margin-bottom: 10px;
@@ -274,8 +279,8 @@ uploadBtn.onclick = async () => {
         showResponse("Upload Success ✅", "success");
 
         // Display domain results
-        if (data.banking || data.financial || data.insurance || data.government) {
-            showDomainResults(data.banking, data.financial, data.insurance, data.government);
+        if (data.banking || data.financial || data.insurance || data.government || data.healthcare) {
+            showDomainResults(data.banking, data.financial, data.insurance, data.government, data.healthcare);
         } else {
             showResponse("Analysis data not found in response", "error");
         }
@@ -310,7 +315,7 @@ function getConfidenceClass(confidence) {
     return "confidence-low";
 }
 
-function showDomainResults(bankingResult, financialResult, insuranceResult, governmentResult) {
+function showDomainResults(bankingResult, financialResult, insuranceResult, governmentResult, healthcareResult) {
     let html = '<div class="results-grid">';
     
     // Banking Results
@@ -428,6 +433,36 @@ function showDomainResults(bankingResult, financialResult, insuranceResult, gove
                 ${governmentResult.matched_columns && governmentResult.matched_columns.length > 0 ? `
                     <h4>Matched Columns</h4>
                     <ul>${governmentResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // Healthcare Results
+    if (healthcareResult) {
+        html += `
+            <div class="domain-section healthcare">
+                <h3 class="domain-title">🩺 Healthcare Domain Detection
+                    <span class="confidence-badge ${getConfidenceClass(healthcareResult.confidence_percentage)}">
+                        ${healthcareResult.confidence_percentage}%
+                    </span>
+                </h3>
+                <p><b>Domain:</b> ${healthcareResult.domain || "Unknown"}</p>
+                <p><b>Decision:</b> ${healthcareResult.decision || "N/A"}</p>
+                <p><b>Strength:</b> ${healthcareResult.qualitative || "N/A"}</p>
+                <p><b>Confidence:</b> ${healthcareResult.confidence_percentage}% 
+                    (${healthcareResult.confidence_out_of_10}/10)</p>
+                <p><b>Total Columns:</b> ${healthcareResult.total_columns || 0}</p>
+                <p><b>Empty Columns:</b> ${(healthcareResult.empty_columns || []).join(", ") || "None"}</p>
+                
+                ${healthcareResult.matched_keywords && healthcareResult.matched_keywords.length > 0 ? `
+                    <h4>Matched Keywords</h4>
+                    <ul>${healthcareResult.matched_keywords.map(k => `<li>${k}</li>`).join("")}</ul>
+                ` : ''}
+                
+                ${healthcareResult.matched_columns && healthcareResult.matched_columns.length > 0 ? `
+                    <h4>Matched Columns</h4>
+                    <ul>${healthcareResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
                 ` : ''}
             </div>
         `;
