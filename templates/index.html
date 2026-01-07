@@ -279,8 +279,17 @@ uploadBtn.onclick = async () => {
         showResponse("Upload Success ✅", "success");
 
         // Display domain results
-        if (data.banking || data.financial || data.insurance || data.government || data.healthcare) {
-            showDomainResults(data.banking, data.financial, data.insurance, data.government, data.healthcare);
+        if (data.banking || data.financial || data.insurance || data.government || data.healthcare || data.retail || data.space || data.human_resource) {
+            showDomainResults(
+                data.banking,
+                data.financial,
+                data.insurance,
+                data.government,
+                data.healthcare,
+                data.retail,
+                data.space,
+                data.human_resource
+            );
         } else {
             showResponse("Analysis data not found in response", "error");
         }
@@ -315,7 +324,7 @@ function getConfidenceClass(confidence) {
     return "confidence-low";
 }
 
-function showDomainResults(bankingResult, financialResult, insuranceResult, governmentResult, healthcareResult) {
+function showDomainResults(bankingResult, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult) {
     let html = '<div class="results-grid">';
     
     // Banking Results
@@ -463,6 +472,96 @@ function showDomainResults(bankingResult, financialResult, insuranceResult, gove
                 ${healthcareResult.matched_columns && healthcareResult.matched_columns.length > 0 ? `
                     <h4>Matched Columns</h4>
                     <ul>${healthcareResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // Retail Results
+    if (retailResult) {
+        html += `
+            <div class="domain-section retail">
+                <h3 class="domain-title">🛍️ Retail Domain Detection
+                    <span class="confidence-badge ${getConfidenceClass(retailResult.confidence_percentage)}">
+                        ${retailResult.confidence_percentage}%
+                    </span>
+                </h3>
+                <p><b>Domain:</b> ${retailResult.domain || "Unknown"}</p>
+                <p><b>Decision:</b> ${retailResult.decision || "N/A"}</p>
+                <p><b>Strength:</b> ${retailResult.qualitative || "N/A"}</p>
+                <p><b>Confidence:</b> ${retailResult.confidence_percentage}% 
+                    (${retailResult.confidence_out_of_10}/10)</p>
+                <p><b>Total Columns:</b> ${retailResult.total_columns || 0}</p>
+                <p><b>Empty Columns:</b> ${(retailResult.empty_columns || []).join(", ") || "None"}</p>
+                
+                ${retailResult.matched_keywords && retailResult.matched_keywords.length > 0 ? `
+                    <h4>Matched Keywords</h4>
+                    <ul>${retailResult.matched_keywords.map(k => `<li>${k}</li>`).join("")}</ul>
+                ` : ''}
+                
+                ${retailResult.matched_columns && retailResult.matched_columns.length > 0 ? `
+                    <h4>Matched Columns</h4>
+                    <ul>${retailResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // Space Results
+    if (spaceResult) {
+        html += `
+            <div class="domain-section space">
+                <h3 class="domain-title">🚀 Space Domain Detection
+                    <span class="confidence-badge ${getConfidenceClass(spaceResult.confidence_percentage)}">
+                        ${spaceResult.confidence_percentage}%
+                    </span>
+                </h3>
+                <p><b>Domain:</b> ${spaceResult.domain || "Unknown"}</p>
+                <p><b>Decision:</b> ${spaceResult.decision || "N/A"}</p>
+                <p><b>Strength:</b> ${spaceResult.qualitative || "N/A"}</p>
+                <p><b>Confidence:</b> ${spaceResult.confidence_percentage}% 
+                    (${spaceResult.confidence_out_of_10}/10)</p>
+                <p><b>Total Columns:</b> ${spaceResult.total_columns || 0}</p>
+                <p><b>Empty Columns:</b> ${(spaceResult.empty_columns || []).join(", ") || "None"}</p>
+                
+                ${spaceResult.matched_keywords && spaceResult.matched_keywords.length > 0 ? `
+                    <h4>Matched Keywords</h4>
+                    <ul>${spaceResult.matched_keywords.map(k => `<li>${k}</li>`).join("")}</ul>
+                ` : ''}
+                
+                ${spaceResult.matched_columns && spaceResult.matched_columns.length > 0 ? `
+                    <h4>Matched Columns</h4>
+                    <ul>${spaceResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // Human Resource Results
+    if (humanResourceResult) {
+        html += `
+            <div class="domain-section human-resource">
+                <h3 class="domain-title">👥 Human Resource Domain Detection
+                    <span class="confidence-badge ${getConfidenceClass(humanResourceResult.confidence_percentage)}">
+                        ${humanResourceResult.confidence_percentage}%
+                    </span>
+                </h3>
+                <p><b>Domain:</b> ${humanResourceResult.domain || "Unknown"}</p>
+                <p><b>Decision:</b> ${humanResourceResult.decision || "N/A"}</p>
+                <p><b>Strength:</b> ${humanResourceResult.qualitative || "N/A"}</p>
+                <p><b>Confidence:</b> ${humanResourceResult.confidence_percentage}% 
+                    (${humanResourceResult.confidence_out_of_10}/10)</p>
+                <p><b>Total Columns:</b> ${humanResourceResult.total_columns || 0}</p>
+                <p><b>Empty Columns:</b> ${(humanResourceResult.empty_columns || []).join(", ") || "None"}</p>
+                
+                ${humanResourceResult.matched_keywords && humanResourceResult.matched_keywords.length > 0 ? `
+                    <h4>Matched Keywords</h4>
+                    <ul>${humanResourceResult.matched_keywords.map(k => `<li>${k}</li>`).join("")}</ul>
+                ` : ''}
+                
+                ${humanResourceResult.matched_columns && humanResourceResult.matched_columns.length > 0 ? `
+                    <h4>Matched Columns</h4>
+                    <ul>${humanResourceResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
                 ` : ''}
             </div>
         `;

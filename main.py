@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from financial import FinancialDomainDetector
+import human_resource
 from insurence import InsuranceDomainDetector
 import os
 from government import GovernmentDomainDetector
@@ -10,6 +11,10 @@ from bank import BankingDomainDetector  # your banking domain detector class
 from database import engine
 from sqlalchemy import text
 from health_care import HealthcareDomainDetector
+from retail import RetailDomainDetector
+from space import SpaceDomainDetector
+from human_resource import HRDomainDetector
+
 
 app = FastAPI(title="Domain Detection API")
 
@@ -91,14 +96,39 @@ async def upload_file(file: UploadFile = File(...)):
             if isinstance(government_result, dict) and "error" in government_result:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Government analysis error: {government_result['error']}",
+                    detail=f"Government analysis error: {government_result['error']}"
                 )
             healthcare_detector = HealthcareDomainDetector()
             healthcare_result = healthcare_detector.predict(file_path)
             if isinstance(healthcare_result, dict) and "error" in healthcare_result:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Healthcare analysis error: {healthcare_result['error']}",
+                    detail=f"Healthcare analysis error: {healthcare_result['error']}"
+                )
+
+            retail_detector = RetailDomainDetector()
+            retail_result = retail_detector.predict(file_path)
+            if isinstance(retail_result, dict) and "error" in retail_result:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Retail analysis error: {retail_result['error']}"
+                )
+
+            space_detector = SpaceDomainDetector()
+            space_result = space_detector.predict(file_path)
+            if isinstance(space_result, dict) and "error" in space_result:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Space analysis error: {space_result['error']}"
+                )
+
+            human_resource_detect =HRDomainDetector()
+            human_resource_result =human_resource_detect.predict(file_path)
+
+            if isinstance(human_resource_result,dict) and  "error"  in human_resource_result:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f'hr analysis error : {human_resource_result["error"]}'
                 )
         except HTTPException:
             raise
@@ -113,7 +143,10 @@ async def upload_file(file: UploadFile = File(...)):
                 "financial": financial_result,
                 "insurance": insurance_result,
                 "government": government_result,
-                "healthcare": healthcare_result
+                "healthcare": healthcare_result,
+                "retail": retail_result,
+                "space":space_result,
+                "human_resource":human_resource_result
             }
         )
     except HTTPException:
