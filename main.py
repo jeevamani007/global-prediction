@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from financial import FinancialDomainDetector
+from insurence import InsuranceDomainDetector
 import os
-
+from government import GovernmentDomainDetector
 from bank import BankingDomainDetector  # your banking domain detector class
 from database import engine
 from sqlalchemy import text
@@ -78,7 +79,19 @@ async def upload_file(file: UploadFile = File(...)):
 
             if isinstance(financial_result, dict) and "error" in financial_result:
                 raise HTTPException(status_code=500, detail=f"Financial analysis error: {financial_result['error']}")
-                
+
+            insurance_detector = InsuranceDomainDetector()
+            insurance_result = insurance_detector.predict(file_path)
+            if isinstance(insurance_result, dict) and "error" in insurance_result:
+                raise HTTPException(status_code=500, detail=f"Insurance analysis error: {insurance_result['error']}")
+            
+            government_detector = GovernmentDomainDetector()
+            government_result = government_detector.predict(file_path)
+            if isinstance(government_result, dict) and "error" in government_result:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Government analysis error: {government_result['error']}",
+                )
         except HTTPException:
             raise
         except Exception as e:
@@ -89,7 +102,9 @@ async def upload_file(file: UploadFile = File(...)):
                 "message": "File analyzed successfully",
                 "filename": file.filename,
                 "banking": banking_result,
-                "financial": financial_result
+                "financial": financial_result,
+                "insurance": insurance_result,
+                "government": government_result
             }
         )
     except HTTPException:

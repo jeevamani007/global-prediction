@@ -97,6 +97,16 @@
             border-left-color: #4CAF50;
         }
 
+        .domain-section.insurance {
+            background: #fff6e5;
+            border-left-color: #ff9800;
+        }
+
+        .domain-section.government {
+            background: #f5e8ff;
+            border-left-color: #9c27b0;
+        }
+
         .domain-title {
             font-size: 1.3em;
             margin-bottom: 10px;
@@ -137,7 +147,7 @@
 
         .results-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 20px;
             margin-top: 20px;
         }
@@ -263,9 +273,9 @@ uploadBtn.onclick = async () => {
 
         showResponse("Upload Success ✅", "success");
 
-        // Display both banking and financial results
-        if (data.banking || data.financial) {
-            showDomainResults(data.banking, data.financial);
+        // Display domain results
+        if (data.banking || data.financial || data.insurance || data.government) {
+            showDomainResults(data.banking, data.financial, data.insurance, data.government);
         } else {
             showResponse("Analysis data not found in response", "error");
         }
@@ -300,7 +310,7 @@ function getConfidenceClass(confidence) {
     return "confidence-low";
 }
 
-function showDomainResults(bankingResult, financialResult) {
+function showDomainResults(bankingResult, financialResult, insuranceResult, governmentResult) {
     let html = '<div class="results-grid">';
     
     // Banking Results
@@ -358,6 +368,66 @@ function showDomainResults(bankingResult, financialResult) {
                 ${financialResult.matched_columns && financialResult.matched_columns.length > 0 ? `
                     <h4>Matched Columns</h4>
                     <ul>${financialResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // Insurance Results
+    if (insuranceResult) {
+        html += `
+            <div class="domain-section insurance">
+                <h3 class="domain-title">🛡️ Insurance Domain Detection
+                    <span class="confidence-badge ${getConfidenceClass(insuranceResult.confidence_percentage)}">
+                        ${insuranceResult.confidence_percentage}%
+                    </span>
+                </h3>
+                <p><b>Domain:</b> ${insuranceResult.domain || "Unknown"}</p>
+                <p><b>Decision:</b> ${insuranceResult.decision || "N/A"}</p>
+                <p><b>Strength:</b> ${insuranceResult.qualitative || "N/A"}</p>
+                <p><b>Confidence:</b> ${insuranceResult.confidence_percentage}% 
+                    (${insuranceResult.confidence_out_of_10}/10)</p>
+                <p><b>Total Columns:</b> ${insuranceResult.total_columns || 0}</p>
+                <p><b>Empty Columns:</b> ${(insuranceResult.empty_columns || []).join(", ") || "None"}</p>
+                
+                ${insuranceResult.matched_keywords && insuranceResult.matched_keywords.length > 0 ? `
+                    <h4>Matched Keywords</h4>
+                    <ul>${insuranceResult.matched_keywords.map(k => `<li>${k}</li>`).join("")}</ul>
+                ` : ''}
+                
+                ${insuranceResult.matched_columns && insuranceResult.matched_columns.length > 0 ? `
+                    <h4>Matched Columns</h4>
+                    <ul>${insuranceResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    // Government Results
+    if (governmentResult) {
+        html += `
+            <div class="domain-section government">
+                <h3 class="domain-title">🏛️ Government Domain Detection
+                    <span class="confidence-badge ${getConfidenceClass(governmentResult.confidence_percentage)}">
+                        ${governmentResult.confidence_percentage}%
+                    </span>
+                </h3>
+                <p><b>Domain:</b> ${governmentResult.domain || "Unknown"}</p>
+                <p><b>Decision:</b> ${governmentResult.decision || "N/A"}</p>
+                <p><b>Strength:</b> ${governmentResult.qualitative || "N/A"}</p>
+                <p><b>Confidence:</b> ${governmentResult.confidence_percentage}% 
+                    (${governmentResult.confidence_out_of_10}/10)</p>
+                <p><b>Total Columns:</b> ${governmentResult.total_columns || 0}</p>
+                <p><b>Empty Columns:</b> ${(governmentResult.empty_columns || []).join(", ") || "None"}</p>
+                
+                ${governmentResult.matched_keywords && governmentResult.matched_keywords.length > 0 ? `
+                    <h4>Matched Keywords</h4>
+                    <ul>${governmentResult.matched_keywords.map(k => `<li>${k}</li>`).join("")}</ul>
+                ` : ''}
+                
+                ${governmentResult.matched_columns && governmentResult.matched_columns.length > 0 ? `
+                    <h4>Matched Columns</h4>
+                    <ul>${governmentResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
                 ` : ''}
             </div>
         `;
