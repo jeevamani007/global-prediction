@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>File Upload System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 16px;
+            width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 { text-align: center; margin-bottom: 20px; }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 12px;
+        }
+
+        .upload-area.dragover {
+            background: #eef;
+        }
+
+        input[type=file] { display: none; }
+
+        .file-info { margin-top: 15px; display: none; }
+        .file-info.show { display: block; }
+
+        .upload-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+        }
+
+        .upload-btn.show { display: block; }
+
+        .loading { display: none; text-align: center; margin-top: 15px; }
+        .loading.show { display: block; }
+
+        .response {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .response.show { display: block; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+
+        .result-box {
+            margin-top: 20px;
+            background: #f5f6ff;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        ul { margin-left: 20px; }
+        pre {
+            background: #eee;
+            padding: 10px;
+            overflow-x: auto;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+    <h1>📁 File Upload</h1>
+
+    <div class="upload-area" id="uploadArea">
+        <p>Click or Drag & Drop</p>
+        <small>.sql, .csv, .xlsx, .xls</small>
+    </div>
+
+    <input type="file" id="fileInput" accept=".sql,.csv,.xlsx,.xls">
+
+    <div class="file-info" id="fileInfo">
+        <p id="fileName"></p>
+        <p id="fileSize"></p>
+    </div>
+
+    <button class="upload-btn" id="uploadBtn">Upload</button>
+
+    <div class="loading" id="loading">Uploading...</div>
+
+    <div class="response" id="response"></div>
+
+    <!-- 🔥 RESULT UI -->
+    <div id="resultBox"></div>
+</div>
+
+<script>
+const uploadArea = document.getElementById("uploadArea");
+const fileInput = document.getElementById("fileInput");
+const fileInfo = document.getElementById("fileInfo");
+const fileName = document.getElementById("fileName");
+const fileSize = document.getElementById("fileSize");
+const uploadBtn = document.getElementById("uploadBtn");
+const loading = document.getElementById("loading");
+const response = document.getElementById("response");
+const resultBox = document.getElementById("resultBox");
+
+let selectedFile = null;
+
+/* ---------------- Upload Handling ---------------- */
+
+uploadArea.onclick = () => fileInput.click();
+
+fileInput.onchange = e => handleFile(e.target.files[0]);
+
+uploadArea.ondragover = e => {
+    e.preventDefault();
+    uploadArea.classList.add("dragover");
+};
+
+uploadArea.ondragleave = () => uploadArea.classList.remove("dragover");
+
+uploadArea.ondrop = e => {
+    e.preventDefault();
+    uploadArea.classList.remove("dragover");
+    handleFile(e.dataTransfer.files[0]);
+};
+
+function handleFile(file) {
+    if (!file) return;
+
+    selectedFile = file;
+    fileName.textContent = "📄 " + file.name;
+    fileSize.textContent = "Size: " + formatFileSize(file.size);
+
+    fileInfo.classList.add("show");
+    uploadBtn.classList.add("show");
+}
+
+function formatFileSize(bytes) {
+    const sizes = ["Bytes", "KB", "MB"];
+    let i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
+}
+
+/* ---------------- Upload API Call ---------------- */
+
+uploadBtn.onclick = async () => {
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    uploadBtn.disabled = true;
+    loading.classList.add("show");
+    resultBox.innerHTML = "";
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+        const res = await fetch("http://localhost:8000/upload", {
+            method: "POST",
+            body: formData,
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+            let errorMsg = "Upload failed";
+            try {
+                const errorData = await res.json();
+                errorMsg = errorData.detail || errorMsg;
+            } catch (e) {
+                errorMsg = `Server error: ${res.status} ${res.statusText}`;
+            }
+            showResponse(errorMsg, "error");
+            return;
+        }
+
+        const data = await res.json();
+
+        showResponse("Upload Success ✅", "success");
+
+        // 🔥 BANKING RESULT
+        if (data.analysis) {
+            showBankingResult(data.analysis);
+        } else {
+            showResponse("Analysis data not found in response", "error");
+        }
+
+    } catch (err) {
+        let errorMsg = "Failed to fetch";
+        if (err.name === "AbortError") {
+            errorMsg = "Request timeout - server took too long to respond";
+        } else if (err.message) {
+            errorMsg = `Network error: ${err.message}`;
+        } else if (err instanceof TypeError) {
+            errorMsg = "Cannot connect to server. Make sure the server is running on http://localhost:8000";
+        }
+        showResponse(errorMsg, "error");
+        console.error("Upload error:", err);
+    } finally {
+        uploadBtn.disabled = false;
+        loading.classList.remove("show");
+    }
+};
+
+function showResponse(msg, type) {
+    response.textContent = msg;
+    response.className = `response ${type} show`;
+}
+
+/* ---------------- RESULT UI ---------------- */
+
+function showBankingResult(r) {
+    resultBox.innerHTML = `
+        <div class="result-box">
+            <h3>🏦 Domain Result</h3>
+
+            <p><b>Domain:</b> ${r.domain}</p>
+            <p><b>Decision:</b> ${r.decision}</p>
+            <p><b>Strength:</b> ${r.qualitative}</p>
+            <p><b>Confidence:</b> ${r.confidence_percentage}% 
+                (${r.confidence_out_of_10}/10)</p>
+
+            <p><b>Total Columns:</b> ${r.total_columns}</p>
+            <p><b>Empty Columns:</b> ${r.empty_columns.join(", ") || "None"}</p>
+
+            <h4>Matched Keywords</h4>
+            <ul>${r.matched_keywords.map(k => `<li>${k}</li>`).join("")}</ul>
+
+            <h4>Matched Columns</h4>
+            <ul>${r.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
+
+        </div>
+    `;
+}
+</script>
+</body>
+</html>
