@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Account Number Detection</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6fb;
+            padding: 20px;
+            color: #222;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 { margin-bottom: 12px; }
+        h2 { margin-top: 20px; }
+        .summary {
+            background: #e8f4ff;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+        .col-card {
+            background: #f9fbff;
+            border: 1px solid #e3e9f5;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        ul { margin-left: 18px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Account Number Detection</h1>
+        <div id="content">Loading...</div>
+    </div>
+
+    <script>
+        function renderRuleList(rules) {
+            if (!rules) return "";
+            return `
+                <ul>
+                    <li>Digits only: ${rules.digits_only_ratio ?? "N/A"}</li>
+                    <li>Length 6-16: ${rules.length_6_16_ratio ?? "N/A"}</li>
+                    <li>Unique: ${rules.unique_ratio ?? "N/A"}</li>
+                    <li>Not null: ${rules.not_null_ratio ?? "N/A"}</li>
+                    <li>No symbols: ${rules.no_symbol_ratio ?? "N/A"}</li>
+                    <li>Randomized: ${rules.randomized ?? "N/A"}</li>
+                </ul>
+            `;
+        }
+
+        function renderContent(data) {
+            if (!data || !data.account_like_columns || data.account_like_columns.length === 0) {
+                return "<p>No account-like columns detected. Run an upload first.</p>";
+            }
+
+            const best = data.summary?.best_match;
+            const cols = data.account_like_columns.map(item => `
+                <div class="col-card">
+                    <p><b>Column:</b> ${item.column}</p>
+                    <p><b>Decision:</b> ${item.decision}</p>
+                    <p><b>Probability:</b> ${item.probability_account_number}%</p>
+                    <p><b>Rules:</b></p>
+                    ${renderRuleList(item.rules)}
+                    ${item.sample_violations && item.sample_violations.length ? `
+                        <p><b>Sample violations:</b></p>
+                        <ul>${item.sample_violations.map(v => `<li>${v}</li>`).join("")}</ul>
+                    ` : ""}
+                </div>
+            `).join("");
+
+            return `
+                <div class="summary">
+                    ${best ? `<p><b>Best match:</b> ${best.column} (${best.probability_account_number}% - ${best.decision})</p>` : "<p>No best match available.</p>"}
+                    <p><b>Total columns checked:</b> ${data.summary?.checked_columns ?? "N/A"}</p>
+                    <p><b>Total rows:</b> ${data.summary?.total_rows ?? "N/A"}</p>
+                </div>
+                ${cols}
+            `;
+        }
+
+        (function init() {
+            const content = document.getElementById("content");
+            try {
+                const raw = sessionStorage.getItem("accountValidation");
+                const parsed = raw ? JSON.parse(raw) : null;
+                content.innerHTML = renderContent(parsed);
+            } catch (e) {
+                content.innerHTML = `<p>Error reading data: ${e.message}</p>`;
+            }
+        })();
+    </script>
+</body>
+</html>

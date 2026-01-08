@@ -1,3 +1,5 @@
+import math
+import re
 import pandas as pd
 import numpy as np
 from rapidfuzz import fuzz
@@ -70,6 +72,92 @@ class BankingDomainDetector:
                 score += 1
 
         return score
+
+    def _looks_account_like_name(self, column_name: str) -> bool:
+        norm = self.normalize(column_name)
+        candidates = ["account", "acct", "accno", "custaccount", "customeraccount", "accnumber"]
+        return any(key in norm for key in candidates)
+
+    def _looks_account_like_values(self, series: pd.Series) -> bool:
+        col = series.dropna().astype(str)
+        if col.empty:
+            return False
+        digit_ratio = col.str.fullmatch(r"\d+").mean()
+        length_ratio = col.str.len().between(6, 16).mean()
+        return digit_ratio > 0.6 and length_ratio > 0.6
+
+    def validate_account_numbers(self, df: pd.DataFrame):
+        results = []
+        total_rows = len(df)
+
+        for col in df.columns:
+            series = df[col]
+
+            if not self._looks_account_like_name(col) and not self._looks_account_like_values(series):
+                continue
+
+            non_null = series.dropna().astype(str)
+            if non_null.empty:
+                continue
+
+            digit_only_ratio = float(non_null.str.fullmatch(r"\d+").mean())
+            length_ok_ratio = float(non_null.str.len().between(6, 16).mean())
+            no_symbol_ratio = float(non_null.str.contains(r"[^0-9]").apply(lambda x: not x).mean())
+            unique_ratio = float(non_null.nunique() / len(non_null))
+            not_null_ratio = float(len(non_null) / max(len(series), 1))
+            randomized_flag = bool(unique_ratio > 0.85 and digit_only_ratio > 0.8)
+
+            violations = []
+            for val in non_null.head(50):
+                val_str = str(val)
+                if not re.fullmatch(r"\d{6,16}", val_str):
+                    violations.append(val_str)
+                if len(violations) >= 5:
+                    break
+
+            weighted_score = (
+                0.35 * digit_only_ratio
+                + 0.25 * length_ok_ratio
+                + 0.15 * unique_ratio
+                + 0.10 * not_null_ratio
+                + 0.10 * no_symbol_ratio
+                + (0.05 if randomized_flag else 0)
+            )
+            prob = float(1 / (1 + math.exp(-6 * (weighted_score - 0.6))))
+
+            results.append({
+                "column": col,
+                "probability_account_number": float(round(prob * 100, 2)),
+                "decision": "match" if prob >= 0.6 else "not_match",
+                "rules": {
+                    "digits_only_ratio": round(digit_only_ratio, 3),
+                    "length_6_16_ratio": round(length_ok_ratio, 3),
+                    "unique_ratio": round(unique_ratio, 3),
+                    "not_null_ratio": round(not_null_ratio, 3),
+                    "no_symbol_ratio": round(no_symbol_ratio, 3),
+                    "randomized": randomized_flag
+                },
+                "sample_violations": violations
+            })
+
+        summary = {
+            "total_rows": total_rows,
+            "checked_columns": len(results),
+            "best_match": None
+        }
+
+        if results:
+            best = max(results, key=lambda r: r["probability_account_number"])
+            summary["best_match"] = {
+                "column": best["column"],
+                "probability_account_number": best["probability_account_number"],
+                "decision": best["decision"]
+            }
+
+        return {
+            "account_like_columns": results,
+            "summary": summary
+        }
 
     def predict(self, csv_path):
         try:
@@ -165,6 +253,12 @@ class BankingDomainDetector:
             decision = "UNKNOWN"
             qualitative = "Weak"
 
+        # 8️⃣ Only do account-number prediction if banking is detected
+        if decision != "UNKNOWN":
+            account_number_validation = self.validate_account_numbers(df)
+        else:
+            account_number_validation = None
+
         return {
             "domain": self.domain if decision != "UNKNOWN" else "Unknown",
             "confidence_percentage": confidence_100,
@@ -179,5 +273,6 @@ class BankingDomainDetector:
             "matched_columns": matched_columns,
             "keyword_column_mapping": match_map,
 
-            "details": details
+            "details": details,
+            "account_number_validation": account_number_validation
         }

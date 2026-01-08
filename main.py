@@ -140,6 +140,7 @@ async def upload_file(file: UploadFile = File(...)):
                 "message": "File analyzed successfully",
                 "filename": file.filename,
                 "banking": banking_result,
+                "banking_account_validation": banking_result.get("account_number_validation"),
                 "financial": financial_result,
                 "insurance": insurance_result,
                 "government": government_result,
@@ -164,6 +165,16 @@ async def health_check():
 async def root(request: Request):
     """Return the index.html page"""
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/account", response_class=HTMLResponse)
+async def account_page(request: Request):
+    """Return the account.html page for account number detection results"""
+    return templates.TemplateResponse("account.html", {"request": request})
+
+@app.get("/account.html", response_class=HTMLResponse)
+async def account_page_html(request: Request):
+    """Return the account.html page (html suffix)"""
+    return templates.TemplateResponse("account.html", {"request": request})
 
 
 if __name__ == "__main__":

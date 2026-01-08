@@ -189,6 +189,10 @@
 
     <!-- 🔥 RESULT UI -->
     <div id="resultBox"></div>
+
+    <button class="upload-btn" id="accountBtn" style="margin-top:12px; display:none; background:#2196F3;">
+        View Account Number Detection
+    </button>
 </div>
 
 <script>
@@ -201,6 +205,7 @@ const uploadBtn = document.getElementById("uploadBtn");
 const loading = document.getElementById("loading");
 const response = document.getElementById("response");
 const resultBox = document.getElementById("resultBox");
+const accountBtn = document.getElementById("accountBtn");
 
 let selectedFile = null;
 
@@ -282,6 +287,7 @@ uploadBtn.onclick = async () => {
         if (data.banking || data.financial || data.insurance || data.government || data.healthcare || data.retail || data.space || data.human_resource) {
             showDomainResults(
                 data.banking,
+                data.banking_account_validation,
                 data.financial,
                 data.insurance,
                 data.government,
@@ -290,6 +296,14 @@ uploadBtn.onclick = async () => {
                 data.space,
                 data.human_resource
             );
+
+            if (data.banking_account_validation) {
+                sessionStorage.setItem("accountValidation", JSON.stringify(data.banking_account_validation));
+                accountBtn.style.display = "block";
+            } else {
+                sessionStorage.removeItem("accountValidation");
+                accountBtn.style.display = "none";
+            }
         } else {
             showResponse("Analysis data not found in response", "error");
         }
@@ -311,6 +325,10 @@ uploadBtn.onclick = async () => {
     }
 };
 
+accountBtn.onclick = () => {
+    window.open("account.html", "_blank");
+};
+
 function showResponse(msg, type) {
     response.textContent = msg;
     response.className = `response ${type} show`;
@@ -324,7 +342,49 @@ function getConfidenceClass(confidence) {
     return "confidence-low";
 }
 
-function showDomainResults(bankingResult, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult) {
+function renderRuleList(rules) {
+    if (!rules) return "";
+    return `
+        <ul>
+            <li>Digits only: ${rules.digits_only_ratio ?? "N/A"}</li>
+            <li>Length 6-16: ${rules.length_6_16_ratio ?? "N/A"}</li>
+            <li>Unique: ${rules.unique_ratio ?? "N/A"}</li>
+            <li>Not null: ${rules.not_null_ratio ?? "N/A"}</li>
+            <li>No symbols: ${rules.no_symbol_ratio ?? "N/A"}</li>
+            <li>Randomized: ${rules.randomized ?? "N/A"}</li>
+        </ul>
+    `;
+}
+
+function renderAccountValidation(accountValidation) {
+    if (!accountValidation || !accountValidation.account_like_columns || accountValidation.account_like_columns.length === 0) {
+        return "<p>No account-like columns detected.</p>";
+    }
+
+    const best = accountValidation.summary?.best_match;
+    const cards = accountValidation.account_like_columns.map(item => `
+        <div style="margin-bottom:12px;padding:10px;border-radius:8px;background:#f0f4ff;">
+            <p><b>Column:</b> ${item.column}</p>
+            <p><b>Decision:</b> ${item.decision}</p>
+            <p><b>Probability:</b> ${item.probability_account_number}%</p>
+            <p><b>Rules:</b></p>
+            ${renderRuleList(item.rules)}
+            ${item.sample_violations && item.sample_violations.length ? `
+                <p><b>Sample violations:</b></p>
+                <ul>${item.sample_violations.map(v => `<li>${v}</li>`).join("")}</ul>
+            ` : ""}
+        </div>
+    `).join("");
+
+    return `
+        <div style="margin-top:10px;">
+            ${best ? `<p><b>Best match:</b> ${best.column} (${best.probability_account_number}% - ${best.decision})</p>` : ""}
+            ${cards}
+        </div>
+    `;
+}
+
+function showDomainResults(bankingResult, bankingAccountValidation, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult) {
     let html = '<div class="results-grid">';
     
     // Banking Results
@@ -353,6 +413,8 @@ function showDomainResults(bankingResult, financialResult, insuranceResult, gove
                     <h4>Matched Columns</h4>
                     <ul>${bankingResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
                 ` : ''}
+                <h4 style="margin-top:10px;">Account Number Detection</h4>
+                ${renderAccountValidation(bankingAccountValidation)}
             </div>
         `;
     }
