@@ -292,9 +292,37 @@ uploadBtn.onclick = async () => {
         } else if (data.banking && data.banking.account_number_check) {
             sessionStorage.setItem("accountNumberCheck", JSON.stringify(data.banking.account_number_check));
         }
+        if (data.banking_account_status) {
+            sessionStorage.setItem("accountStatus", JSON.stringify(data.banking_account_status));
+        }
+        if (data.banking_missing_columns) {
+            sessionStorage.setItem("missingColumns", JSON.stringify(data.banking_missing_columns));
+        }
+        if (data.banking_balance_analysis) {
+            sessionStorage.setItem("balanceAnalysis", JSON.stringify(data.banking_balance_analysis));
+        }
+        if (data.banking_kyc_verification) {
+            sessionStorage.setItem("kycVerification", JSON.stringify(data.banking_kyc_verification));
+        }
+        if (data.banking_customer_id_validation) {
+            sessionStorage.setItem("customerIdValidation", JSON.stringify(data.banking_customer_id_validation));
+        }
+        if (data.banking_transaction_validation) {
+            sessionStorage.setItem("transactionValidation", JSON.stringify(data.banking_transaction_validation));
+        }
+        if (data.banking_debit_credit_validation) {
+            sessionStorage.setItem("debitCreditValidation", JSON.stringify(data.banking_debit_credit_validation));
+        }
+        if (data.banking_fraud_detection) {
+            sessionStorage.setItem("fraudDetection", JSON.stringify(data.banking_fraud_detection));
+        }
 
         // Display domain results on index.html page
+        // Always show results if any domain data exists
         if (data.banking || data.financial || data.insurance || data.government || data.healthcare || data.retail || data.space || data.human_resource) {
+            console.log("Banking data:", data.banking);
+            console.log("Banking account validation:", data.banking_account_validation);
+            
             showDomainResults(
                 data.banking,
                 data.banking_account_validation,
@@ -307,14 +335,17 @@ uploadBtn.onclick = async () => {
                 data.human_resource
             );
 
-            // Show account button if banking detected
-            if (data.banking && data.banking.decision && data.banking.decision !== "UNKNOWN" && data.banking_account_validation) {
+            // Show account button if banking data exists (even if decision is UNKNOWN)
+            if (data.banking && data.banking !== null) {
                 accountBtn.style.display = "block";
+                console.log("Account button should be visible");
             } else {
                 accountBtn.style.display = "none";
+                console.log("Account button hidden - no banking data");
             }
         } else {
             showResponse("Analysis data not found in response", "error");
+            accountBtn.style.display = "none";
         }
 
     } catch (err) {
@@ -335,7 +366,7 @@ uploadBtn.onclick = async () => {
 };
 
 accountBtn.onclick = () => {
-    window.open("account.html", "_blank");
+    window.location.href = "/account";
 };
 
 function showResponse(msg, type) {
@@ -396,20 +427,21 @@ function renderAccountValidation(accountValidation) {
 function showDomainResults(bankingResult, bankingAccountValidation, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult) {
     let html = '<div class="results-grid">';
     
-    // Banking Results
-    if (bankingResult) {
+    // Banking Results - ALWAYS SHOW FIRST if banking data exists
+    if (bankingResult && bankingResult !== null && typeof bankingResult === 'object') {
+        const bankingConfidence = bankingResult.confidence_percentage || 0;
         html += `
             <div class="domain-section banking">
                 <h3 class="domain-title">🏦 Banking Domain Detection
-                    <span class="confidence-badge ${getConfidenceClass(bankingResult.confidence_percentage)}">
-                        ${bankingResult.confidence_percentage}%
+                    <span class="confidence-badge ${getConfidenceClass(bankingConfidence)}">
+                        ${bankingConfidence}%
                     </span>
                 </h3>
                 <p><b>Domain:</b> ${bankingResult.domain || "Unknown"}</p>
                 <p><b>Decision:</b> ${bankingResult.decision || "N/A"}</p>
                 <p><b>Strength:</b> ${bankingResult.qualitative || "N/A"}</p>
-                <p><b>Confidence:</b> ${bankingResult.confidence_percentage}% 
-                    (${bankingResult.confidence_out_of_10}/10)</p>
+                <p><b>Confidence:</b> ${bankingConfidence}% 
+                    (${bankingResult.confidence_out_of_10 || 0}/10)</p>
                 <p><b>Total Columns:</b> ${bankingResult.total_columns || 0}</p>
                 <p><b>Empty Columns:</b> ${(bankingResult.empty_columns || []).join(", ") || "None"}</p>
                 
@@ -422,8 +454,19 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                     <h4>Matched Columns</h4>
                     <ul>${bankingResult.matched_columns.map(c => `<li>${c}</li>`).join("")}</ul>
                 ` : ''}
-                <h4 style="margin-top:10px;">Account Number Detection</h4>
-                ${renderAccountValidation(bankingAccountValidation)}
+                ${bankingAccountValidation ? `
+                    <h4 style="margin-top:10px;">Account Number Detection</h4>
+                    ${renderAccountValidation(bankingAccountValidation)}
+                ` : '<p style="margin-top:10px;">Account validation data not available.</p>'}
+            </div>
+        `;
+    } else if (bankingResult !== null && bankingResult !== undefined) {
+        // Fallback: show basic banking info even if structure is unexpected
+        html += `
+            <div class="domain-section banking">
+                <h3 class="domain-title">🏦 Banking Domain Detection</h3>
+                <p>Banking data received but format may be unexpected.</p>
+                <pre>${JSON.stringify(bankingResult, null, 2).substring(0, 200)}</pre>
             </div>
         `;
     }

@@ -60,7 +60,7 @@ class FinancialDomainDetector:
             if col.astype(str).str.isnumeric().mean() > 0.7:
                 score += 1
 
-        if "ifsc" in name:
+        if "ifscs" in name:
             if col.astype(str).str.len().mean() == 11:
                 score += 1
 

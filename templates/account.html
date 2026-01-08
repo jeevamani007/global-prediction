@@ -5,79 +5,297 @@
     <title>Account Number Detection</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            border: none !important;
+            outline: none !important;
+        }
+        
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f6fb;
-            padding: 20px;
-            color: #222;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+            color: #2d3748;
+            line-height: 1.6;
         }
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            padding: 20px;
-            max-width: 900px;
-            margin: 0 auto;
+        
+        .container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
         }
-        h1 { margin-bottom: 12px; }
-        h2 { margin-top: 20px; }
-        .summary {
-            background: #e8f4ff;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 16px;
-        }
-        .final-result {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            padding: 16px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        
+        .header {
             text-align: center;
+            padding: 30px 20px;
+            margin: 0;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .final-result.found {
-            background: #d4edda;
-            border-color: #28a745;
+        
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .final-result.not-found {
-            background: #f8d7da;
-            border-color: #dc3545;
+        
+        .header p {
+            font-size: 0.95rem;
+            opacity: 0.9;
         }
-        .col-card {
-            background: #f9fbff;
-            border: 1px solid #e3e9f5;
-            border-radius: 10px;
-            padding: 12px;
-            margin-bottom: 10px;
+        
+        .card {
+            background: white;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 24px;
+            margin: 0;
+            width: 100%;
         }
-        ul { margin-left: 18px; }
-        h3 { font-size: 1.5em; margin-bottom: 8px; }
+        
+        .status-banner {
+            padding: 24px;
+            border-radius: 0;
+            margin: 0 0 24px 0;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .status-banner.success {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .status-banner.error {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .status-banner.warning {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            color: #744210;
+        }
+        
+        .status-icon {
+            font-size: 2.5rem;
+            flex-shrink: 0;
+        }
+        
+        .status-content h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .status-content p {
+            font-size: 0.95rem;
+            opacity: 0.95;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .info-card {
+            background: #f7fafc;
+            padding: 18px;
+            border-radius: 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        .info-card.success-bg {
+            background: linear-gradient(135deg, #e6f7ff 0%, #d4edff 100%);
+        }
+        
+        .info-card.warning-bg {
+            background: linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%);
+        }
+        
+        .info-card.error-bg {
+            background: linear-gradient(135deg, #fff1f0 0%, #ffd6d6 100%);
+        }
+        
+        .info-card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        
+        .info-card-icon {
+            font-size: 1.5rem;
+        }
+        
+        .info-card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 0.9rem;
+        }
+        
+        .info-label {
+            color: #718096;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #2d3748;
+            font-weight: 600;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .badge.success {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .badge.error {
+            background: #f56565;
+            color: white;
+        }
+        
+        .badge.warning {
+            background: #ed8936;
+            color: white;
+        }
+        
+        .list-clean {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .list-clean li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .list-clean li::before {
+            content: "•";
+            color: #667eea;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+            margin: 24px 0;
+        }
+        
+        .risk-assessment {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            padding: 24px;
+            border-radius: 0;
+            margin: 0 0 20px 0;
+        }
+        
+        .risk-assessment.high {
+            background: linear-gradient(135deg, #ff7675 0%, #d63031 100%);
+            color: white;
+        }
+        
+        .risk-assessment.low {
+            background: linear-gradient(135deg, #55efc4 0%, #00b894 100%);
+            color: white;
+        }
+        
+        .action-box {
+            background: #f7fafc;
+            padding: 18px;
+            border-radius: 0;
+            margin-top: 16px;
+        }
+        
+        .action-box h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #2d3748;
+        }
+        
+        @media (max-width: 640px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .card {
+                padding: 16px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Account Number Detection</h1>
-        <div id="content">Loading...</div>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Banking Account Validation</h1>
+            <p>Comprehensive Account Analysis & Risk Assessment</p>
+        </div>
+        
+        <div class="card">
+            <div id="content">Loading validation results...</div>
+        </div>
     </div>
 
     <script>
-        function renderRuleList(rules) {
-            if (!rules) return "";
-            return `
-                <ul>
-                    <li>Digits only: ${rules.digits_only_ratio ?? "N/A"}</li>
-                    <li>Length 6-16: ${rules.length_6_16_ratio ?? "N/A"}</li>
-                    <li>Unique: ${rules.unique_ratio ?? "N/A"}</li>
-                    <li>Not null: ${rules.not_null_ratio ?? "N/A"}</li>
-                    <li>No symbols: ${rules.no_symbol_ratio ?? "N/A"}</li>
-                    <li>Randomized: ${rules.randomized ?? "N/A"}</li>
-                </ul>
-            `;
-        }
+        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, customerIdData, transactionData, debitCreditData, fraudData) {
+            // Compute risk and decision
+            const missingCritical = missingData?.missing_columns?.filter(m => ["account_status", "balance"].includes(m)) || [];
+            const lowBalance = balanceData?.has_balance_column ? balanceData.zero_or_negative_count > 0 : true;
+            const kycMissing = !kycData?.kyc_verified || !kycData?.has_user_name;
+            const riskHigh = missingCritical.length > 0 || lowBalance || kycMissing;
+            const riskLevel = riskHigh ? "HIGH" : "LOW";
+            const decisionText = riskHigh ? "HOLD" : "ALLOW";
+            const reasonText = riskHigh
+                ? "Account status, balance, and KYC verification are mandatory for banking operations. Without these, transaction eligibility and account safety cannot be verified."
+                : "All critical banking fields are present, balance is acceptable, and KYC is verified.";
 
-        function renderContent(data, checkData) {
-            // Show final result banner
-            let finalResultHtml = "";
+            // Main status banner
+            let statusBannerHtml = "";
             if (checkData) {
                 const hasAccount = checkData.has_account_number_column;
                 const decision = checkData.best_match_decision;
@@ -85,90 +303,246 @@
                 const probability = checkData.best_match_probability;
                 
                 if (hasAccount && decision === "match") {
-                    finalResultHtml = `
-                        <div class="final-result found">
-                            <h3>✅ Account Number Found</h3>
-                            <p><b>Column:</b> ${column}</p>
-                            <p><b>Decision:</b> ${decision}</p>
-                            <p><b>Probability:</b> ${probability}%</p>
+                    statusBannerHtml = `
+                        <div class="status-banner success">
+                            <div class="status-icon">✅</div>
+                            <div class="status-content">
+                                <h3>Account Number Detected</h3>
+                                <p><strong>Column:</strong> ${column || "-"} &nbsp;|&nbsp; <strong>Confidence:</strong> ${probability ?? "-"}%</p>
+                            </div>
                         </div>
                     `;
                 } else if (hasAccount && decision === "not_match") {
-                    finalResultHtml = `
-                        <div class="final-result not-found">
-                            <h3>❌ Account Number Not Valid</h3>
-                            <p><b>Column:</b> ${column}</p>
-                            <p><b>Decision:</b> ${decision}</p>
-                            <p><b>Probability:</b> ${probability}%</p>
+                    statusBannerHtml = `
+                        <div class="status-banner error">
+                            <div class="status-icon">❌</div>
+                            <div class="status-content">
+                                <h3>Account Number Invalid</h3>
+                                <p><strong>Column:</strong> ${column || "-"} &nbsp;|&nbsp; <strong>Confidence:</strong> ${probability ?? "-"}%</p>
+                            </div>
                         </div>
                     `;
                 } else {
-                    finalResultHtml = `
-                        <div class="final-result not-found">
-                            <h3>❌ No Account Number Column Detected</h3>
-                            <p>The file does not contain a valid account number column.</p>
+                    statusBannerHtml = `
+                        <div class="status-banner warning">
+                            <div class="status-icon">⚠️</div>
+                            <div class="status-content">
+                                <h3>No Account Number Column Detected</h3>
+                                <p>The uploaded file does not contain a valid account number column.</p>
+                            </div>
                         </div>
                     `;
                 }
             }
 
-            if (!data || !data.account_like_columns || data.account_like_columns.length === 0) {
-                return finalResultHtml + "<p>No account-like columns detected. Run an upload first.</p>";
+            // Info grid
+            let infoGridHtml = '<div class="info-grid">';
+            
+            // Account Status Card
+            if (statusData) {
+                if (statusData.has_status_column) {
+                    infoGridHtml += `
+                        <div class="info-card success-bg">
+                            <div class="info-card-header">
+                                <span class="info-card-icon">📊</span>
+                                <span class="info-card-title">Account Status</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Status Column</span>
+                                <span class="info-value">${statusData.status_column}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Active Accounts</span>
+                                <span class="info-value">${statusData.active_count}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Inactive Accounts</span>
+                                <span class="info-value">${statusData.inactive_count}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    infoGridHtml += `
+                        <div class="info-card warning-bg">
+                            <div class="info-card-header">
+                                <span class="info-card-icon">⚠️</span>
+                                <span class="info-card-title">Account Status Missing</span>
+                            </div>
+                            <p style="color: #744210; font-size: 0.9rem;">No account status column (active/inactive) found in the file.</p>
+                        </div>
+                    `;
+                }
             }
+            
+            // Balance Card
+            if (balanceData?.has_balance_column) {
+                infoGridHtml += `
+                    <div class="info-card success-bg">
+                        <div class="info-card-header">
+                            <span class="info-card-icon">💰</span>
+                            <span class="info-card-title">Balance Analysis</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Balance Column</span>
+                            <span class="info-value">${balanceData.balance_column}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Zero/Negative</span>
+                            <span class="info-value">${balanceData.zero_or_negative_count} / ${balanceData.total_rows}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Percentage</span>
+                            <span class="info-value">${balanceData.zero_or_negative_pct}%</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                infoGridHtml += `
+                    <div class="info-card warning-bg">
+                        <div class="info-card-header">
+                            <span class="info-card-icon">⚠️</span>
+                            <span class="info-card-title">Balance Column Missing</span>
+                        </div>
+                        <p style="color: #744210; font-size: 0.9rem;">Balance is required to evaluate transaction readiness.</p>
+                    </div>
+                `;
+            }
+            
+            // KYC Card
+            if (kycData) {
+                const cardClass = kycData.kyc_verified ? 'success-bg' : 'warning-bg';
+                const icon = kycData.kyc_verified ? '✅' : '⚠️';
+                infoGridHtml += `
+                    <div class="info-card ${cardClass}">
+                        <div class="info-card-header">
+                            <span class="info-card-icon">${icon}</span>
+                            <span class="info-card-title">KYC Status</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">User Name</span>
+                            <span class="info-value">${kycData.has_user_name ? 'Present' : 'Missing'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Completeness</span>
+                            <span class="info-value">${kycData.kyc_completeness}%</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Status</span>
+                            <span class="badge ${kycData.kyc_verified ? 'success' : 'warning'}">${kycData.kyc_verified ? 'Verified' : 'Pending'}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Customer ID Card
+            if (customerIdData) {
+                const cardClass = customerIdData.decision === 'found' ? 'success-bg' : 'warning-bg';
+                const icon = customerIdData.decision === 'found' ? '✅' : '⚠️';
+                infoGridHtml += `
+                    <div class="info-card ${cardClass}">
+                        <div class="info-card-header">
+                            <span class="info-card-icon">${icon}</span>
+                            <span class="info-card-title">Customer ID</span>
+                        </div>
+                        ${customerIdData.column_exists ? `
+                            <div class="info-item">
+                                <span class="info-label">Column</span>
+                                <span class="info-value">${customerIdData.column_name}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Confidence</span>
+                                <span class="info-value">${customerIdData.probability_customer_id}%</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Rules Passed</span>
+                                <span class="info-value">${customerIdData.rules_passed} / ${customerIdData.rules_total}</span>
+                            </div>
+                        ` : '<p style="font-size: 0.9rem;">Customer ID column not found</p>'}
+                    </div>
+                `;
+            }
+            
+            infoGridHtml += '</div>';
 
-            const best = data.summary?.best_match;
-            const cols = data.account_like_columns.map(item => `
-                <div class="col-card">
-                    <p><b>Column:</b> ${item.column}</p>
-                    <p><b>Decision:</b> ${item.decision}</p>
-                    <p><b>Probability:</b> ${item.probability_account_number}%</p>
-                    <p><b>Rules:</b></p>
-                    ${renderRuleList(item.rules)}
-                    ${item.sample_violations && item.sample_violations.length ? `
-                        <p><b>Sample violations:</b></p>
-                        <ul>${item.sample_violations.map(v => `<li>${v}</li>`).join("")}</ul>
-                    ` : ""}
+            // Risk Assessment
+            const riskClass = riskLevel === 'HIGH' ? 'high' : 'low';
+            const riskHtml = `
+                <div class="risk-assessment ${riskClass}">
+                    <div class="section-title">🔍 Risk Assessment</div>
+                    <div class="info-item">
+                        <span class="info-label">Risk Level</span>
+                        <span class="badge ${riskLevel === 'HIGH' ? 'error' : 'success'}">${riskLevel}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Decision</span>
+                        <span class="badge ${decisionText === 'HOLD' ? 'error' : 'success'}">${decisionText}</span>
+                    </div>
+                    <p style="margin-top: 12px; font-size: 0.95rem;">${reasonText}</p>
                 </div>
-            `).join("");
-
-            return `
-                ${finalResultHtml}
-                <div class="summary">
-                    ${best ? `<p><b>Best match:</b> ${best.column} (${best.probability_account_number}% - ${best.decision})</p>` : "<p>No best match available.</p>"}
-                    <p><b>Total columns checked:</b> ${data.summary?.checked_columns ?? "N/A"}</p>
-                    <p><b>Total rows:</b> ${data.summary?.total_rows ?? "N/A"}</p>
-                </div>
-                ${cols}
             `;
+
+            // Next Action
+            const missingItems = [];
+            if (missingCritical.includes("account_status")) missingItems.push("Account Status");
+            if (missingCritical.includes("balance")) missingItems.push("Balance");
+            if (kycMissing && (!kycData || !kycData.has_user_name)) missingItems.push("User Name (KYC)");
+            
+            const nextActionHtml = missingItems.length > 0 ? `
+                <div class="action-box">
+                    <h4>📋 Required Actions</h4>
+                    <ul class="list-clean">
+                        ${missingItems.map(item => `<li>${item}</li>`).join("")}
+                    </ul>
+                </div>
+            ` : `
+                <div class="action-box" style="background: linear-gradient(135deg, #e6f7ff 0%, #d4edff 100%);">
+                    <h4>✅ All Requirements Met</h4>
+                    <p style="font-size: 0.9rem; color: #2d3748;">Account is ready for banking operations.</p>
+                </div>
+            `;
+
+            return statusBannerHtml + infoGridHtml + riskHtml + nextActionHtml;
         }
 
         (function init() {
             const content = document.getElementById("content");
             try {
-                const rawValidation = sessionStorage.getItem("accountValidation");
-                const rawCheck = sessionStorage.getItem("accountNumberCheck");
-                const parsedValidation = rawValidation ? JSON.parse(rawValidation) : null;
-                const parsedCheck = rawCheck ? JSON.parse(rawCheck) : null;
-                
-                // Debug: log to console
-                console.log("Account Validation:", parsedValidation);
-                console.log("Account Check:", parsedCheck);
+                const parsedValidation = JSON.parse(sessionStorage.getItem("accountValidation") || "null");
+                const parsedCheck = JSON.parse(sessionStorage.getItem("accountNumberCheck") || "null");
+                const parsedStatus = JSON.parse(sessionStorage.getItem("accountStatus") || "null");
+                const parsedMissing = JSON.parse(sessionStorage.getItem("missingColumns") || "null");
+                const parsedBalance = JSON.parse(sessionStorage.getItem("balanceAnalysis") || "null");
+                const parsedKyc = JSON.parse(sessionStorage.getItem("kycVerification") || "null");
+                const parsedCustomerId = JSON.parse(sessionStorage.getItem("customerIdValidation") || "null");
+                const parsedTransaction = JSON.parse(sessionStorage.getItem("transactionValidation") || "null");
+                const parsedDebitCredit = JSON.parse(sessionStorage.getItem("debitCreditValidation") || "null");
+                const parsedFraud = JSON.parse(sessionStorage.getItem("fraudDetection") || "null");
                 
                 if (!parsedValidation && !parsedCheck) {
                     content.innerHTML = `
-                        <div class="final-result not-found">
-                            <h3>⚠️ No Data Available</h3>
-                            <p>Please upload a banking file first to see account number detection results.</p>
-                            <p><a href="/">Go back to upload page</a></p>
+                        <div class="status-banner warning">
+                            <div class="status-icon">⚠️</div>
+                            <div class="status-content">
+                                <h3>No Data Available</h3>
+                                <p>Please upload a banking file first to see account validation results.</p>
+                            </div>
                         </div>
                     `;
                     return;
                 }
                 
-                content.innerHTML = renderContent(parsedValidation, parsedCheck);
+                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedCustomerId, parsedTransaction, parsedDebitCredit, parsedFraud);
             } catch (e) {
                 console.error("Error:", e);
-                content.innerHTML = `<p>Error reading data: ${e.message}</p><p><a href="/">Go back to upload page</a></p>`;
+                content.innerHTML = `
+                    <div class="status-banner error">
+                        <div class="status-icon">❌</div>
+                        <div class="status-content">
+                            <h3>Error Loading Data</h3>
+                            <p>${e.message}</p>
+                        </div>
+                    </div>
+                `;
             }
         })();
     </script>

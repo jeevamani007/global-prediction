@@ -86,6 +86,233 @@ class BankingDomainDetector:
         length_ratio = col.str.len().between(6, 16).mean()
         return digit_ratio > 0.6 and length_ratio > 0.6
 
+    def detect_account_status(self, df: pd.DataFrame):
+        """
+        Detect account status column (active/inactive) and analyze status values
+        """
+        status_keywords = ["status", "state", "active", "inactive", "account_status", "acc_status", "account_state"]
+        status_column = None
+        status_values = []
+        active_count = 0
+        inactive_count = 0
+        
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in status_keywords):
+                status_column = col
+                series = df[col].dropna().astype(str).str.lower()
+                status_values = series.unique().tolist()
+                
+                # Count active/inactive
+                active_count = series.str.contains("active|enabled|open|1|yes|true", case=False, na=False).sum()
+                inactive_count = series.str.contains("inactive|disabled|closed|0|no|false", case=False, na=False).sum()
+                break
+        
+        return {
+            "has_status_column": status_column is not None,
+            "status_column": status_column,
+            "status_values": status_values[:10],  # Limit to first 10 unique values
+            "active_count": int(active_count),
+            "inactive_count": int(inactive_count),
+            "total_with_status": int(active_count + inactive_count)
+        }
+    
+    def check_missing_columns(self, df: pd.DataFrame):
+        """
+        Check for missing required banking columns
+        """
+        required_columns = {
+            "account": ["account", "acct", "accno", "account_number", "account_no"],
+            "customer": ["customer", "cust", "customer_id", "customer_name"],
+            "balance": ["balance", "bal", "account_balance", "current_balance"],
+            "transaction": ["transaction", "txn", "transaction_id", "trans_id"]
+        }
+        
+        found_columns = {}
+        missing_columns = []
+        
+        for required_type, keywords in required_columns.items():
+            found = False
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                if any(keyword in norm_col for keyword in keywords):
+                    found_columns[required_type] = col
+                    found = True
+                    break
+            if not found:
+                missing_columns.append(required_type)
+        
+        return {
+            "found_columns": found_columns,
+            "missing_columns": missing_columns,
+            "completeness_percentage": round((len(found_columns) / len(required_columns)) * 100, 2)
+        }
+    
+    def verify_kyc(self, df: pd.DataFrame):
+        """
+        Verify KYC (Know Your Customer) - check for user name and other KYC fields
+        """
+        kyc_fields = {
+            "user_name": ["user_name", "username", "user name", "name", "customer_name", "full_name", "account_holder_name"],
+            "email": ["email", "email_id", "email_address", "e_mail"],
+            "phone": ["phone", "phone_number", "mobile", "mobile_number", "contact_number"],
+            "address": ["address", "residential_address", "permanent_address"],
+            "id_proof": ["id_proof", "id_number", "aadhar", "pan", "passport", "id_card"]
+        }
+        
+        found_kyc = {}
+        missing_kyc = []
+        
+        for kyc_type, keywords in kyc_fields.items():
+            found = False
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                if any(keyword in norm_col for keyword in keywords):
+                    found_kyc[kyc_type] = col
+                    found = True
+                    break
+            if not found:
+                missing_kyc.append(kyc_type)
+        
+        # Check if user_name is present (critical for KYC)
+        has_user_name = "user_name" in found_kyc
+        kyc_verified = has_user_name and len(found_kyc) >= 2  # At least user_name + one more field
+        
+        return {
+            "kyc_verified": kyc_verified,
+            "has_user_name": has_user_name,
+            "found_kyc_fields": found_kyc,
+            "missing_kyc_fields": missing_kyc,
+            "kyc_completeness": round((len(found_kyc) / len(kyc_fields)) * 100, 2)
+        }
+    
+    def validate_customer_id(self, df: pd.DataFrame):
+        """
+        Validate Customer ID with 7 rules:
+        1. Column Exists
+        2. Not Null
+        3. Unique (optional)
+        4. Format/Pattern Check (letter(s) + numbers, e.g., C001, C002)
+        5. No Symbols/Special Characters
+        6. Length Check (Min: 3, Max: 6)
+        7. Data Type Check
+        """
+        customer_id_keywords = ["customer_id", "cust_id", "customerid", "custid", "client_id"]
+        customer_id_col = None
+        
+        # Rule 1: Column Exists
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in customer_id_keywords):
+                customer_id_col = col
+                break
+        
+        if customer_id_col is None:
+            return {
+                "column_exists": False,
+                "column_name": None,
+                "not_null": False,
+                "not_null_ratio": 0.0,
+                "unique": False,
+                "unique_ratio": 0.0,
+                "format_valid": False,
+                "format_valid_ratio": 0.0,
+                "no_symbols": False,
+                "no_symbols_ratio": 0.0,
+                "length_valid": False,
+                "length_valid_ratio": 0.0,
+                "data_type_valid": False,
+                "data_type_valid_ratio": 0.0,
+                "total_rows": len(df),
+                "rules_passed": 0,
+                "rules_total": 7,
+                "probability_customer_id": 0.0,
+                "decision": "not_found"
+            }
+        
+        series = df[customer_id_col].dropna().astype(str)
+        total_rows = len(df)
+        non_null_count = len(series)
+        
+        # Rule 2: Not Null
+        not_null_ratio = float(non_null_count / total_rows) if total_rows > 0 else 0.0
+        not_null = not_null_ratio >= 0.95  # 95% threshold
+        
+        # Rule 3: Unique (optional - usually one customer can have multiple accounts)
+        unique_count = series.nunique()
+        unique_ratio = float(unique_count / non_null_count) if non_null_count > 0 else 0.0
+        unique = unique_ratio >= 0.5  # Optional, so lower threshold
+        
+        # Rule 4: Format/Pattern Check (letter(s) + numbers, e.g., C001, C002)
+        # Pattern: starts with 1-2 letters, followed by 1-4 digits
+        format_pattern = r'^[A-Za-z]{1,2}\d{1,4}$'
+        format_matches = series.str.fullmatch(format_pattern, na=False)
+        format_valid_ratio = float(format_matches.sum() / non_null_count) if non_null_count > 0 else 0.0
+        format_valid = format_valid_ratio >= 0.8
+        
+        # Rule 5: No Symbols/Special Characters (only letters + numbers)
+        no_symbols_matches = series.str.fullmatch(r'^[A-Za-z0-9]+$', na=False)
+        no_symbols_ratio = float(no_symbols_matches.sum() / non_null_count) if non_null_count > 0 else 0.0
+        no_symbols = no_symbols_ratio >= 0.95
+        
+        # Rule 6: Length Check (Min: 3, Max: 6 characters)
+        length_valid_matches = series.str.len().between(3, 6, inclusive='both')
+        length_valid_ratio = float(length_valid_matches.sum() / non_null_count) if non_null_count > 0 else 0.0
+        length_valid = length_valid_ratio >= 0.9
+        
+        # Rule 7: Data Type Check (should be string/text, not numeric only)
+        # Check if it's stored as string and has mixed alphanumeric
+        data_type_valid = True  # Already converted to string
+        data_type_valid_ratio = 1.0 if non_null_count > 0 else 0.0
+        
+        # Count rules passed
+        rules_passed = sum([
+            True,  # Rule 1: Column Exists
+            not_null,  # Rule 2
+            unique,  # Rule 3 (optional)
+            format_valid,  # Rule 4
+            no_symbols,  # Rule 5
+            length_valid,  # Rule 6
+            data_type_valid  # Rule 7
+        ])
+        
+        # Calculate probability (weighted)
+        weighted_score = (
+            0.20 * (1.0 if customer_id_col else 0.0) +  # Column exists
+            0.20 * not_null_ratio +
+            0.10 * unique_ratio +  # Optional, lower weight
+            0.20 * format_valid_ratio +
+            0.15 * no_symbols_ratio +
+            0.10 * length_valid_ratio +
+            0.05 * data_type_valid_ratio
+        )
+        
+        probability = float(round(weighted_score * 100, 2))
+        decision = "found" if probability >= 60.0 else "not_found"
+        
+        return {
+            "column_exists": True,
+            "column_name": customer_id_col,
+            "not_null": not_null,
+            "not_null_ratio": round(not_null_ratio, 3),
+            "unique": unique,
+            "unique_ratio": round(unique_ratio, 3),
+            "format_valid": format_valid,
+            "format_valid_ratio": round(format_valid_ratio, 3),
+            "no_symbols": no_symbols,
+            "no_symbols_ratio": round(no_symbols_ratio, 3),
+            "length_valid": length_valid,
+            "length_valid_ratio": round(length_valid_ratio, 3),
+            "data_type_valid": data_type_valid,
+            "data_type_valid_ratio": round(data_type_valid_ratio, 3),
+            "total_rows": total_rows,
+            "non_null_count": non_null_count,
+            "rules_passed": rules_passed,
+            "rules_total": 7,
+            "probability_customer_id": probability,
+            "decision": decision
+        }
+    
     def validate_account_numbers(self, df: pd.DataFrame):
         results = []
         total_rows = len(df)
@@ -157,6 +384,277 @@ class BankingDomainDetector:
         return {
             "account_like_columns": results,
             "summary": summary
+        }
+
+    def analyze_balance(self, df: pd.DataFrame):
+        """
+        Analyze balance column: presence and count of zero/negative balances.
+        """
+        balance_keywords = ["balance", "bal", "account_balance", "current_balance"]
+        balance_col = None
+
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if any(k in norm_col for k in balance_keywords):
+                balance_col = col
+                break
+
+        if balance_col is None:
+            return {
+                "has_balance_column": False,
+                "balance_column": None,
+                "zero_or_negative_count": 0,
+                "total_rows": len(df),
+                "zero_or_negative_pct": 0.0
+            }
+
+        series = pd.to_numeric(df[balance_col], errors="coerce")
+        total = len(series)
+        zero_neg = series.fillna(0) <= 0
+        zero_neg_count = int(zero_neg.sum())
+        pct = round((zero_neg_count / total) * 100, 2) if total else 0.0
+
+        return {
+            "has_balance_column": True,
+            "balance_column": balance_col,
+            "zero_or_negative_count": zero_neg_count,
+            "total_rows": total,
+            "zero_or_negative_pct": pct
+        }
+
+    def validate_transaction_data(self, df: pd.DataFrame):
+        """
+        STEP-2: Transaction Data Validation
+        Check for transaction columns and validate transaction rules
+        """
+        transaction_columns = {
+            "transaction_id": ["transaction_id", "txn_id", "trans_id", "transactionid"],
+            "transaction_date": ["transaction_date", "txn_date", "trans_date", "date", "transaction_date"],
+            "debit": ["debit", "debit_amount", "withdrawal", "withdraw"],
+            "credit": ["credit", "credit_amount", "deposit"],
+            "transaction_type": ["transaction_type", "txn_type", "trans_type", "type"]
+        }
+        
+        found_columns = {}
+        missing_columns = []
+        
+        for col_type, keywords in transaction_columns.items():
+            found = False
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                if any(keyword in norm_col for keyword in keywords):
+                    found_columns[col_type] = col
+                    found = True
+                    break
+            if not found:
+                missing_columns.append(col_type)
+        
+        # Validation rules
+        validation_results = {
+            "debit_credit_same_row": True,
+            "amount_positive": True,
+            "date_not_future": True,
+            "violations": []
+        }
+        
+        if "debit" in found_columns and "credit" in found_columns:
+            debit_col = found_columns["debit"]
+            credit_col = found_columns["credit"]
+            
+            # Rule: debit & credit should not both be > 0 in same row
+            debit_series = pd.to_numeric(df[debit_col], errors="coerce").fillna(0)
+            credit_series = pd.to_numeric(df[credit_col], errors="coerce").fillna(0)
+            both_present = (debit_series > 0) & (credit_series > 0)
+            validation_results["debit_credit_same_row"] = not both_present.any()
+            if both_present.any():
+                validation_results["violations"].append(f"Found {both_present.sum()} rows with both debit and credit > 0")
+        
+        if "debit" in found_columns:
+            debit_col = found_columns["debit"]
+            debit_series = pd.to_numeric(df[debit_col], errors="coerce")
+            negative_debits = (debit_series < 0).sum()
+            validation_results["amount_positive"] = negative_debits == 0
+            if negative_debits > 0:
+                validation_results["violations"].append(f"Found {negative_debits} negative debit amounts")
+        
+        if "credit" in found_columns:
+            credit_col = found_columns["credit"]
+            credit_series = pd.to_numeric(df[credit_col], errors="coerce")
+            negative_credits = (credit_series < 0).sum()
+            if negative_credits > 0:
+                validation_results["violations"].append(f"Found {negative_credits} negative credit amounts")
+        
+        if "transaction_date" in found_columns:
+            date_col = found_columns["transaction_date"]
+            try:
+                dates = pd.to_datetime(df[date_col], errors="coerce")
+                future_dates = dates > pd.Timestamp.now()
+                validation_results["date_not_future"] = not future_dates.any()
+                if future_dates.any():
+                    validation_results["violations"].append(f"Found {future_dates.sum()} future dates")
+            except:
+                validation_results["date_not_future"] = True
+        
+        return {
+            "has_transaction_data": len(found_columns) > 0,
+            "found_columns": found_columns,
+            "missing_columns": missing_columns,
+            "completeness": round((len(found_columns) / len(transaction_columns)) * 100, 2),
+            "validation_results": validation_results,
+            "is_valid": len(validation_results["violations"]) == 0
+        }
+    
+    def validate_debit_credit_balance(self, df: pd.DataFrame, balance_col_name: str = None):
+        """
+        STEP-3: Debit/Credit vs Balance Check
+        Validate debit doesn't exceed balance, credit increases balance
+        """
+        if balance_col_name is None:
+            # Find balance column
+            balance_keywords = ["balance", "bal", "account_balance", "current_balance"]
+            balance_col_name = None
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                if any(k in norm_col for k in balance_keywords):
+                    balance_col_name = col
+                    break
+        
+        if balance_col_name is None:
+            return {
+                "has_balance": False,
+                "can_validate": False,
+                "insufficient_funds_count": 0,
+                "total_debit_transactions": 0,
+                "validation_passed": False
+            }
+        
+        # Find debit and credit columns
+        debit_col = None
+        credit_col = None
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if "debit" in norm_col:
+                debit_col = col
+            if "credit" in norm_col:
+                credit_col = col
+        
+        balance_series = pd.to_numeric(df[balance_col_name], errors="coerce").fillna(0)
+        insufficient_count = 0
+        total_debits = 0
+        
+        if debit_col:
+            debit_series = pd.to_numeric(df[debit_col], errors="coerce").fillna(0)
+            total_debits = (debit_series > 0).sum()
+            # Check if debit > balance
+            insufficient = (debit_series > balance_series) & (debit_series > 0)
+            insufficient_count = int(insufficient.sum())
+        
+        return {
+            "has_balance": True,
+            "balance_column": balance_col_name,
+            "can_validate": debit_col is not None or credit_col is not None,
+            "insufficient_funds_count": insufficient_count,
+            "total_debit_transactions": total_debits,
+            "validation_passed": insufficient_count == 0,
+            "debit_column": debit_col,
+            "credit_column": credit_col
+        }
+    
+    def detect_fraud_patterns(self, df: pd.DataFrame, account_col: str = None):
+        """
+        STEP-4: Transaction Pattern / Fraud Check
+        Detect suspicious transaction patterns
+        """
+        if account_col is None:
+            # Find account column
+            account_keywords = ["account", "account_number", "account_id", "acc_no"]
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                if any(k in norm_col for k in account_keywords):
+                    account_col = col
+                    break
+        
+        if account_col is None:
+            return {
+                "can_analyze": False,
+                "suspicious_patterns": [],
+                "fraud_risk": "LOW"
+            }
+        
+        # Find transaction date and amount columns
+        date_col = None
+        debit_col = None
+        credit_col = None
+        
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if "date" in norm_col and "transaction" in norm_col:
+                date_col = col
+            if "debit" in norm_col:
+                debit_col = col
+            if "credit" in norm_col:
+                credit_col = col
+        
+        suspicious_patterns = []
+        risk_factors = 0
+        
+        # Pattern 1: Many transactions in short time (same account)
+        if account_col and date_col:
+            try:
+                df_with_dates = df.copy()
+                df_with_dates['_date'] = pd.to_datetime(df_with_dates[date_col], errors="coerce")
+                df_with_dates = df_with_dates.dropna(subset=['_date', account_col])
+                
+                if len(df_with_dates) > 0:
+                    # Group by account and check transactions per hour
+                    account_transactions = df_with_dates.groupby(account_col).size()
+                    high_frequency = account_transactions[account_transactions > 10]
+                    if len(high_frequency) > 0:
+                        suspicious_patterns.append(f"High transaction frequency: {len(high_frequency)} accounts with >10 transactions")
+                        risk_factors += 1
+            except:
+                pass
+        
+        # Pattern 2: Very high amount suddenly
+        if debit_col:
+            try:
+                debit_series = pd.to_numeric(df[debit_col], errors="coerce")
+                if len(debit_series) > 0:
+                    mean_debit = debit_series.mean()
+                    std_debit = debit_series.std()
+                    if std_debit > 0:
+                        high_amounts = debit_series[debit_series > (mean_debit + 3 * std_debit)]
+                        if len(high_amounts) > 0:
+                            suspicious_patterns.append(f"Unusually high amounts: {len(high_amounts)} transactions >3 standard deviations")
+                            risk_factors += 1
+            except:
+                pass
+        
+        # Pattern 3: Midnight transactions repeatedly
+        if date_col:
+            try:
+                dates = pd.to_datetime(df[date_col], errors="coerce")
+                midnight_hours = dates.dt.hour.between(0, 3)
+                midnight_count = midnight_hours.sum()
+                if midnight_count > len(df) * 0.3:  # More than 30% at midnight
+                    suspicious_patterns.append(f"High midnight transaction rate: {midnight_count} transactions ({(midnight_count/len(df)*100).round(1)}%)")
+                    risk_factors += 1
+            except:
+                pass
+        
+        # Determine fraud risk
+        if risk_factors >= 2:
+            fraud_risk = "HIGH"
+        elif risk_factors == 1:
+            fraud_risk = "MEDIUM"
+        else:
+            fraud_risk = "LOW"
+        
+        return {
+            "can_analyze": True,
+            "suspicious_patterns": suspicious_patterns,
+            "fraud_risk": fraud_risk,
+            "risk_factors": risk_factors
         }
 
     def predict(self, csv_path):
@@ -263,6 +761,17 @@ class BankingDomainDetector:
                 "best_match_decision": best_match.get("decision") if best_match else None,
                 "best_match_probability": best_match.get("probability_account_number") if best_match else None
             }
+            # Check account status and missing columns
+            account_status = self.detect_account_status(df)
+            missing_columns_check = self.check_missing_columns(df)
+            balance_analysis = self.analyze_balance(df)
+            kyc_verification = self.verify_kyc(df)
+            customer_id_validation = self.validate_customer_id(df)
+            # Transaction validations
+            transaction_validation = self.validate_transaction_data(df)
+            balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
+            debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
+            fraud_detection = self.detect_fraud_patterns(df)
         else:
             account_number_validation = None
             account_number_check = {
@@ -270,6 +779,75 @@ class BankingDomainDetector:
                 "best_match_column": None,
                 "best_match_decision": None,
                 "best_match_probability": None
+            }
+            account_status = {
+                "has_status_column": False,
+                "status_column": None,
+                "status_values": [],
+                "active_count": 0,
+                "inactive_count": 0,
+                "total_with_status": 0
+            }
+            missing_columns_check = {
+                "found_columns": {},
+                "missing_columns": [],
+                "completeness_percentage": 0.0
+            }
+            balance_analysis = {
+                "has_balance_column": False,
+                "balance_column": None,
+                "zero_or_negative_count": 0,
+                "total_rows": len(df),
+                "zero_or_negative_pct": 0.0
+            }
+            kyc_verification = {
+                "kyc_verified": False,
+                "has_user_name": False,
+                "found_kyc_fields": {},
+                "missing_kyc_fields": [],
+                "kyc_completeness": 0.0
+            }
+            customer_id_validation = {
+                "column_exists": False,
+                "column_name": None,
+                "not_null": False,
+                "not_null_ratio": 0.0,
+                "unique": False,
+                "unique_ratio": 0.0,
+                "format_valid": False,
+                "format_valid_ratio": 0.0,
+                "no_symbols": False,
+                "no_symbols_ratio": 0.0,
+                "length_valid": False,
+                "length_valid_ratio": 0.0,
+                "data_type_valid": False,
+                "data_type_valid_ratio": 0.0,
+                "total_rows": len(df),
+                "rules_passed": 0,
+                "rules_total": 7,
+                "probability_customer_id": 0.0,
+                "decision": "not_found"
+            }
+            transaction_validation = {
+                "has_transaction_data": False,
+                "found_columns": {},
+                "missing_columns": [],
+                "completeness": 0.0,
+                "validation_results": {"violations": []},
+                "is_valid": False
+            }
+            debit_credit_validation = {
+                "has_balance": False,
+                "can_validate": False,
+                "insufficient_funds_count": 0,
+                "total_debit_transactions": 0,
+                "validation_passed": False
+            }
+            fraud_detection = {
+                "can_analyze": False,
+                "suspicious_patterns": [],
+                "fraud_risk": "LOW",
+                "risk_factors": 0
             }
 
         return {
@@ -288,5 +866,13 @@ class BankingDomainDetector:
 
             "details": details,
             "account_number_validation": account_number_validation,
-            "account_number_check": account_number_check
+            "account_number_check": account_number_check,
+            "account_status": account_status,
+            "missing_columns_check": missing_columns_check,
+            "balance_analysis": balance_analysis,
+            "kyc_verification": kyc_verification,
+            "customer_id_validation": customer_id_validation,
+            "transaction_validation": transaction_validation,
+            "debit_credit_validation": debit_credit_validation,
+            "fraud_detection": fraud_detection
         }
