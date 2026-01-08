@@ -256,8 +256,21 @@ class BankingDomainDetector:
         # 8️⃣ Only do account-number prediction if banking is detected
         if decision != "UNKNOWN":
             account_number_validation = self.validate_account_numbers(df)
+            best_match = account_number_validation.get("summary", {}).get("best_match") if account_number_validation else None
+            account_number_check = {
+                "has_account_number_column": bool(account_number_validation and account_number_validation.get("account_like_columns")),
+                "best_match_column": best_match.get("column") if best_match else None,
+                "best_match_decision": best_match.get("decision") if best_match else None,
+                "best_match_probability": best_match.get("probability_account_number") if best_match else None
+            }
         else:
             account_number_validation = None
+            account_number_check = {
+                "has_account_number_column": False,
+                "best_match_column": None,
+                "best_match_decision": None,
+                "best_match_probability": None
+            }
 
         return {
             "domain": self.domain if decision != "UNKNOWN" else "Unknown",
@@ -274,5 +287,6 @@ class BankingDomainDetector:
             "keyword_column_mapping": match_map,
 
             "details": details,
-            "account_number_validation": account_number_validation
+            "account_number_validation": account_number_validation,
+            "account_number_check": account_number_check
         }

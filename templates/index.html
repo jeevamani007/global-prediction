@@ -283,7 +283,17 @@ uploadBtn.onclick = async () => {
 
         showResponse("Upload Success ✅", "success");
 
-        // Display domain results
+        // Store account validation data for account.html page
+        if (data.banking_account_validation) {
+            sessionStorage.setItem("accountValidation", JSON.stringify(data.banking_account_validation));
+        }
+        if (data.banking_account_check) {
+            sessionStorage.setItem("accountNumberCheck", JSON.stringify(data.banking_account_check));
+        } else if (data.banking && data.banking.account_number_check) {
+            sessionStorage.setItem("accountNumberCheck", JSON.stringify(data.banking.account_number_check));
+        }
+
+        // Display domain results on index.html page
         if (data.banking || data.financial || data.insurance || data.government || data.healthcare || data.retail || data.space || data.human_resource) {
             showDomainResults(
                 data.banking,
@@ -297,11 +307,10 @@ uploadBtn.onclick = async () => {
                 data.human_resource
             );
 
-            if (data.banking_account_validation) {
-                sessionStorage.setItem("accountValidation", JSON.stringify(data.banking_account_validation));
+            // Show account button if banking detected
+            if (data.banking && data.banking.decision && data.banking.decision !== "UNKNOWN" && data.banking_account_validation) {
                 accountBtn.style.display = "block";
             } else {
-                sessionStorage.removeItem("accountValidation");
                 accountBtn.style.display = "none";
             }
         } else {

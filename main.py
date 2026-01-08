@@ -141,6 +141,7 @@ async def upload_file(file: UploadFile = File(...)):
                 "filename": file.filename,
                 "banking": banking_result,
                 "banking_account_validation": banking_result.get("account_number_validation"),
+                "banking_account_check": banking_result.get("account_number_check"),
                 "financial": financial_result,
                 "insurance": insurance_result,
                 "government": government_result,

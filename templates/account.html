@@ -27,6 +27,22 @@
             border-radius: 10px;
             margin-bottom: 16px;
         }
+        .final-result {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .final-result.found {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+        .final-result.not-found {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
         .col-card {
             background: #f9fbff;
             border: 1px solid #e3e9f5;
@@ -35,6 +51,7 @@
             margin-bottom: 10px;
         }
         ul { margin-left: 18px; }
+        h3 { font-size: 1.5em; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -58,9 +75,45 @@
             `;
         }
 
-        function renderContent(data) {
+        function renderContent(data, checkData) {
+            // Show final result banner
+            let finalResultHtml = "";
+            if (checkData) {
+                const hasAccount = checkData.has_account_number_column;
+                const decision = checkData.best_match_decision;
+                const column = checkData.best_match_column;
+                const probability = checkData.best_match_probability;
+                
+                if (hasAccount && decision === "match") {
+                    finalResultHtml = `
+                        <div class="final-result found">
+                            <h3>✅ Account Number Found</h3>
+                            <p><b>Column:</b> ${column}</p>
+                            <p><b>Decision:</b> ${decision}</p>
+                            <p><b>Probability:</b> ${probability}%</p>
+                        </div>
+                    `;
+                } else if (hasAccount && decision === "not_match") {
+                    finalResultHtml = `
+                        <div class="final-result not-found">
+                            <h3>❌ Account Number Not Valid</h3>
+                            <p><b>Column:</b> ${column}</p>
+                            <p><b>Decision:</b> ${decision}</p>
+                            <p><b>Probability:</b> ${probability}%</p>
+                        </div>
+                    `;
+                } else {
+                    finalResultHtml = `
+                        <div class="final-result not-found">
+                            <h3>❌ No Account Number Column Detected</h3>
+                            <p>The file does not contain a valid account number column.</p>
+                        </div>
+                    `;
+                }
+            }
+
             if (!data || !data.account_like_columns || data.account_like_columns.length === 0) {
-                return "<p>No account-like columns detected. Run an upload first.</p>";
+                return finalResultHtml + "<p>No account-like columns detected. Run an upload first.</p>";
             }
 
             const best = data.summary?.best_match;
@@ -79,6 +132,7 @@
             `).join("");
 
             return `
+                ${finalResultHtml}
                 <div class="summary">
                     ${best ? `<p><b>Best match:</b> ${best.column} (${best.probability_account_number}% - ${best.decision})</p>` : "<p>No best match available.</p>"}
                     <p><b>Total columns checked:</b> ${data.summary?.checked_columns ?? "N/A"}</p>
@@ -91,11 +145,30 @@
         (function init() {
             const content = document.getElementById("content");
             try {
-                const raw = sessionStorage.getItem("accountValidation");
-                const parsed = raw ? JSON.parse(raw) : null;
-                content.innerHTML = renderContent(parsed);
+                const rawValidation = sessionStorage.getItem("accountValidation");
+                const rawCheck = sessionStorage.getItem("accountNumberCheck");
+                const parsedValidation = rawValidation ? JSON.parse(rawValidation) : null;
+                const parsedCheck = rawCheck ? JSON.parse(rawCheck) : null;
+                
+                // Debug: log to console
+                console.log("Account Validation:", parsedValidation);
+                console.log("Account Check:", parsedCheck);
+                
+                if (!parsedValidation && !parsedCheck) {
+                    content.innerHTML = `
+                        <div class="final-result not-found">
+                            <h3>⚠️ No Data Available</h3>
+                            <p>Please upload a banking file first to see account number detection results.</p>
+                            <p><a href="/">Go back to upload page</a></p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                content.innerHTML = renderContent(parsedValidation, parsedCheck);
             } catch (e) {
-                content.innerHTML = `<p>Error reading data: ${e.message}</p>`;
+                console.error("Error:", e);
+                content.innerHTML = `<p>Error reading data: ${e.message}</p><p><a href="/">Go back to upload page</a></p>`;
             }
         })();
     </script>
