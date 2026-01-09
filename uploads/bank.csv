@@ -1,21 +1,21 @@
-transaction_id,account_number,customer_id,transaction_type,amount,balance,transaction_date,description,status
-T001,1234567890,C001,deposit,5000,5000,2026-01-01,Initial deposit,completed
-T002,1234567890,C001,withdraw,2000,3000,2026-01-02,ATM withdrawal,completed
-T003,9876543210,C002,deposit,7000,7000,2026-01-01,Initial deposit,completed
-T004,9876543210,C002,transfer,1000,6000,2026-01-03,To C001,completed
-T005,1234567890,C001,deposit,1500,4500,2026-01-04,Salary,completed
-T006,9876543210,C002,withdraw,500,5500,2026-01-05,ATM withdrawal,completed
-T007,1234567890,C001,transfer,1000,3500,2026-01-06,To C002,completed
-T008,9876543210,C002,deposit,2000,7500,2026-01-06,Bonus,completed
-T009,1234567890,C001,withdraw,500,3000,2026-01-07,ATM withdrawal,completed
-T010,9876543210,C002,transfer,500,7000,2026-01-08,To C001,completed
-T011,1234567890,C001,deposit,2000,5000,2026-01-09,Salary,completed
-T012,9876543210,C002,withdraw,1000,6000,2026-01-10,ATM withdrawal,completed
-T013,1234567890,C001,transfer,1500,3500,2026-01-11,To C002,completed
-T014,9876543210,C002,deposit,500,6500,2026-01-12,Bonus,completed
-T015,1234567890,C001,withdraw,1000,2500,2026-01-13,ATM withdrawal,completed
-T016,9876543210,C002,transfer,1000,5500,2026-01-14,To C001,completed
-T017,1234567890,C001,deposit,3000,5500,2026-01-15,Salary,completed
-T018,9876543210,C002,withdraw,500,5000,2026-01-16,ATM withdrawal,completed
-T019,1234567890,C001,transfer,500,5000,2026-01-17,To C002,completed
-T020,9876543210,C002,deposit,1500,6500,2026-01-18,Bonus,completed
+customer_id,customer_name,account_number,account_type,account_status,transaction_type,amount,balance,kyc_status,pan_number
+C001,Ramesh,1234567890,Savings,Active,deposit,5000,5000,Verified,ABCDE1234F
+C002,Priya,9876543210,Current,Active,deposit,7000,7000,Pending,FGHIJ5678K
+C003,Suresh,4567891234,Savings,Inactive,withdraw,2000,3000,Verified,KLMNO9012P
+C004,Anita,7891234560,Current,Active,transfer,1000,5000,Pending,PQRST3456Q
+C005,Raj,3216549870,Savings,Active,deposit,2500,2500,Verified,UVWXY6789R
+C006,Kavya,6549873210,Current,Inactive,withdraw,1500,2000,Pending,ABCDE2345F
+C007,Mani,9873216540,Savings,Active,deposit,3000,5000,Verified,FGHIJ3456K
+C008,Divya,1237894560,Current,Active,transfer,2000,4000,Pending,KLMNO4567P
+C009,Arun,3219876540,Savings,Inactive,withdraw,1000,3000,Verified,PQRST5678Q
+C010,Nila,4563217890,Current,Active,deposit,4000,4000,Pending,UVWXY6789R
+C011,Vijay,7894561230,Savings,Active,transfer,500,4500,Verified,ABCDE3456F
+C012,Sahana,6541239870,Current,Inactive,withdraw,700,3800,Pending,FGHIJ4567K
+C013,Karthik,9876543211,Savings,Active,deposit,3500,5000,Verified,KLMNO5678P
+C014,Meena,1234567891,Current,Active,transfer,1500,4000,Pending,PQRST6789Q
+C015,Rahul,3216549871,Savings,Inactive,withdraw,2000,3000,Verified,UVWXY7890R
+C016,Sri,6549873211,Current,Active,deposit,4500,4500,Pending,ABCDE4567F
+C017,Anbu,9873216541,Savings,Active,transfer,1000,3500,Verified,FGHIJ5678K
+C018,Divya,1237894561,Current,Active,deposit,2000,5000,Pending,KLMNO6789P
+C019,Arjun,3219876541,Savings,Inactive,withdraw,1500,2500,Verified,PQRST7890Q
+C020,Nila,4563217891,Current,Active,deposit,3000,3000,Pending,UVWXY8901R

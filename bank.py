@@ -575,15 +575,42 @@ class BankingDomainDetector:
         # Valid transaction types (case-insensitive)
         valid_types = ["deposit", "withdraw", "withdrawal", "transfer"]
         
-        # Find transaction_type column
-        transaction_type_keywords = ["transaction_type", "txn_type", "trans_type", "type", "transactiontype"]
+        # Find transaction_type column - prioritize exact matches first
+        # Primary keywords (exact transaction type columns)
+        primary_keywords = ["transaction_type", "txn_type", "trans_type", "transactiontype"]
+        # Secondary keywords (generic "type" but must validate values)
+        secondary_keywords = ["type"]
+        
         transaction_type_col = None
         
+        # First pass: Look for primary transaction type keywords
         for col in df.columns:
             norm_col = self.normalize(col)
-            if any(keyword in norm_col for keyword in transaction_type_keywords):
+            # Exclude account-related columns
+            if "account" in norm_col:
+                continue
+            if any(keyword in norm_col for keyword in primary_keywords):
                 transaction_type_col = col
                 break
+        
+        # Second pass: If not found, check for generic "type" but validate values
+        if transaction_type_col is None:
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                # Exclude account-related columns
+                if "account" in norm_col:
+                    continue
+                # Check if it's a generic "type" column
+                if any(keyword in norm_col for keyword in secondary_keywords):
+                    # Validate that this column actually contains transaction type values
+                    series = df[col].dropna().astype(str).str.lower().str.strip()
+                    if len(series) > 0:
+                        # Check if at least 50% of values match transaction types
+                        valid_mask = series.isin(valid_types)
+                        match_ratio = valid_mask.sum() / len(series)
+                        if match_ratio >= 0.5:  # At least 50% should be transaction types
+                            transaction_type_col = col
+                            break
         
         if transaction_type_col is None:
             return {
@@ -641,6 +668,97 @@ class BankingDomainDetector:
             "invalid_count": invalid_count,
             "valid_types_found": valid_types_found,
             "invalid_types_found": invalid_types_found,
+            "probability_percentage": probability_percentage,
+            "is_valid": is_valid,
+            "decision": decision
+        }
+    
+    def validate_pan_number(self, df: pd.DataFrame):
+        """
+        Validate PAN (Permanent Account Number) Column
+        PAN format: ABCDE1234F (10 characters)
+        - First 5 = letters (A-Z)
+        - Next 4 = digits (0-9)
+        - Last 1 = letter (A-Z)
+        Regex pattern: [A-Z]{5}[0-9]{4}[A-Z]{1}
+        """
+        # PAN column keywords
+        pan_keywords = ["pan", "pan_number", "pan_no", "pannumber", "panno", "permanent_account_number"]
+        
+        # Find PAN column
+        pan_col = None
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in pan_keywords):
+                pan_col = col
+                break
+        
+        if pan_col is None:
+            return {
+                "column_found": False,
+                "column_name": None,
+                "total_rows": len(df),
+                "valid_pan_count": 0,
+                "invalid_pan_count": 0,
+                "total_pan_found": 0,
+                "pan_list": [],
+                "invalid_pan_list": [],
+                "probability_percentage": 0.0,
+                "is_valid": False,
+                "decision": "column_not_found"
+            }
+        
+        # Get the series and convert to string, remove whitespace, convert to uppercase
+        series = df[pan_col].dropna().astype(str).str.strip().str.upper()
+        total_rows = len(series)
+        
+        if total_rows == 0:
+            return {
+                "column_found": True,
+                "column_name": pan_col,
+                "total_rows": total_rows,
+                "valid_pan_count": 0,
+                "invalid_pan_count": 0,
+                "total_pan_found": 0,
+                "pan_list": [],
+                "invalid_pan_list": [],
+                "probability_percentage": 0.0,
+                "is_valid": False,
+                "decision": "empty_column"
+            }
+        
+        # PAN regex pattern: [A-Z]{5}[0-9]{4}[A-Z]{1}
+        pan_pattern = r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$'
+        
+        # Check each value against PAN pattern
+        valid_mask = series.str.fullmatch(pan_pattern, na=False)
+        valid_pan_count = int(valid_mask.sum())
+        invalid_pan_count = int((~valid_mask).sum())
+        
+        # Get list of valid PAN numbers (unique, limit to 50 for display)
+        valid_pans = series[valid_mask].unique().tolist()
+        pan_list = sorted(valid_pans)[:50]  # Limit to first 50 for UI
+        
+        # Get list of invalid PANs (sample, limit to 20 for display)
+        invalid_pans = series[~valid_mask].unique().tolist()
+        invalid_pan_list = sorted(invalid_pans)[:20]
+        
+        # Calculate probability percentage
+        probability_percentage = round((valid_pan_count / total_rows) * 100, 2) if total_rows > 0 else 0.0
+        
+        # Decision logic: valid if >= 80% of values match PAN format
+        is_valid = probability_percentage >= 80.0
+        decision = "valid" if is_valid else ("partial" if probability_percentage >= 50.0 else "invalid")
+        
+        return {
+            "column_found": True,
+            "column_name": pan_col,
+            "total_rows": total_rows,
+            "valid_pan_count": valid_pan_count,
+            "invalid_pan_count": invalid_pan_count,
+            "total_pan_found": valid_pan_count,
+            "pan_list": pan_list,
+            "invalid_pan_list": invalid_pan_list,
             "probability_percentage": probability_percentage,
             "is_valid": is_valid,
             "decision": decision
@@ -1414,6 +1532,7 @@ class BankingDomainDetector:
         kyc_verification = self.verify_kyc(df)
         transaction_validation = self.validate_transaction_data(df)
         transaction_type_validation = self.validate_transaction_type(df)
+        pan_validation = self.validate_pan_number(df)
         balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
         debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
         fraud_detection = self.detect_fraud_patterns(df)
@@ -1611,6 +1730,7 @@ class BankingDomainDetector:
             "customer_id_validation": customer_id_validation,
             "transaction_validation": transaction_validation,
             "transaction_type_validation": transaction_type_validation,
+            "pan_validation": pan_validation,
             "debit_credit_validation": debit_credit_validation,
             "fraud_detection": fraud_detection,
             "foreign_key_check": foreign_key_check,
