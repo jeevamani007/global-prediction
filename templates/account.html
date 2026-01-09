@@ -282,17 +282,28 @@
     </div>
 
     <script>
-        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, customerIdData, transactionData, debitCreditData, fraudData) {
+        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, customerIdData, transactionData, debitCreditData, fraudData, foreignKeyData, purposeData) {
             // Compute risk and decision
             const missingCritical = missingData?.missing_columns?.filter(m => ["account_status", "balance"].includes(m)) || [];
             const lowBalance = balanceData?.has_balance_column ? balanceData.zero_or_negative_count > 0 : true;
             const kycMissing = !kycData?.kyc_verified || !kycData?.has_user_name;
-            const riskHigh = missingCritical.length > 0 || lowBalance || kycMissing;
+            const foreignKeyInvalid = foreignKeyData?.can_check && !foreignKeyData?.linking_valid;
+            const riskHigh = missingCritical.length > 0 || lowBalance || kycMissing || foreignKeyInvalid;
             const riskLevel = riskHigh ? "HIGH" : "LOW";
             const decisionText = riskHigh ? "HOLD" : "ALLOW";
-            const reasonText = riskHigh
-                ? "Account status, balance, and KYC verification are mandatory for banking operations. Without these, transaction eligibility and account safety cannot be verified."
-                : "All critical banking fields are present, balance is acceptable, and KYC is verified.";
+            let reasonText = "";
+            if (riskHigh) {
+                const reasons = [];
+                if (missingCritical.length > 0) reasons.push("Missing critical columns: " + missingCritical.join(", "));
+                if (lowBalance) reasons.push("Low or zero balance detected");
+                if (kycMissing) reasons.push("KYC verification incomplete");
+                if (foreignKeyInvalid) reasons.push("Foreign key linking issues detected");
+                reasonText = reasons.length > 0 
+                    ? "Risk factors identified: " + reasons.join("; ") + ". Transaction eligibility and account safety cannot be verified."
+                    : "Account status, balance, and KYC verification are mandatory for banking operations. Without these, transaction eligibility and account safety cannot be verified.";
+            } else {
+                reasonText = "All critical banking fields are present, balance is acceptable, KYC is verified, and data integrity is maintained.";
+            }
 
             // Main status banner
             let statusBannerHtml = "";
@@ -333,6 +344,65 @@
                         </div>
                     `;
                 }
+            }
+
+            // Purpose Detection Display
+            let purposeHtml = "";
+            if (purposeData && purposeData.primary_purpose) {
+                purposeHtml = `
+                    <div class="col-card" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; margin-bottom:20px; border-left-color:#764ba2;">
+                        <h3 style="color:white; margin-bottom:12px;">🎯 Dataset Purpose Detection</h3>
+                        <p style="font-size:1.1rem; font-weight:600; margin-bottom:8px;"><b>Primary Purpose:</b> ${purposeData.primary_purpose}</p>
+                        <p style="font-size:0.95rem; opacity:0.95; margin-bottom:8px;"><b>Confidence:</b> ${purposeData.purpose_confidence}%</p>
+                        <p style="font-size:0.95rem; opacity:0.95; margin-top:12px;"><b>Purpose Statement:</b> ${purposeData.purpose_statement}</p>
+                        ${purposeData.detected_purposes && purposeData.detected_purposes.length > 1 ? `
+                            <p style="font-size:0.9rem; opacity:0.9; margin-top:12px;"><b>Other Detected Purposes:</b></p>
+                            <ul style="margin-top:8px; padding-left:20px;">
+                                ${purposeData.detected_purposes.map((p, idx) => 
+                                    idx === 0 ? '' : `<li>${p} (${purposeData.confidence_scores[idx]}%)</li>`
+                                ).filter(x => x).join("")}
+                            </ul>
+                        ` : ""}
+                    </div>
+                `;
+            }
+
+            // Account Number Validation Rules
+            let accountRulesHtml = "";
+            if (data && data.account_like_columns && Array.isArray(data.account_like_columns) && data.account_like_columns.length > 0) {
+                data.account_like_columns.forEach((colData, idx) => {
+                    const rules = colData.rules || {};
+                    const digitsOnly = rules.digits_only_ratio !== undefined ? rules.digits_only_ratio : 0;
+                    const lengthOk = rules.length_6_16_ratio !== undefined ? rules.length_6_16_ratio : 0;
+                    const unique = rules.unique_ratio !== undefined ? rules.unique_ratio : 0;
+                    const notNull = rules.not_null_ratio !== undefined ? rules.not_null_ratio : 0;
+                    const noSymbols = rules.no_symbol_ratio !== undefined ? rules.no_symbol_ratio : 0;
+                    const randomized = rules.randomized !== undefined ? rules.randomized : false;
+                    
+                    accountRulesHtml += `
+                        <div class="col-card" style="background:#e6f7ff; border-left-color:#1890ff; margin-bottom:16px;">
+                            <h3>🔍 Account Number Validation Rules - ${colData.column || 'Unknown'}</h3>
+                            <p><b>Column:</b> ${colData.column || 'N/A'}</p>
+                            <p><b>Decision:</b> ${colData.decision === 'match' ? '✅ MATCH' : '❌ NOT MATCH'}</p>
+                            <p><b>Probability:</b> ${colData.probability_account_number || 0}%</p>
+                            <p><b>Validation Rules:</b></p>
+                            <ul class="list-clean" style="margin-top:8px;">
+                                <li>✔ Digits only: ${digitsOnly >= 0.9 ? '✅' : '❌'} (${(digitsOnly * 100).toFixed(1)}%)</li>
+                                <li>✔ Length: 6–16: ${lengthOk >= 0.9 ? '✅' : '❌'} (${(lengthOk * 100).toFixed(1)}%)</li>
+                                <li>✔ Unique: ${unique >= 0.85 ? '✅' : '❌'} (${(unique * 100).toFixed(1)}%)</li>
+                                <li>✔ NOT NULL: ${notNull >= 0.95 ? '✅' : '❌'} (${(notNull * 100).toFixed(1)}%)</li>
+                                <li>✔ No symbols: ${noSymbols >= 0.95 ? '✅' : '❌'} (${(noSymbols * 100).toFixed(1)}%)</li>
+                                <li>✔ Randomized: ${randomized ? '✅' : '❌'}</li>
+                            </ul>
+                            ${colData.sample_violations && Array.isArray(colData.sample_violations) && colData.sample_violations.length > 0 ? `
+                                <p style="margin-top:12px;"><b>Sample Violations:</b></p>
+                                <ul class="list-clean">
+                                    ${colData.sample_violations.slice(0, 5).map(v => `<li>${v}</li>`).join("")}
+                                </ul>
+                            ` : ""}
+                        </div>
+                    `;
+                });
             }
 
             // Info grid
@@ -464,6 +534,34 @@
             
             infoGridHtml += '</div>';
 
+            // Foreign Key / Linking Check
+            let foreignKeyHtml = "";
+            if (foreignKeyData && foreignKeyData.can_check) {
+                const linkingStatus = foreignKeyData.linking_valid ? 'success' : 'warning';
+                const linkingIcon = foreignKeyData.linking_valid ? '✅' : '⚠️';
+                foreignKeyHtml = `
+                    <div class="col-card" style="background:${foreignKeyData.linking_valid ? '#d4edda' : '#fff3cd'}; border-left-color:${foreignKeyData.linking_valid ? '#28a745' : '#ffc107'}; margin-bottom:20px;">
+                        <h3>🔹 STEP-7: Foreign Key / Linking Check</h3>
+                        <p><b>Account Column:</b> ${foreignKeyData.account_column || 'N/A'}</p>
+                        <p><b>Customer Column:</b> ${foreignKeyData.customer_column || 'N/A'}</p>
+                        <p><b>Relationship Type:</b> ${foreignKeyData.relationship_type || 'UNKNOWN'}</p>
+                        <p><b>Total Accounts:</b> ${foreignKeyData.total_accounts}</p>
+                        <p><b>Total Customers:</b> ${foreignKeyData.total_customers}</p>
+                        ${foreignKeyData.accounts_per_customer ? `<p><b>Accounts per Customer:</b> ${foreignKeyData.accounts_per_customer}</p>` : ''}
+                        <p><b>Missing Links:</b> ${foreignKeyData.missing_links_count}</p>
+                        <p><b>Linking Status:</b> ${linkingIcon} ${foreignKeyData.linking_valid ? 'VALID' : 'INVALID'}</p>
+                        ${!foreignKeyData.linking_valid ? '<p style="margin-top:8px; color:#856404;">⚠️ Some accounts or customers have missing links. Data integrity may be compromised.</p>' : ''}
+                    </div>
+                `;
+            } else if (foreignKeyData && !foreignKeyData.can_check) {
+                foreignKeyHtml = `
+                    <div class="col-card" style="background:#f8d7da; border-left-color:#dc3545; margin-bottom:20px;">
+                        <h3>🔹 STEP-7: Foreign Key / Linking Check</h3>
+                        <p>⚠️ Cannot perform linking check - account number or customer ID columns are missing.</p>
+                    </div>
+                `;
+            }
+
             // Risk Assessment
             const riskClass = riskLevel === 'HIGH' ? 'high' : 'low';
             const riskHtml = `
@@ -501,7 +599,7 @@
                 </div>
             `;
 
-            return statusBannerHtml + infoGridHtml + riskHtml + nextActionHtml;
+            return statusBannerHtml + purposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + riskHtml + nextActionHtml;
         }
 
         (function init() {
@@ -517,6 +615,8 @@
                 const parsedTransaction = JSON.parse(sessionStorage.getItem("transactionValidation") || "null");
                 const parsedDebitCredit = JSON.parse(sessionStorage.getItem("debitCreditValidation") || "null");
                 const parsedFraud = JSON.parse(sessionStorage.getItem("fraudDetection") || "null");
+                const parsedForeignKey = JSON.parse(sessionStorage.getItem("foreignKeyCheck") || "null");
+                const parsedPurpose = JSON.parse(sessionStorage.getItem("purposeDetection") || "null");
                 
                 if (!parsedValidation && !parsedCheck) {
                     content.innerHTML = `
@@ -531,7 +631,11 @@
                     return;
                 }
                 
-                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedCustomerId, parsedTransaction, parsedDebitCredit, parsedFraud);
+                // Debug logging
+                console.log("Purpose Detection:", parsedPurpose);
+                console.log("Foreign Key Check:", parsedForeignKey);
+                
+                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedCustomerId, parsedTransaction, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose);
             } catch (e) {
                 console.error("Error:", e);
                 content.innerHTML = `

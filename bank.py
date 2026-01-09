@@ -656,6 +656,153 @@ class BankingDomainDetector:
             "fraud_risk": fraud_risk,
             "risk_factors": risk_factors
         }
+    
+    def check_foreign_key_linking(self, df: pd.DataFrame, account_col: str = None, customer_col: str = None):
+        """
+        STEP-7: Foreign Key / Linking Check
+        Check one-to-one or one-to-many relationship between account_number and customer_id
+        """
+        if account_col is None or customer_col is None:
+            # Try to find columns
+            account_keywords = ["account", "account_number", "acc_no", "acct_no"]
+            customer_keywords = ["customer_id", "cust_id", "user_id", "customerid"]
+            
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                if account_col is None and any(k in norm_col for k in account_keywords):
+                    account_col = col
+                if customer_col is None and any(k in norm_col for k in customer_keywords):
+                    customer_col = col
+        
+        if account_col is None or customer_col is None:
+            return {
+                "can_check": False,
+                "account_column": account_col,
+                "customer_column": customer_col,
+                "relationship_type": None,
+                "missing_links_count": 0,
+                "total_accounts": 0,
+                "total_customers": 0,
+                "linking_valid": False
+            }
+        
+        # Check for missing links
+        account_series = df[account_col].dropna()
+        customer_series = df[customer_col].dropna()
+        
+        # Create pairs and check for missing links
+        pairs = df[[account_col, customer_col]].dropna()
+        missing_accounts = pairs[pairs[account_col].isna()].shape[0]
+        missing_customers = pairs[pairs[customer_col].isna()].shape[0]
+        missing_links = missing_accounts + missing_customers
+        
+        # Determine relationship type
+        unique_accounts = account_series.nunique()
+        unique_customers = customer_series.nunique()
+        
+        # Check if one-to-many (one customer, many accounts)
+        if unique_customers > 0:
+            accounts_per_customer = unique_accounts / unique_customers
+            if accounts_per_customer > 1.2:  # More accounts than customers
+                relationship_type = "ONE_TO_MANY"  # One customer can have multiple accounts
+            else:
+                relationship_type = "ONE_TO_ONE"
+        else:
+            relationship_type = "UNKNOWN"
+        
+        linking_valid = missing_links == 0
+        
+        return {
+            "can_check": True,
+            "account_column": account_col,
+            "customer_column": customer_col,
+            "relationship_type": relationship_type,
+            "missing_links_count": int(missing_links),
+            "total_accounts": int(unique_accounts),
+            "total_customers": int(unique_customers),
+            "accounts_per_customer": round(accounts_per_customer, 2) if unique_customers > 0 else 0.0,
+            "linking_valid": linking_valid
+        }
+    
+    def detect_purpose(self, df: pd.DataFrame, account_check: dict, customer_check: dict, 
+                      transaction_check: dict, balance_check: dict, status_check: dict):
+        """
+        STEP-8: Purpose Detection Logic
+        Infer dataset purpose based on column combinations
+        """
+        has_account = account_check.get("has_account_number_column", False)
+        has_customer = customer_check.get("column_exists", False)
+        has_transaction = transaction_check.get("has_transaction_data", False)
+        has_balance = balance_check.get("has_balance_column", False)
+        has_status = status_check.get("has_status_column", False)
+        
+        # Check for transaction columns specifically
+        transaction_cols = transaction_check.get("found_columns", {})
+        has_debit_credit = "debit" in transaction_cols or "credit" in transaction_cols
+        has_transaction_date = "transaction_date" in transaction_cols
+        
+        purposes = []
+        confidence_scores = []
+        
+        # Purpose 1: Account Verification
+        if has_account and not has_customer and not has_transaction and not has_balance:
+            purposes.append("Account Verification")
+            confidence_scores.append(90)
+        
+        # Purpose 2: Customer Account Mapping
+        if has_account and has_customer and not has_transaction:
+            purposes.append("Customer Account Mapping")
+            confidence_scores.append(85)
+        
+        # Purpose 3: Transaction Processing
+        if has_account and has_debit_credit and has_transaction_date:
+            purposes.append("Transaction Processing")
+            confidence_scores.append(95)
+        
+        # Purpose 4: Funds Validation
+        if has_account and has_balance and not has_transaction:
+            purposes.append("Funds Validation")
+            confidence_scores.append(80)
+        
+        # Purpose 5: Transaction Authorization
+        if has_transaction and has_balance and has_status:
+            purposes.append("Transaction Authorization")
+            confidence_scores.append(90)
+        
+        # Purpose 6: Account Management
+        if has_account and has_status and has_customer:
+            purposes.append("Account Management")
+            confidence_scores.append(75)
+        
+        # Determine primary purpose
+        if purposes:
+            max_idx = confidence_scores.index(max(confidence_scores))
+            primary_purpose = purposes[max_idx]
+            purpose_confidence = confidence_scores[max_idx]
+        else:
+            primary_purpose = "General Banking Data"
+            purpose_confidence = 50
+        
+        # Generate purpose statement
+        purpose_statements = {
+            "Account Verification": "This dataset is used to verify account numbers and validate account existence.",
+            "Customer Account Mapping": "This dataset maps customers to their associated accounts for relationship management.",
+            "Transaction Processing": "This dataset contains transaction records for processing debits, credits, and transaction history.",
+            "Funds Validation": "This dataset validates account balances and available funds.",
+            "Transaction Authorization": "This dataset is used to authorize transactions based on balance and account status.",
+            "Account Management": "This dataset manages account status, customer relationships, and account lifecycle.",
+            "General Banking Data": "This dataset contains general banking information without a specific primary purpose."
+        }
+        
+        purpose_statement = purpose_statements.get(primary_purpose, "Purpose could not be determined.")
+        
+        return {
+            "primary_purpose": primary_purpose,
+            "purpose_confidence": purpose_confidence,
+            "purpose_statement": purpose_statement,
+            "detected_purposes": purposes,
+            "confidence_scores": confidence_scores
+        }
 
     def predict(self, csv_path):
         try:
@@ -772,6 +919,13 @@ class BankingDomainDetector:
             balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
             debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
             fraud_detection = self.detect_fraud_patterns(df)
+            # Foreign key linking check
+            account_col = account_number_check.get("best_match_column")
+            customer_col = customer_id_validation.get("column_name")
+            foreign_key_check = self.check_foreign_key_linking(df, account_col, customer_col)
+            # Purpose detection
+            purpose_detection = self.detect_purpose(df, account_number_check, customer_id_validation, 
+                                                   transaction_validation, balance_analysis, account_status)
         else:
             account_number_validation = None
             account_number_check = {
@@ -849,6 +1003,23 @@ class BankingDomainDetector:
                 "fraud_risk": "LOW",
                 "risk_factors": 0
             }
+            foreign_key_check = {
+                "can_check": False,
+                "account_column": None,
+                "customer_column": None,
+                "relationship_type": None,
+                "missing_links_count": 0,
+                "total_accounts": 0,
+                "total_customers": 0,
+                "linking_valid": False
+            }
+            purpose_detection = {
+                "primary_purpose": "Unknown",
+                "purpose_confidence": 0,
+                "purpose_statement": "Cannot determine purpose - banking domain not detected.",
+                "detected_purposes": [],
+                "confidence_scores": []
+            }
 
         return {
             "domain": self.domain if decision != "UNKNOWN" else "Unknown",
@@ -874,5 +1045,7 @@ class BankingDomainDetector:
             "customer_id_validation": customer_id_validation,
             "transaction_validation": transaction_validation,
             "debit_credit_validation": debit_credit_validation,
-            "fraud_detection": fraud_detection
+            "fraud_detection": fraud_detection,
+            "foreign_key_check": foreign_key_check,
+            "purpose_detection": purpose_detection
         }

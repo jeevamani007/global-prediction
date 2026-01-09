@@ -316,6 +316,12 @@ uploadBtn.onclick = async () => {
         if (data.banking_fraud_detection) {
             sessionStorage.setItem("fraudDetection", JSON.stringify(data.banking_fraud_detection));
         }
+        if (data.banking_foreign_key_check) {
+            sessionStorage.setItem("foreignKeyCheck", JSON.stringify(data.banking_foreign_key_check));
+        }
+        if (data.banking_purpose_detection) {
+            sessionStorage.setItem("purposeDetection", JSON.stringify(data.banking_purpose_detection));
+        }
 
         // Display domain results on index.html page
         // Always show results if any domain data exists
