@@ -310,6 +310,9 @@ uploadBtn.onclick = async () => {
         if (data.banking_transaction_validation) {
             sessionStorage.setItem("transactionValidation", JSON.stringify(data.banking_transaction_validation));
         }
+        if (data.banking_transaction_type_validation) {
+            sessionStorage.setItem("transactionTypeValidation", JSON.stringify(data.banking_transaction_type_validation));
+        }
         if (data.banking_debit_credit_validation) {
             sessionStorage.setItem("debitCreditValidation", JSON.stringify(data.banking_debit_credit_validation));
         }

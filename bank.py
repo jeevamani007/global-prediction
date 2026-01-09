@@ -566,6 +566,86 @@ class BankingDomainDetector:
             "is_valid": len(validation_results["violations"]) == 0
         }
     
+    def validate_transaction_type(self, df: pd.DataFrame):
+        """
+        Validate Transaction Type Column
+        Check if transaction_type column exists and contains valid values: deposit, withdraw, transfer
+        Calculate probability percentage based on valid values
+        """
+        # Valid transaction types (case-insensitive)
+        valid_types = ["deposit", "withdraw", "withdrawal", "transfer"]
+        
+        # Find transaction_type column
+        transaction_type_keywords = ["transaction_type", "txn_type", "trans_type", "type", "transactiontype"]
+        transaction_type_col = None
+        
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in transaction_type_keywords):
+                transaction_type_col = col
+                break
+        
+        if transaction_type_col is None:
+            return {
+                "column_found": False,
+                "column_name": None,
+                "total_rows": len(df),
+                "valid_count": 0,
+                "invalid_count": 0,
+                "valid_types_found": [],
+                "invalid_types_found": [],
+                "probability_percentage": 0.0,
+                "is_valid": False,
+                "decision": "column_not_found"
+            }
+        
+        # Get the series and normalize values
+        series = df[transaction_type_col].dropna().astype(str).str.lower().str.strip()
+        total_rows = len(series)
+        
+        if total_rows == 0:
+            return {
+                "column_found": True,
+                "column_name": transaction_type_col,
+                "total_rows": len(df),
+                "valid_count": 0,
+                "invalid_count": 0,
+                "valid_types_found": [],
+                "invalid_types_found": [],
+                "probability_percentage": 0.0,
+                "is_valid": False,
+                "decision": "empty_column"
+            }
+        
+        # Check each value against valid types
+        valid_mask = series.isin(valid_types)
+        valid_count = int(valid_mask.sum())
+        invalid_count = int((~valid_mask).sum())
+        
+        # Get unique valid and invalid types found
+        valid_types_found = sorted(series[valid_mask].unique().tolist())
+        invalid_types_found = sorted(series[~valid_mask].unique().tolist()[:10])  # Limit to first 10
+        
+        # Calculate probability percentage
+        probability_percentage = round((valid_count / total_rows) * 100, 2) if total_rows > 0 else 0.0
+        
+        # Decision logic: valid if >= 80% of values match valid types
+        is_valid = probability_percentage >= 80.0
+        decision = "valid" if is_valid else ("partial" if probability_percentage >= 50.0 else "invalid")
+        
+        return {
+            "column_found": True,
+            "column_name": transaction_type_col,
+            "total_rows": total_rows,
+            "valid_count": valid_count,
+            "invalid_count": invalid_count,
+            "valid_types_found": valid_types_found,
+            "invalid_types_found": invalid_types_found,
+            "probability_percentage": probability_percentage,
+            "is_valid": is_valid,
+            "decision": decision
+        }
+    
     def validate_debit_credit_balance(self, df: pd.DataFrame, balance_col_name: str = None):
         """
         STEP-3: Debit/Credit vs Balance Check
@@ -1333,6 +1413,7 @@ class BankingDomainDetector:
         balance_analysis = self.analyze_balance(df)
         kyc_verification = self.verify_kyc(df)
         transaction_validation = self.validate_transaction_data(df)
+        transaction_type_validation = self.validate_transaction_type(df)
         balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
         debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
         fraud_detection = self.detect_fraud_patterns(df)
@@ -1529,6 +1610,7 @@ class BankingDomainDetector:
             "kyc_verification": kyc_verification,
             "customer_id_validation": customer_id_validation,
             "transaction_validation": transaction_validation,
+            "transaction_type_validation": transaction_type_validation,
             "debit_credit_validation": debit_credit_validation,
             "fraud_detection": fraud_detection,
             "foreign_key_check": foreign_key_check,
