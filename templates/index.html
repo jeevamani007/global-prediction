@@ -322,6 +322,12 @@ uploadBtn.onclick = async () => {
         if (data.banking_purpose_detection) {
             sessionStorage.setItem("purposeDetection", JSON.stringify(data.banking_purpose_detection));
         }
+        if (data.banking_final_decision) {
+            sessionStorage.setItem("finalDecision", JSON.stringify(data.banking_final_decision));
+        }
+        if (data.banking_risk_assessment) {
+            sessionStorage.setItem("riskAssessment", JSON.stringify(data.banking_risk_assessment));
+        }
 
         // Display domain results on index.html page
         // Always show results if any domain data exists

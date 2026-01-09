@@ -119,33 +119,56 @@ class BankingDomainDetector:
     
     def check_missing_columns(self, df: pd.DataFrame):
         """
-        Check for missing required banking columns
+        STEP-5: Mandatory Banking Columns Check
+        Mandatory: account_status, balance
+        Optional: transaction_date, debit, credit
         """
-        required_columns = {
-            "account": ["account", "acct", "accno", "account_number", "account_no"],
-            "customer": ["customer", "cust", "customer_id", "customer_name"],
-            "balance": ["balance", "bal", "account_balance", "current_balance"],
-            "transaction": ["transaction", "txn", "transaction_id", "trans_id"]
+        mandatory_columns = {
+            "account_status": ["status", "account_status", "acc_status", "state", "active", "inactive"],
+            "balance": ["balance", "bal", "account_balance", "current_balance", "available_balance"]
         }
         
-        found_columns = {}
-        missing_columns = []
+        optional_columns = {
+            "transaction_date": ["transaction_date", "txn_date", "trans_date", "date"],
+            "debit": ["debit", "debit_amount", "withdrawal", "withdraw"],
+            "credit": ["credit", "credit_amount", "deposit"]
+        }
         
-        for required_type, keywords in required_columns.items():
+        found_mandatory = {}
+        missing_mandatory = []
+        found_optional = {}
+        missing_optional = []
+        
+        # Check mandatory columns
+        for col_type, keywords in mandatory_columns.items():
             found = False
             for col in df.columns:
                 norm_col = self.normalize(col)
                 if any(keyword in norm_col for keyword in keywords):
-                    found_columns[required_type] = col
+                    found_mandatory[col_type] = col
                     found = True
                     break
             if not found:
-                missing_columns.append(required_type)
+                missing_mandatory.append(col_type)
+        
+        # Check optional columns
+        for col_type, keywords in optional_columns.items():
+            found = False
+            for col in df.columns:
+                norm_col = self.normalize(col)
+                if any(keyword in norm_col for keyword in keywords):
+                    found_optional[col_type] = col
+                    found = True
+                    break
+            if not found:
+                missing_optional.append(col_type)
         
         return {
-            "found_columns": found_columns,
-            "missing_columns": missing_columns,
-            "completeness_percentage": round((len(found_columns) / len(required_columns)) * 100, 2)
+            "found_mandatory": found_mandatory,
+            "missing_mandatory": missing_mandatory,
+            "found_optional": found_optional,
+            "missing_optional": missing_optional,
+            "all_mandatory_present": len(missing_mandatory) == 0
         }
     
     def verify_kyc(self, df: pd.DataFrame):
@@ -176,14 +199,16 @@ class BankingDomainDetector:
         
         # Check if user_name is present (critical for KYC)
         has_user_name = "user_name" in found_kyc
-        kyc_verified = has_user_name and len(found_kyc) >= 2  # At least user_name + one more field
+        kyc_completeness = round((len(found_kyc) / len(kyc_fields)) * 100, 2)
+        kyc_verified = kyc_completeness >= 60.0  # STEP-6: >= 60% threshold
         
         return {
             "kyc_verified": kyc_verified,
             "has_user_name": has_user_name,
             "found_kyc_fields": found_kyc,
             "missing_kyc_fields": missing_kyc,
-            "kyc_completeness": round((len(found_kyc) / len(kyc_fields)) * 100, 2)
+            "kyc_completeness": kyc_completeness,
+            "meets_threshold": kyc_completeness >= 60.0
         }
     
     def validate_customer_id(self, df: pd.DataFrame):
@@ -659,8 +684,9 @@ class BankingDomainDetector:
     
     def check_foreign_key_linking(self, df: pd.DataFrame, account_col: str = None, customer_col: str = None):
         """
-        STEP-7: Foreign Key / Linking Check
-        Check one-to-one or one-to-many relationship between account_number and customer_id
+        STEP-4: Foreign Key / Linking Check
+        Validate relationship: one customer_id can have multiple accounts,
+        but one account_number must map to only one customer_id
         """
         if account_col is None or customer_col is None:
             # Try to find columns
@@ -683,34 +709,45 @@ class BankingDomainDetector:
                 "missing_links_count": 0,
                 "total_accounts": 0,
                 "total_customers": 0,
-                "linking_valid": False
+                "fk_mismatch": False,
+                "linking_valid": False,
+                "violations": []
             }
         
         # Check for missing links
-        account_series = df[account_col].dropna()
-        customer_series = df[customer_col].dropna()
-        
-        # Create pairs and check for missing links
         pairs = df[[account_col, customer_col]].dropna()
         missing_accounts = pairs[pairs[account_col].isna()].shape[0]
         missing_customers = pairs[pairs[customer_col].isna()].shape[0]
         missing_links = missing_accounts + missing_customers
         
-        # Determine relationship type
-        unique_accounts = account_series.nunique()
-        unique_customers = customer_series.nunique()
+        # Check FK constraint: one account_number must map to only one customer_id
+        violations = []
+        fk_mismatch = False
         
-        # Check if one-to-many (one customer, many accounts)
+        # Group by account_number and check if any account maps to multiple customers
+        account_to_customers = pairs.groupby(account_col)[customer_col].nunique()
+        accounts_with_multiple_customers = account_to_customers[account_to_customers > 1]
+        
+        if len(accounts_with_multiple_customers) > 0:
+            fk_mismatch = True
+            violations.append(f"{len(accounts_with_multiple_customers)} account(s) map to multiple customers (FK violation)")
+        
+        # Determine relationship type
+        unique_accounts = pairs[account_col].nunique()
+        unique_customers = pairs[customer_col].nunique()
+        
+        # Check if one-to-many (one customer, many accounts) - this is VALID
         if unique_customers > 0:
             accounts_per_customer = unique_accounts / unique_customers
-            if accounts_per_customer > 1.2:  # More accounts than customers
-                relationship_type = "ONE_TO_MANY"  # One customer can have multiple accounts
+            if accounts_per_customer > 1.1:  # More accounts than customers
+                relationship_type = "ONE_TO_MANY"  # One customer can have multiple accounts (VALID)
             else:
                 relationship_type = "ONE_TO_ONE"
         else:
             relationship_type = "UNKNOWN"
         
-        linking_valid = missing_links == 0
+        # Linking is valid if no missing links AND no FK mismatch
+        linking_valid = missing_links == 0 and not fk_mismatch
         
         return {
             "can_check": True,
@@ -721,7 +758,84 @@ class BankingDomainDetector:
             "total_accounts": int(unique_accounts),
             "total_customers": int(unique_customers),
             "accounts_per_customer": round(accounts_per_customer, 2) if unique_customers > 0 else 0.0,
-            "linking_valid": linking_valid
+            "fk_mismatch": fk_mismatch,
+            "linking_valid": linking_valid,
+            "violations": violations
+        }
+    
+    def calculate_risk_assessment(self, missing_columns_check: dict, kyc_check: dict, foreign_key_check: dict):
+        """
+        STEP-7: Risk Assessment
+        Rules: Missing account_status OR balance → HIGH RISK
+               Missing KYC → HIGH RISK
+               FK mismatch → HIGH RISK
+        """
+        missing_mandatory = missing_columns_check.get("missing_mandatory", [])
+        missing_account_status = "account_status" in missing_mandatory
+        missing_balance = "balance" in missing_mandatory
+        kyc_below_threshold = not kyc_check.get("meets_threshold", False)
+        fk_mismatch = foreign_key_check.get("fk_mismatch", False)
+        
+        risk_factors = []
+        if missing_account_status or missing_balance:
+            risk_factors.append("Missing mandatory columns")
+        if kyc_below_threshold:
+            risk_factors.append("KYC completeness < 60%")
+        if fk_mismatch:
+            risk_factors.append("Foreign key mismatch detected")
+        
+        risk_level = "HIGH" if len(risk_factors) > 0 else "LOW"
+        
+        return {
+            "risk_level": risk_level,
+            "risk_factors": risk_factors,
+            "missing_account_status": missing_account_status,
+            "missing_balance": missing_balance,
+            "kyc_below_threshold": kyc_below_threshold,
+            "fk_mismatch": fk_mismatch
+        }
+    
+    def final_decision_logic(self, account_check: dict, customer_check: dict, 
+                             missing_columns_check: dict, kyc_check: dict, 
+                             foreign_key_check: dict):
+        """
+        STEP-8: Final Decision Logic
+        APPROVE / HOLD / REJECT based on validation results
+        """
+        # Extract validation results
+        account_valid = account_check.get("best_match_decision") == "match"
+        customer_valid = customer_check.get("decision") == "found"
+        mandatory_present = missing_columns_check.get("all_mandatory_present", False)
+        kyc_meets_threshold = kyc_check.get("meets_threshold", False) or kyc_check.get("kyc_completeness", 0) >= 60.0
+        no_fk_mismatch = foreign_key_check.get("can_check", False) and not foreign_key_check.get("fk_mismatch", True)
+        
+        # Decision logic
+        if account_valid and customer_valid and mandatory_present and kyc_meets_threshold and no_fk_mismatch:
+            decision = "APPROVE"
+            reason = "All validation checks passed: account number valid, customer ID valid, mandatory columns present, KYC completeness ≥60%, and no foreign key mismatches."
+        elif account_valid and (not mandatory_present or not kyc_meets_threshold or not customer_valid):
+            decision = "HOLD"
+            reasons = []
+            if not customer_valid:
+                reasons.append("customer ID validation failed")
+            if not mandatory_present:
+                missing = missing_columns_check.get("missing_mandatory", [])
+                reasons.append(f"missing mandatory columns: {', '.join(missing)}")
+            if not kyc_meets_threshold:
+                reasons.append(f"KYC completeness {kyc_check.get('kyc_completeness', 0)}% < 60%")
+            reason = f"Account number is valid, but: {', '.join(reasons)}."
+        else:
+            decision = "REJECT"
+            reason = "Account number validation failed or critical data integrity issues detected."
+        
+        return {
+            "decision": decision,
+            "reason": reason,
+            "account_valid": account_valid,
+            "customer_valid": customer_valid,
+            "mandatory_present": mandatory_present,
+            "kyc_meets_threshold": kyc_meets_threshold,
+            "no_fk_mismatch": no_fk_mismatch
         }
     
     def detect_purpose(self, df: pd.DataFrame, account_check: dict, customer_check: dict, 
@@ -926,6 +1040,11 @@ class BankingDomainDetector:
             # Purpose detection
             purpose_detection = self.detect_purpose(df, account_number_check, customer_id_validation, 
                                                    transaction_validation, balance_analysis, account_status)
+            # Final decision logic (STEP-8)
+            final_decision = self.final_decision_logic(account_number_check, customer_id_validation,
+                                                      missing_columns_check, kyc_verification, foreign_key_check)
+            # Risk assessment (STEP-7)
+            risk_assessment = self.calculate_risk_assessment(missing_columns_check, kyc_verification, foreign_key_check)
         else:
             account_number_validation = None
             account_number_check = {
@@ -943,9 +1062,11 @@ class BankingDomainDetector:
                 "total_with_status": 0
             }
             missing_columns_check = {
-                "found_columns": {},
-                "missing_columns": [],
-                "completeness_percentage": 0.0
+                "found_mandatory": {},
+                "missing_mandatory": ["account_status", "balance"],
+                "found_optional": {},
+                "missing_optional": [],
+                "all_mandatory_present": False
             }
             balance_analysis = {
                 "has_balance_column": False,
@@ -959,7 +1080,8 @@ class BankingDomainDetector:
                 "has_user_name": False,
                 "found_kyc_fields": {},
                 "missing_kyc_fields": [],
-                "kyc_completeness": 0.0
+                "kyc_completeness": 0.0,
+                "meets_threshold": False
             }
             customer_id_validation = {
                 "column_exists": False,
@@ -1011,7 +1133,9 @@ class BankingDomainDetector:
                 "missing_links_count": 0,
                 "total_accounts": 0,
                 "total_customers": 0,
-                "linking_valid": False
+                "fk_mismatch": False,
+                "linking_valid": False,
+                "violations": []
             }
             purpose_detection = {
                 "primary_purpose": "Unknown",
@@ -1019,6 +1143,23 @@ class BankingDomainDetector:
                 "purpose_statement": "Cannot determine purpose - banking domain not detected.",
                 "detected_purposes": [],
                 "confidence_scores": []
+            }
+            final_decision = {
+                "decision": "REJECT",
+                "reason": "Banking domain not detected.",
+                "account_valid": False,
+                "customer_valid": False,
+                "mandatory_present": False,
+                "kyc_meets_threshold": False,
+                "no_fk_mismatch": False
+            }
+            risk_assessment = {
+                "risk_level": "HIGH",
+                "risk_factors": ["Banking domain not detected"],
+                "missing_account_status": True,
+                "missing_balance": True,
+                "kyc_below_threshold": True,
+                "fk_mismatch": False
             }
 
         return {
@@ -1047,5 +1188,7 @@ class BankingDomainDetector:
             "debit_credit_validation": debit_credit_validation,
             "fraud_detection": fraud_detection,
             "foreign_key_check": foreign_key_check,
-            "purpose_detection": purpose_detection
+            "purpose_detection": purpose_detection,
+            "final_decision": final_decision,
+            "risk_assessment": risk_assessment
         }

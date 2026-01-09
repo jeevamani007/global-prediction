@@ -152,6 +152,8 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_fraud_detection": banking_result.get("fraud_detection"),
                 "banking_foreign_key_check": banking_result.get("foreign_key_check"),
                 "banking_purpose_detection": banking_result.get("purpose_detection"),
+                "banking_final_decision": banking_result.get("final_decision"),
+                "banking_risk_assessment": banking_result.get("risk_assessment"),
                 "financial": financial_result,
                 "insurance": insurance_result,
                 "government": government_result,
