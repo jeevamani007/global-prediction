@@ -695,46 +695,75 @@
                 // Render PyCharts / ECharts column‑purpose chart
                 if (parsedColumnPurpose && parsedColumnPurpose.category_counts) {
                     const chartDom = document.getElementById("purposeChart");
-                    chartDom.style.display = "block";
-                    const chart = echarts.init(chartDom);
                     const counts = parsedColumnPurpose.category_counts;
-                    const seriesData = Object.keys(counts).map(k => ({
-                        name: k,
-                        value: counts[k]
-                    }));
-                    const option = {
-                        title: {
-                            text: "Banking Column Purpose Distribution",
-                            left: "center",
-                            textStyle: { fontSize: 14 }
-                        },
-                        tooltip: {
-                            trigger: "item",
-                            formatter: "{b}: {c} cols ({d}%)"
-                        },
-                        legend: {
-                            bottom: 0
-                        },
-                        series: [{
-                            name: "Columns",
-                            type: "pie",
-                            radius: "55%",
-                            center: ["50%", "50%"],
-                            data: seriesData,
-                            label: {
-                                show: true,
-                                formatter: "{b}\n{d}%"
+                    
+                    // Filter out zero values but keep them for percentage calculation
+                    const seriesData = Object.keys(counts)
+                        .map(k => ({
+                            name: k,
+                            value: counts[k] || 0  // Ensure value is a number, not undefined
+                        }))
+                        .filter(item => item.value > 0);  // Only show non-zero in chart
+                    
+                    // Calculate total for percentage display
+                    const total = Object.values(counts).reduce((sum, val) => sum + (val || 0), 0);
+                    
+                    // Always show chart if we have category_counts data
+                    if (total > 0 || Object.keys(counts).length > 0) {
+                        chartDom.style.display = "block";
+                        const chart = echarts.init(chartDom);
+                        
+                        const option = {
+                            title: {
+                                text: "Banking Column Purpose Distribution",
+                                left: "center",
+                                textStyle: { fontSize: 14 }
                             },
-                            emphasis: {
-                                itemStyle: {
-                                    shadowBlur: 10,
-                                    shadowOffsetX: 0,
-                                    shadowColor: "rgba(0, 0, 0, 0.5)"
+                            tooltip: {
+                                trigger: "item",
+                                formatter: function(params) {
+                                    const value = params.value || 0;
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${params.name}: ${value} cols (${percentage}%)`;
                                 }
-                            }
-                        }]
-                    };
-                    chart.setOption(option);
+                            },
+                            legend: {
+                                bottom: 0,
+                                data: Object.keys(counts).map(k => k)
+                            },
+                            series: [{
+                                name: "Columns",
+                                type: "pie",
+                                radius: "55%",
+                                center: ["50%", "50%"],
+                                data: seriesData.length > 0 ? seriesData : Object.keys(counts).map(k => ({
+                                    name: k,
+                                    value: counts[k] || 0
+                                })),
+                                label: {
+                                    show: true,
+                                    formatter: function(params) {
+                                        const value = params.value || 0;
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                        return `${params.name}\n${percentage}%`;
+                                    }
+                                },
+                                labelLine: {
+                                    show: true
+                                },
+                                emphasis: {
+                                    itemStyle: {
+                                        shadowBlur: 10,
+                                        shadowOffsetX: 0,
+                                        shadowColor: "rgba(0, 0, 0, 0.5)"
+                                    }
+                                }
+                            }]
+                        };
+                        chart.setOption(option);
+                    } else {
+                        chartDom.style.display = "none";
+                    }
                 }
             } catch (e) {
                 console.error("Error:", e);

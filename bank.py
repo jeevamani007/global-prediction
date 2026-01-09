@@ -1048,16 +1048,108 @@ class BankingDomainDetector:
 
         # 3️⃣ Withdrawal / Deposit / Transfer specific columns
         wdt_cols = []
-        wdt_keywords = [
-            "withdraw", "withdrawal",
-            "deposit",
-            "transfer", "transfer_to", "transfer_from"
+        # Base words to look for (most important)
+        base_words = ["withdraw", "deposit", "transfer"]
+        # Expanded keyword list with all possible variations (normalized versions)
+        wdt_keywords_normalized = [
+            "withdraw", "withdrawal", "withdrawalamount", "withdrawamount", "withdrawl",
+            "deposit", "depositamount", "depositamt", "deposited", "depositing",
+            "transfer", "transferto", "transferfrom", "transferamount", "transferamt",
+            "transferred", "transferring", "transfers"
         ]
+        
+        # Check all columns in the dataframe - use multiple matching strategies
         for col in columns:
-            norm = self.normalize(col)
-            if any(k in norm for k in wdt_keywords):
-                wdt_cols.append(col)
+            col_str = str(col)
+            norm_col = self.normalize(col_str)
+            col_lower = col_str.lower()
+            
+            # Strategy 1: Check normalized column name against normalized keywords
+            matched = False
+            for keyword in wdt_keywords_normalized:
+                if keyword in norm_col:
+                    wdt_cols.append(col)
+                    matched = True
+                    break
+            
+            # Strategy 2: Check for base words in original column name (case-insensitive, whole word or part)
+            if not matched:
+                for base_word in base_words:
+                    if base_word in col_lower:
+                        wdt_cols.append(col)
+                        matched = True
+                        break
+            
+            # Strategy 3: Check for transaction_type or similar column names
+            if not matched:
+                type_keywords = ["transaction_type", "txn_type", "trans_type", "type", "operation", "operation_type"]
+                for type_kw in type_keywords:
+                    if type_kw in col_lower or type_kw in norm_col:
+                        wdt_cols.append(col)
+                        matched = True
+                        break
+            
+            # Strategy 4: Check column VALUES for withdrawal/deposit/transfer patterns
+            # This catches columns like "transaction_type" that contain these values
+            if not matched and col in df.columns:
+                try:
+                    col_series = df[col].dropna().astype(str).str.lower()
+                    if len(col_series) > 0:
+                        # Check if any values contain withdrawal/deposit/transfer keywords
+                        value_matches = col_series.str.contains('|'.join(base_words), case=False, na=False)
+                        if value_matches.sum() > 0:
+                            # If more than 20% of values match, consider it a WDT column
+                            match_ratio = value_matches.sum() / len(col_series)
+                            if match_ratio >= 0.2:  # At least 20% of values match (lowered threshold)
+                                wdt_cols.append(col)
+                                matched = True
+                except Exception:
+                    pass  # Skip if column can't be analyzed
+        
+        # Also check transaction columns that might be WDT-specific
+        for col in transaction_cols:
+            if col not in wdt_cols:  # Avoid duplicates
+                col_str = str(col)
+                norm_col = self.normalize(col_str)
+                col_lower = col_str.lower()
+                
+                matched = False
+                for keyword in wdt_keywords_normalized:
+                    if keyword in norm_col:
+                        wdt_cols.append(col)
+                        matched = True
+                        break
+                
+                if not matched:
+                    for base_word in base_words:
+                        if base_word in col_lower:
+                            wdt_cols.append(col)
+                            matched = True
+                            break
+                
+                # Check for transaction_type or similar column names
+                if not matched:
+                    type_keywords = ["transaction_type", "txn_type", "trans_type", "type", "operation", "operation_type"]
+                    for type_kw in type_keywords:
+                        if type_kw in col_lower or type_kw in norm_col:
+                            wdt_cols.append(col)
+                            matched = True
+                            break
+                
+                # Also check values for transaction columns
+                if not matched and col in df.columns:
+                    try:
+                        col_series = df[col].dropna().astype(str).str.lower()
+                        if len(col_series) > 0:
+                            value_matches = col_series.str.contains('|'.join(base_words), case=False, na=False)
+                            if value_matches.sum() > 0:
+                                match_ratio = value_matches.sum() / len(col_series)
+                                if match_ratio >= 0.2:  # At least 20% of values match
+                                    wdt_cols.append(col)
+                    except Exception:
+                        pass
 
+        # Remove duplicates and sort
         wdt_cols = sorted(list(dict.fromkeys(wdt_cols)))
 
         # Category counts for charts
