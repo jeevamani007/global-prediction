@@ -328,6 +328,9 @@ uploadBtn.onclick = async () => {
         if (data.banking_risk_assessment) {
             sessionStorage.setItem("riskAssessment", JSON.stringify(data.banking_risk_assessment));
         }
+        if (data.banking_column_purpose_report) {
+            sessionStorage.setItem("columnPurposeReport", JSON.stringify(data.banking_column_purpose_report));
+        }
 
         // Display domain results on index.html page
         // Always show results if any domain data exists
@@ -483,8 +486,8 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
         `;
     }
     
-    // Financial Results
-    if (financialResult) {
+    // Financial Results (hide if explicitly skipped after banking success)
+    if (financialResult && financialResult.decision !== "SKIPPED") {
         html += `
             <div class="domain-section financial">
                 <h3 class="domain-title">💰 Financial Domain Detection

@@ -69,7 +69,7 @@ async def upload_file(file: UploadFile = File(...)):
         with open(file_path, "wb") as f:
             f.write(content)
 
-        # Run domain detection for both banking and financial
+        # Run domain detection – banking first, then others as needed
         try:
             # Banking domain detection
             banking_detector = BankingDomainDetector()
@@ -78,13 +78,29 @@ async def upload_file(file: UploadFile = File(...)):
             # Check if result contains an error
             if isinstance(banking_result, dict) and "error" in banking_result:
                 raise HTTPException(status_code=500, detail=f"Banking analysis error: {banking_result['error']}")
-            
-            # Financial domain detection
-            financial_detector = FinancialDomainDetector()
-            financial_result = financial_detector.predict(file_path)
 
-            if isinstance(financial_result, dict) and "error" in financial_result:
-                raise HTTPException(status_code=500, detail=f"Financial analysis error: {financial_result['error']}")
+            # Financial domain detection (only if banking is NOT clearly detected)
+            financial_result = None
+            banking_decision = None
+            if isinstance(banking_result, dict):
+                banking_decision = banking_result.get("decision")
+
+            if banking_decision in (None, "UNKNOWN"):
+                financial_detector = FinancialDomainDetector()
+                financial_result = financial_detector.predict(file_path)
+
+                if isinstance(financial_result, dict) and "error" in financial_result:
+                    raise HTTPException(status_code=500, detail=f"Financial analysis error: {financial_result['error']}")
+            else:
+                # Explicit marker so UI / logs know financial was skipped intentionally
+                financial_result = {
+                    "domain": "Financial",
+                    "decision": "SKIPPED",
+                    "reason": "Skipped because Banking domain was already detected for this file.",
+                    "confidence_percentage": 0.0,
+                    "confidence_out_of_10": 0.0,
+                    "qualitative": "Not evaluated"
+                }
 
             insurance_detector = InsuranceDomainDetector()
             insurance_result = insurance_detector.predict(file_path)
@@ -152,6 +168,7 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_fraud_detection": banking_result.get("fraud_detection"),
                 "banking_foreign_key_check": banking_result.get("foreign_key_check"),
                 "banking_purpose_detection": banking_result.get("purpose_detection"),
+                "banking_column_purpose_report": banking_result.get("column_purpose_report"),
                 "banking_final_decision": banking_result.get("final_decision"),
                 "banking_risk_assessment": banking_result.get("risk_assessment"),
                 "financial": financial_result,

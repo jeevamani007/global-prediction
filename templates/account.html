@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Account Number Detection</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -277,12 +278,13 @@
         </div>
         
         <div class="card">
+            <div id="purposeChart" style="width:100%;height:320px;margin-bottom:24px;display:none;"></div>
             <div id="content">Loading validation results...</div>
         </div>
     </div>
 
     <script>
-        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, customerIdData, transactionData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData) {
+        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, customerIdData, transactionData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData, columnPurposeReport) {
             // Use risk assessment and final decision from backend
             const riskLevel = riskAssessmentData?.risk_level || "HIGH";
             const decisionText = finalDecisionData?.decision || "REJECT";
@@ -346,6 +348,20 @@
                                 ).filter(x => x).join("")}
                             </ul>
                         ` : ""}
+                    </div>
+                `;
+            }
+
+            // Column purpose explanations (Account / Customer / Transaction / Withdrawal‑Deposit‑Transfer)
+            let columnPurposeHtml = "";
+            if (columnPurposeReport && columnPurposeReport.explanations) {
+                const ex = columnPurposeReport.explanations;
+                columnPurposeHtml = `
+                    <div class="col-card" style="background:#f7fafc;margin-bottom:20px;border-left:4px solid #667eea;">
+                        <h3 style="margin-bottom:10px;">📚 Column Purpose Summary</h3>
+                        <p style="font-size:0.95rem;margin-bottom:8px;"><b>Account / Customer Details:</b> ${ex.account_customer || ""}</p>
+                        <p style="font-size:0.95rem;margin-bottom:8px;"><b>Transaction Columns:</b> ${ex.transaction || ""}</p>
+                        <p style="font-size:0.95rem;margin-bottom:4px;"><b>Withdrawal / Deposit / Transfer:</b> ${ex.wdt || ""}</p>
                     </div>
                 `;
             }
@@ -632,7 +648,7 @@
                 </div>
             ` : '';
 
-            return statusBannerHtml + purposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + riskHtml + decisionHtml + nextActionHtml;
+            return statusBannerHtml + purposeHtml + columnPurposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + riskHtml + decisionHtml + nextActionHtml;
         }
 
         (function init() {
@@ -652,6 +668,7 @@
                 const parsedPurpose = JSON.parse(sessionStorage.getItem("purposeDetection") || "null");
                 const parsedFinalDecision = JSON.parse(sessionStorage.getItem("finalDecision") || "null");
                 const parsedRiskAssessment = JSON.parse(sessionStorage.getItem("riskAssessment") || "null");
+                const parsedColumnPurpose = JSON.parse(sessionStorage.getItem("columnPurposeReport") || "null");
                 
                 if (!parsedValidation && !parsedCheck) {
                     content.innerHTML = `
@@ -671,8 +688,54 @@
                 console.log("Foreign Key Check:", parsedForeignKey);
                 console.log("Final Decision:", parsedFinalDecision);
                 console.log("Risk Assessment:", parsedRiskAssessment);
+                console.log("Column Purpose Report:", parsedColumnPurpose);
                 
-                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedCustomerId, parsedTransaction, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment);
+                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedCustomerId, parsedTransaction, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment, parsedColumnPurpose);
+
+                // Render PyCharts / ECharts column‑purpose chart
+                if (parsedColumnPurpose && parsedColumnPurpose.category_counts) {
+                    const chartDom = document.getElementById("purposeChart");
+                    chartDom.style.display = "block";
+                    const chart = echarts.init(chartDom);
+                    const counts = parsedColumnPurpose.category_counts;
+                    const seriesData = Object.keys(counts).map(k => ({
+                        name: k,
+                        value: counts[k]
+                    }));
+                    const option = {
+                        title: {
+                            text: "Banking Column Purpose Distribution",
+                            left: "center",
+                            textStyle: { fontSize: 14 }
+                        },
+                        tooltip: {
+                            trigger: "item",
+                            formatter: "{b}: {c} cols ({d}%)"
+                        },
+                        legend: {
+                            bottom: 0
+                        },
+                        series: [{
+                            name: "Columns",
+                            type: "pie",
+                            radius: "55%",
+                            center: ["50%", "50%"],
+                            data: seriesData,
+                            label: {
+                                show: true,
+                                formatter: "{b}\n{d}%"
+                            },
+                            emphasis: {
+                                itemStyle: {
+                                    shadowBlur: 10,
+                                    shadowOffsetX: 0,
+                                    shadowColor: "rgba(0, 0, 0, 0.5)"
+                                }
+                            }
+                        }]
+                    };
+                    chart.setOption(option);
+                }
             } catch (e) {
                 console.error("Error:", e);
                 content.innerHTML = `

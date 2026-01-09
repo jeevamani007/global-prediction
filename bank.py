@@ -17,19 +17,44 @@ class BankingDomainDetector:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT keyword, column_name FROM banking_keywords"))
                 data = result.fetchall()
-            
+
             self.keywords = [row[0].lower() if row[0] else "" for row in data]
             self.columns_db = [row[1].lower() if row[1] else "" for row in data]
-            
+
             # Filter out empty strings
             self.keywords = [k for k in self.keywords if k]
             self.columns_db = [c for c in self.columns_db if c]
-            
+
         except Exception as e:
             # Fallback to empty lists if database query fails
             print(f"Warning: Could not load keywords from database: {e}")
             self.keywords = []
             self.columns_db = []
+
+        # 🔁 Hard fallback: built‑in banking keywords when DB is empty
+        if not self.keywords and not self.columns_db:
+            self.keywords = [
+                "account", "account_number", "acc_no",
+                "customer", "customer_id", "cust_id",
+                "balance", "available_balance",
+                "transaction", "transaction_id", "txn_id",
+                "transaction_date", "txn_date",
+                "debit", "credit", "amount",
+                "status", "account_status",
+                "ifsc", "branch"
+            ]
+            self.columns_db = [
+                "account_number",
+                "customer_id",
+                "customer_name",
+                "account_status",
+                "balance",
+                "transaction_date",
+                "transaction_type",
+                "debit",
+                "credit",
+                "amount"
+            ]
 
         self.synonyms = {
             "acct": "account",
@@ -120,14 +145,26 @@ class BankingDomainDetector:
     def check_missing_columns(self, df: pd.DataFrame):
         """
         STEP-5: Mandatory Banking Columns Check
-        Mandatory: account_status, balance
+        Mandatory (per latest banking rules):
+            - account_number
+            - customer_id
+            - account_status
+            - balance
         Optional: transaction_date, debit, credit
         """
         mandatory_columns = {
+            "account_number": [
+                "account_number", "acct_no", "accno", "accountno",
+                "account", "acct", "custaccount", "customeraccount", "accnumber"
+            ],
+            "customer_id": [
+                "customer_id", "cust_id", "customerid", "custid", "client_id",
+                "clientid", "user_id", "userid"
+            ],
             "account_status": ["status", "account_status", "acc_status", "state", "active", "inactive"],
             "balance": ["balance", "bal", "account_balance", "current_balance", "available_balance"]
         }
-        
+
         optional_columns = {
             "transaction_date": ["transaction_date", "txn_date", "trans_date", "date"],
             "debit": ["debit", "debit_amount", "withdrawal", "withdraw"],
@@ -763,159 +800,317 @@ class BankingDomainDetector:
             "violations": violations
         }
     
-    def calculate_risk_assessment(self, missing_columns_check: dict, kyc_check: dict, foreign_key_check: dict):
+    def calculate_risk_assessment(self, account_check: dict, missing_columns_check: dict,
+                                  kyc_check: dict, foreign_key_check: dict):
         """
         STEP-7: Risk Assessment
-        Rules: Missing account_status OR balance → HIGH RISK
-               Missing KYC → HIGH RISK
-               FK mismatch → HIGH RISK
+
+        Updated rules:
+        - Missing ANY mandatory column (account_number, customer_id, account_status, balance) → HIGH RISK
+        - KYC completeness < 60% → HIGH RISK
+        - Foreign key mismatch (when check is possible) → HIGH RISK
+        - Otherwise, LOW RISK
         """
         missing_mandatory = missing_columns_check.get("missing_mandatory", [])
+        missing_account_number = "account_number" in missing_mandatory
+        missing_customer_id = "customer_id" in missing_mandatory
         missing_account_status = "account_status" in missing_mandatory
         missing_balance = "balance" in missing_mandatory
+
+        account_valid = account_check.get("best_match_decision") == "match"
+
         kyc_below_threshold = not kyc_check.get("meets_threshold", False)
-        fk_mismatch = foreign_key_check.get("fk_mismatch", False)
-        
+
+        can_fk_check = foreign_key_check.get("can_check", False)
+        fk_mismatch = bool(foreign_key_check.get("fk_mismatch", False)) if can_fk_check else False
+
         risk_factors = []
-        if missing_account_status or missing_balance:
-            risk_factors.append("Missing mandatory columns")
+        if missing_mandatory:
+            risk_factors.append(
+                "Missing mandatory column(s): " + ", ".join(sorted(missing_mandatory))
+            )
         if kyc_below_threshold:
             risk_factors.append("KYC completeness < 60%")
         if fk_mismatch:
             risk_factors.append("Foreign key mismatch detected")
-        
-        risk_level = "HIGH" if len(risk_factors) > 0 else "LOW"
-        
+        if not account_valid:
+            risk_factors.append("Account number validation failed")
+
+        risk_level = "HIGH" if risk_factors else "LOW"
+
         return {
             "risk_level": risk_level,
             "risk_factors": risk_factors,
+            "missing_account_number": missing_account_number,
+            "missing_customer_id": missing_customer_id,
             "missing_account_status": missing_account_status,
             "missing_balance": missing_balance,
             "kyc_below_threshold": kyc_below_threshold,
             "fk_mismatch": fk_mismatch
         }
     
-    def final_decision_logic(self, account_check: dict, customer_check: dict, 
-                             missing_columns_check: dict, kyc_check: dict, 
+    def final_decision_logic(self, account_check: dict, customer_check: dict,
+                             missing_columns_check: dict, kyc_check: dict,
                              foreign_key_check: dict):
         """
         STEP-8: Final Decision Logic
-        APPROVE / HOLD / REJECT based on validation results
+
+        Updated business rules:
+        - Account number valid BUT missing balance/account_status/KYC → HOLD
+        - Account number invalid → REJECT
+        - Account + balance + status + KYC ≥ 60% → APPROVE
+        - Missing mandatory columns should not cause immediate REJECT; use HOLD with HIGH risk.
         """
         # Extract validation results
         account_valid = account_check.get("best_match_decision") == "match"
-        customer_valid = customer_check.get("decision") == "found"
-        mandatory_present = missing_columns_check.get("all_mandatory_present", False)
-        kyc_meets_threshold = kyc_check.get("meets_threshold", False) or kyc_check.get("kyc_completeness", 0) >= 60.0
-        no_fk_mismatch = foreign_key_check.get("can_check", False) and not foreign_key_check.get("fk_mismatch", True)
-        
-        # Decision logic
-        if account_valid and customer_valid and mandatory_present and kyc_meets_threshold and no_fk_mismatch:
-            decision = "APPROVE"
-            reason = "All validation checks passed: account number valid, customer ID valid, mandatory columns present, KYC completeness ≥60%, and no foreign key mismatches."
-        elif account_valid and (not mandatory_present or not kyc_meets_threshold or not customer_valid):
+
+        missing_mandatory = missing_columns_check.get("missing_mandatory", [])
+        all_mandatory_present = len(missing_mandatory) == 0
+
+        kyc_pct = float(kyc_check.get("kyc_completeness", 0.0))
+        kyc_meets_threshold = kyc_check.get("meets_threshold", False) or kyc_pct >= 60.0
+
+        can_fk_check = foreign_key_check.get("can_check", False)
+        fk_mismatch = bool(foreign_key_check.get("fk_mismatch", False)) if can_fk_check else False
+
+        customer_exists = customer_check.get("column_exists", False)
+
+        if not account_valid:
+            decision = "REJECT"
+            reason = "Account number validation failed; dataset cannot be used for banking-grade processing."
+        elif account_valid and (not all_mandatory_present or not kyc_meets_threshold or fk_mismatch):
             decision = "HOLD"
             reasons = []
-            if not customer_valid:
-                reasons.append("customer ID validation failed")
-            if not mandatory_present:
-                missing = missing_columns_check.get("missing_mandatory", [])
-                reasons.append(f"missing mandatory columns: {', '.join(missing)}")
+            if not all_mandatory_present:
+                reasons.append(
+                    "missing mandatory columns: " + ", ".join(sorted(missing_mandatory))
+                )
             if not kyc_meets_threshold:
-                reasons.append(f"KYC completeness {kyc_check.get('kyc_completeness', 0)}% < 60%")
-            reason = f"Account number is valid, but: {', '.join(reasons)}."
+                reasons.append(f"KYC completeness {kyc_pct:.2f}% < 60%")
+            if fk_mismatch:
+                reasons.append("foreign-key inconsistency between account_number and customer_id")
+            if not customer_exists:
+                reasons.append("customer_id column not present; foreign-key checks skipped")
+            reason = "Account number is valid, but " + "; ".join(reasons) + "."
         else:
-            decision = "REJECT"
-            reason = "Account number validation failed or critical data integrity issues detected."
-        
+            decision = "APPROVE"
+            reason = (
+                "Account number validation passed, all mandatory columns are present, "
+                "and KYC completeness is at or above the 60% threshold."
+            )
+
         return {
             "decision": decision,
             "reason": reason,
             "account_valid": account_valid,
-            "customer_valid": customer_valid,
-            "mandatory_present": mandatory_present,
+            "mandatory_present": all_mandatory_present,
             "kyc_meets_threshold": kyc_meets_threshold,
-            "no_fk_mismatch": no_fk_mismatch
+            "no_fk_mismatch": not fk_mismatch
         }
     
-    def detect_purpose(self, df: pd.DataFrame, account_check: dict, customer_check: dict, 
-                      transaction_check: dict, balance_check: dict, status_check: dict):
+    def detect_purpose(self, df: pd.DataFrame, account_check: dict, customer_check: dict,
+                       transaction_check: dict, balance_check: dict, status_check: dict,
+                       kyc_check: dict):
         """
-        STEP-8: Purpose Detection Logic
-        Infer dataset purpose based on column combinations
+        STEP-8: Purpose Detection Logic (updated)
+
+        New rules:
+        - account_number + customer details → "Account Management Data"
+        - transaction_id / debit / credit / transaction_type → "Transaction Data"
+        - withdrawal / deposit / transfer keywords → "Transaction Operations"
+        - mix of account + transaction → "Core Banking Dataset"
+
+        Purpose must NEVER be "Unknown" if an account_number column is detected.
         """
         has_account = account_check.get("has_account_number_column", False)
-        has_customer = customer_check.get("column_exists", False)
-        has_transaction = transaction_check.get("has_transaction_data", False)
-        has_balance = balance_check.get("has_balance_column", False)
-        has_status = status_check.get("has_status_column", False)
-        
-        # Check for transaction columns specifically
-        transaction_cols = transaction_check.get("found_columns", {})
-        has_debit_credit = "debit" in transaction_cols or "credit" in transaction_cols
-        has_transaction_date = "transaction_date" in transaction_cols
-        
+        has_customer_id = customer_check.get("column_exists", False)
+
+        kyc_fields_found = (kyc_check or {}).get("found_kyc_fields", {})
+        has_customer_details = bool(has_customer_id or kyc_fields_found)
+
+        transaction_cols = transaction_check.get("found_columns", {}) if transaction_check else {}
+        tx_has_id = "transaction_id" in transaction_cols
+        tx_has_debit = "debit" in transaction_cols
+        tx_has_credit = "credit" in transaction_cols
+        tx_has_type = "transaction_type" in transaction_cols
+
+        has_transaction_data = any([tx_has_id, tx_has_debit, tx_has_credit, tx_has_type])
+
+        cols_lower = [self.normalize(c) for c in df.columns]
+        wdt_keywords = ["withdraw", "withdrawal", "deposit", "transfer", "transfer_to", "transfer_from"]
+        has_tx_operations = any(any(k in c for k in wdt_keywords) for c in cols_lower)
+
         purposes = []
         confidence_scores = []
-        
-        # Purpose 1: Account Verification
-        if has_account and not has_customer and not has_transaction and not has_balance:
-            purposes.append("Account Verification")
+
+        if has_account and has_customer_details and not has_transaction_data and not has_tx_operations:
+            purposes.append("Account Management Data")
             confidence_scores.append(90)
-        
-        # Purpose 2: Customer Account Mapping
-        if has_account and has_customer and not has_transaction:
-            purposes.append("Customer Account Mapping")
+
+        if has_transaction_data and not has_account and not has_customer_details:
+            purposes.append("Transaction Data")
             confidence_scores.append(85)
-        
-        # Purpose 3: Transaction Processing
-        if has_account and has_debit_credit and has_transaction_date:
-            purposes.append("Transaction Processing")
-            confidence_scores.append(95)
-        
-        # Purpose 4: Funds Validation
-        if has_account and has_balance and not has_transaction:
-            purposes.append("Funds Validation")
+
+        if has_tx_operations and not has_account and not has_customer_details:
+            purposes.append("Transaction Operations")
             confidence_scores.append(80)
-        
-        # Purpose 5: Transaction Authorization
-        if has_transaction and has_balance and has_status:
-            purposes.append("Transaction Authorization")
-            confidence_scores.append(90)
-        
-        # Purpose 6: Account Management
-        if has_account and has_status and has_customer:
-            purposes.append("Account Management")
-            confidence_scores.append(75)
-        
-        # Determine primary purpose
-        if purposes:
-            max_idx = confidence_scores.index(max(confidence_scores))
-            primary_purpose = purposes[max_idx]
-            purpose_confidence = confidence_scores[max_idx]
-        else:
-            primary_purpose = "General Banking Data"
-            purpose_confidence = 50
-        
-        # Generate purpose statement
+
+        if has_account and (has_transaction_data or has_tx_operations):
+            purposes.append("Core Banking Dataset")
+            confidence_scores.append(95)
+
+        if not purposes:
+            if has_account:
+                purposes.append("Account Management Data")
+                confidence_scores.append(70)
+            elif has_transaction_data or has_tx_operations:
+                purposes.append("Transaction Data")
+                confidence_scores.append(70)
+            else:
+                purposes.append("Unknown")
+                confidence_scores.append(40)
+
+        max_idx = confidence_scores.index(max(confidence_scores))
+        primary_purpose = purposes[max_idx]
+        purpose_confidence = confidence_scores[max_idx]
+
         purpose_statements = {
-            "Account Verification": "This dataset is used to verify account numbers and validate account existence.",
-            "Customer Account Mapping": "This dataset maps customers to their associated accounts for relationship management.",
-            "Transaction Processing": "This dataset contains transaction records for processing debits, credits, and transaction history.",
-            "Funds Validation": "This dataset validates account balances and available funds.",
-            "Transaction Authorization": "This dataset is used to authorize transactions based on balance and account status.",
-            "Account Management": "This dataset manages account status, customer relationships, and account lifecycle.",
-            "General Banking Data": "This dataset contains general banking information without a specific primary purpose."
+            "Account Management Data": "Dataset primarily contains account and customer details used for managing customer accounts.",
+            "Transaction Data": "Dataset primarily contains transactional records such as transaction IDs, debits, credits, and types.",
+            "Transaction Operations": "Dataset focuses on operational movements such as withdrawals, deposits, and transfers between accounts.",
+            "Core Banking Dataset": "Dataset combines account, customer, and transaction information typical of core banking systems.",
+            "Unknown": "Purpose could not be determined from the available columns."
         }
-        
+
         purpose_statement = purpose_statements.get(primary_purpose, "Purpose could not be determined.")
-        
+
         return {
             "primary_purpose": primary_purpose,
             "purpose_confidence": purpose_confidence,
             "purpose_statement": purpose_statement,
             "detected_purposes": purposes,
             "confidence_scores": confidence_scores
+        }
+
+    def generate_column_purpose_report(self, df: pd.DataFrame,
+                                       transaction_check: dict,
+                                       kyc_check: dict):
+        """
+        Extra human-readable explanation for banking reports.
+
+        Groups columns into:
+        1) Account / Customer details
+        2) Transaction columns
+        3) Withdrawal / Deposit / Transfer specific columns
+        """
+        columns = [str(c) for c in df.columns]
+
+        # 1️⃣ Account / Customer details
+        account_customer_cols = []
+
+        # From KYC detection
+        kyc_fields = (kyc_check or {}).get("found_kyc_fields", {})
+        account_customer_cols.extend(list(kyc_fields.values()))
+
+        # Common id / name / contact patterns
+        account_customer_keywords = [
+            "account", "acct", "accno", "account_number",
+            "customer", "cust", "client",
+            "name", "fullname", "full_name",
+            "email", "mail",
+            "phone", "mobile", "contact",
+            "address", "id_proof", "idcard", "aadhar", "pan", "passport"
+        ]
+        for col in columns:
+            norm = self.normalize(col)
+            if any(k in norm for k in account_customer_keywords):
+                account_customer_cols.append(col)
+
+        account_customer_cols = sorted(list(dict.fromkeys(account_customer_cols)))
+
+        # 2️⃣ Transaction columns
+        transaction_cols = []
+        tx_found = (transaction_check or {}).get("found_columns", {})
+        transaction_cols.extend(list(tx_found.values()))
+
+        transaction_keywords = [
+            "transaction_id", "txn_id", "trans_id",
+            "transaction_type", "txn_type", "trans_type",
+            "transaction_date", "txn_date", "trans_date",
+            "debit", "credit", "amount"
+        ]
+        for col in columns:
+            norm = self.normalize(col)
+            if any(k in norm for k in transaction_keywords):
+                transaction_cols.append(col)
+
+        transaction_cols = sorted(list(dict.fromkeys(transaction_cols)))
+
+        # 3️⃣ Withdrawal / Deposit / Transfer specific columns
+        wdt_cols = []
+        wdt_keywords = [
+            "withdraw", "withdrawal",
+            "deposit",
+            "transfer", "transfer_to", "transfer_from"
+        ]
+        for col in columns:
+            norm = self.normalize(col)
+            if any(k in norm for k in wdt_keywords):
+                wdt_cols.append(col)
+
+        wdt_cols = sorted(list(dict.fromkeys(wdt_cols)))
+
+        # Category counts for charts
+        category_counts = {
+            "Account / Customer Details": len(account_customer_cols),
+            "Transaction Columns": len(transaction_cols),
+            "Withdrawal / Deposit / Transfer": len(wdt_cols)
+        }
+
+        # Human‑readable reasoning texts (for the report / UI)
+        explanations = {}
+
+        if account_customer_cols:
+            explanations["account_customer"] = (
+                "This dataset contains standard customer and account identification fields "
+                "(such as account numbers, customer identifiers, names, emails, and phones) "
+                "used for account identification and verification."
+            )
+        else:
+            explanations["account_customer"] = (
+                "No strong account or customer detail columns were detected; "
+                "the file does not look like a typical customer/account master table."
+            )
+
+        if transaction_cols:
+            explanations["transaction"] = (
+                "This dataset contains transaction history columns (for example transaction IDs, "
+                "transaction types, dates, debits and credits) that are typically used to monitor "
+                "account activity and update running balances."
+            )
+        else:
+            explanations["transaction"] = (
+                "No strong transaction columns (like transaction_id, debit, credit, or transaction_date) "
+                "were detected; it does not appear to be a detailed transaction ledger."
+            )
+
+        if wdt_cols:
+            explanations["wdt"] = (
+                "This dataset contains explicit withdrawal, deposit, or transfer columns which are "
+                "typically used for auditing and verifying individual fund movements between accounts."
+            )
+        else:
+            explanations["wdt"] = (
+                "No explicit withdrawal/deposit/transfer columns were found; "
+                "fund movement may be encoded only through generic debit/credit amounts."
+            )
+
+        return {
+            "account_customer_columns": account_customer_cols,
+            "transaction_columns": transaction_cols,
+            "withdraw_deposit_transfer_columns": wdt_cols,
+            "category_counts": category_counts,
+            "explanations": explanations
         }
 
     def predict(self, csv_path):
@@ -1001,166 +1196,223 @@ class BankingDomainDetector:
         confidence_100 = round((matched_score / max_possible) * 100, 2)
         confidence_10 = round(confidence_100 / 10, 2)
 
-        # 7️⃣ Final decision
-        if confidence_100 >= 85:
-            decision = "CONFIRMED_BANKING"
-            qualitative = "Very Strong"
-        elif confidence_100 >= 65:
-            decision = "LIKELY_BANKING"
-            qualitative = "Strong"
-        else:
-            decision = "UNKNOWN"
-            qualitative = "Weak"
+        # 7️⃣ Account number & customer ID validation (always run)
+        account_number_validation = self.validate_account_numbers(df)
+        best_match = account_number_validation.get("summary", {}).get("best_match") if account_number_validation else None
+        account_number_check = {
+            "has_account_number_column": bool(account_number_validation and account_number_validation.get("account_like_columns")),
+            "best_match_column": best_match.get("column") if best_match else None,
+            "best_match_decision": best_match.get("decision") if best_match else None,
+            "best_match_probability": best_match.get("probability_account_number") if best_match else None
+        }
 
-        # 8️⃣ Only do account-number prediction if banking is detected
-        if decision != "UNKNOWN":
-            account_number_validation = self.validate_account_numbers(df)
-            best_match = account_number_validation.get("summary", {}).get("best_match") if account_number_validation else None
-            account_number_check = {
-                "has_account_number_column": bool(account_number_validation and account_number_validation.get("account_like_columns")),
-                "best_match_column": best_match.get("column") if best_match else None,
-                "best_match_decision": best_match.get("decision") if best_match else None,
-                "best_match_probability": best_match.get("probability_account_number") if best_match else None
-            }
-            # Check account status and missing columns
-            account_status = self.detect_account_status(df)
-            missing_columns_check = self.check_missing_columns(df)
-            balance_analysis = self.analyze_balance(df)
-            kyc_verification = self.verify_kyc(df)
-            customer_id_validation = self.validate_customer_id(df)
-            # Transaction validations
-            transaction_validation = self.validate_transaction_data(df)
-            balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
-            debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
-            fraud_detection = self.detect_fraud_patterns(df)
-            # Foreign key linking check
-            account_col = account_number_check.get("best_match_column")
-            customer_col = customer_id_validation.get("column_name")
-            foreign_key_check = self.check_foreign_key_linking(df, account_col, customer_col)
-            # Purpose detection
-            purpose_detection = self.detect_purpose(df, account_number_check, customer_id_validation, 
-                                                   transaction_validation, balance_analysis, account_status)
-            # Final decision logic (STEP-8)
-            final_decision = self.final_decision_logic(account_number_check, customer_id_validation,
-                                                      missing_columns_check, kyc_verification, foreign_key_check)
-            # Risk assessment (STEP-7)
-            risk_assessment = self.calculate_risk_assessment(missing_columns_check, kyc_verification, foreign_key_check)
+        customer_id_validation = self.validate_customer_id(df)
+
+        # 8️⃣ Domain decision – enforce banking when account_number OR customer_id exists
+        has_account_or_customer = bool(
+            account_number_check.get("has_account_number_column")
+            or customer_id_validation.get("column_exists")
+        )
+
+        if has_account_or_customer:
+            if account_number_check.get("best_match_decision") == "match":
+                decision = "CONFIRMED_BANKING"
+                qualitative = "Very Strong"
+            else:
+                decision = "LIKELY_BANKING"
+                qualitative = "Strong"
+            if confidence_100 < 65:
+                confidence_100 = 65.0
+                confidence_10 = round(confidence_100 / 10, 2)
         else:
-            account_number_validation = None
-            account_number_check = {
-                "has_account_number_column": False,
-                "best_match_column": None,
-                "best_match_decision": None,
-                "best_match_probability": None
-            }
-            account_status = {
-                "has_status_column": False,
-                "status_column": None,
-                "status_values": [],
-                "active_count": 0,
-                "inactive_count": 0,
-                "total_with_status": 0
-            }
-            missing_columns_check = {
-                "found_mandatory": {},
-                "missing_mandatory": ["account_status", "balance"],
-                "found_optional": {},
-                "missing_optional": [],
-                "all_mandatory_present": False
-            }
-            balance_analysis = {
-                "has_balance_column": False,
-                "balance_column": None,
-                "zero_or_negative_count": 0,
-                "total_rows": len(df),
-                "zero_or_negative_pct": 0.0
-            }
-            kyc_verification = {
-                "kyc_verified": False,
-                "has_user_name": False,
-                "found_kyc_fields": {},
-                "missing_kyc_fields": [],
-                "kyc_completeness": 0.0,
-                "meets_threshold": False
-            }
-            customer_id_validation = {
-                "column_exists": False,
-                "column_name": None,
-                "not_null": False,
-                "not_null_ratio": 0.0,
-                "unique": False,
-                "unique_ratio": 0.0,
-                "format_valid": False,
-                "format_valid_ratio": 0.0,
-                "no_symbols": False,
-                "no_symbols_ratio": 0.0,
-                "length_valid": False,
-                "length_valid_ratio": 0.0,
-                "data_type_valid": False,
-                "data_type_valid_ratio": 0.0,
-                "total_rows": len(df),
-                "rules_passed": 0,
-                "rules_total": 7,
-                "probability_customer_id": 0.0,
-                "decision": "not_found"
-            }
-            transaction_validation = {
-                "has_transaction_data": False,
-                "found_columns": {},
-                "missing_columns": [],
-                "completeness": 0.0,
-                "validation_results": {"violations": []},
-                "is_valid": False
-            }
-            debit_credit_validation = {
-                "has_balance": False,
-                "can_validate": False,
-                "insufficient_funds_count": 0,
-                "total_debit_transactions": 0,
-                "validation_passed": False
-            }
-            fraud_detection = {
-                "can_analyze": False,
-                "suspicious_patterns": [],
-                "fraud_risk": "LOW",
-                "risk_factors": 0
-            }
-            foreign_key_check = {
-                "can_check": False,
-                "account_column": None,
-                "customer_column": None,
-                "relationship_type": None,
-                "missing_links_count": 0,
-                "total_accounts": 0,
-                "total_customers": 0,
-                "fk_mismatch": False,
-                "linking_valid": False,
-                "violations": []
-            }
-            purpose_detection = {
-                "primary_purpose": "Unknown",
-                "purpose_confidence": 0,
-                "purpose_statement": "Cannot determine purpose - banking domain not detected.",
-                "detected_purposes": [],
-                "confidence_scores": []
-            }
-            final_decision = {
-                "decision": "REJECT",
-                "reason": "Banking domain not detected.",
-                "account_valid": False,
-                "customer_valid": False,
-                "mandatory_present": False,
-                "kyc_meets_threshold": False,
-                "no_fk_mismatch": False
-            }
-            risk_assessment = {
-                "risk_level": "HIGH",
-                "risk_factors": ["Banking domain not detected"],
-                "missing_account_status": True,
-                "missing_balance": True,
-                "kyc_below_threshold": True,
-                "fk_mismatch": False
-            }
+            if confidence_100 >= 85:
+                decision = "CONFIRMED_BANKING"
+                qualitative = "Very Strong"
+            elif confidence_100 >= 65:
+                decision = "LIKELY_BANKING"
+                qualitative = "Strong"
+            else:
+                decision = "UNKNOWN"
+                qualitative = "Weak"
+
+        # 9️⃣ Downstream banking checks (safe on any tabular file)
+        account_status = self.detect_account_status(df)
+        missing_columns_check = self.check_missing_columns(df)
+        balance_analysis = self.analyze_balance(df)
+        kyc_verification = self.verify_kyc(df)
+        transaction_validation = self.validate_transaction_data(df)
+        balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
+        debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
+        fraud_detection = self.detect_fraud_patterns(df)
+
+        # Foreign key linking check – skip cleanly if customer_id is missing
+        account_col = account_number_check.get("best_match_column")
+        customer_col = customer_id_validation.get("column_name")
+        foreign_key_check = self.check_foreign_key_linking(df, account_col, customer_col)
+
+        # Purpose detection (updated rules)
+        purpose_detection = self.detect_purpose(
+            df,
+            account_number_check,
+            customer_id_validation,
+            transaction_validation,
+            balance_analysis,
+            account_status,
+            kyc_verification
+        )
+
+        # Column‑purpose report for UI / charts
+        column_purpose_report = self.generate_column_purpose_report(df, transaction_validation, kyc_verification)
+
+        # Final decision logic and risk assessment
+        final_decision = self.final_decision_logic(
+            account_number_check,
+            customer_id_validation,
+            missing_columns_check,
+            kyc_verification,
+            foreign_key_check
+        )
+        risk_assessment = self.calculate_risk_assessment(
+            account_number_check,
+            missing_columns_check,
+            kyc_verification,
+            foreign_key_check
+        )
+
+        # 🔟 Ordered, human-readable summary for the banking engine
+        has_account_col = account_number_check.get("has_account_number_column", False)
+        account_match_decision = account_number_check.get("best_match_decision")
+        customer_exists = customer_id_validation.get("column_exists", False)
+
+        # 1. Domain Detection Result
+        if decision == "UNKNOWN":
+            domain_summary = "Banking domain not confidently detected from this file."
+        else:
+            domain_summary = (
+                f"Banking domain detected ({decision.replace('_', ' ').title()}) "
+                f"with overall confidence {confidence_100:.2f}% based on column and value patterns."
+            )
+
+        # 2. Dataset Purpose Detection
+        purpose_summary = (
+            f"{purpose_detection.get('primary_purpose')} "
+            f"(confidence {purpose_detection.get('purpose_confidence', 0)}%). "
+            f"{purpose_detection.get('purpose_statement')}"
+        )
+
+        # 3. Account Number Validation (ML + Rules)
+        if has_account_col and account_match_decision == "match":
+            acc_validation_summary = (
+                f"Account number column detected as `{account_number_check.get('best_match_column')}` "
+                f"with probability {account_number_check.get('best_match_probability', 0)}% "
+                "using rule-based and statistical pattern checks."
+            )
+        elif has_account_col:
+            acc_validation_summary = (
+                f"An account-like column `{account_number_check.get('best_match_column')}` was found, "
+                "but it did not strongly satisfy account-number validation rules."
+            )
+        else:
+            acc_validation_summary = "No strong account number column could be validated in this file."
+
+        # 4. Customer ID Validation (if exists)
+        if customer_exists:
+            cust_validation_summary = (
+                f"Customer ID column detected as `{customer_id_validation.get('column_name')}` with "
+                f"overall probability {customer_id_validation.get('probability_customer_id', 0)}% "
+                "based on completeness, uniqueness and format checks."
+            )
+        else:
+            cust_validation_summary = (
+                "No customer_id column detected; customer-level foreign key checks are skipped, "
+                "but the rest of the pipeline continues with a warning only."
+            )
+
+        # 5. Foreign Key Linking Check (if possible)
+        if foreign_key_check.get("can_check"):
+            if foreign_key_check.get("fk_mismatch"):
+                fk_summary = (
+                    f"Foreign-key relationship between `{foreign_key_check.get('account_column')}` and "
+                    f"`{foreign_key_check.get('customer_column')}` has mismatches and needs correction."
+                )
+            else:
+                fk_summary = (
+                    f"Foreign-key relationship between `{foreign_key_check.get('account_column')}` and "
+                    f"`{foreign_key_check.get('customer_column')}` is consistent (no mismatches detected)."
+                )
+        else:
+            fk_summary = "Foreign-key consistency could not be evaluated (missing account or customer identifier columns)."
+
+        # 6. Mandatory Column Check
+        missing_mand = missing_columns_check.get("missing_mandatory", [])
+        if not missing_mand:
+            mandatory_summary = (
+                "All mandatory banking columns (account_number, customer_id, account_status, balance) "
+                "are present in the dataset."
+            )
+        else:
+            mandatory_summary = (
+                "Missing mandatory banking column(s): "
+                + ", ".join(sorted(missing_mand))
+                + ". Risk is marked HIGH and decision should remain on HOLD until these are provided."
+            )
+
+        # 7. KYC Completeness
+        kyc_summary = (
+            f"KYC completeness is {kyc_verification.get('kyc_completeness', 0):.2f}%; "
+            f"{'meets' if kyc_verification.get('meets_threshold') else 'does not meet'} "
+            "the 60% minimum threshold."
+        )
+
+        # 8. Risk Assessment
+        rf = risk_assessment.get("risk_factors") or []
+        if rf:
+            risk_factors_text = "; ".join(rf)
+        else:
+            risk_factors_text = "No major risk drivers detected."
+        risk_summary = f"Overall risk level: {risk_assessment.get('risk_level')}. {risk_factors_text}"
+
+        # 9. Final Decision (APPROVE / HOLD / REJECT)
+        final_decision_summary = (
+            f"Final decision: {final_decision.get('decision')} – {final_decision.get('reason')}"
+        )
+
+        # 10. Clear Next Action Steps
+        if final_decision.get("decision") == "APPROVE":
+            next_steps = (
+                "Proceed with ingesting this dataset into downstream banking systems, "
+                "and continue monitoring for schema or quality drift."
+            )
+        elif final_decision.get("decision") == "HOLD":
+            actions = []
+            if missing_mand:
+                actions.append(
+                    "provide the missing mandatory columns: " + ", ".join(sorted(missing_mand))
+                )
+            if not kyc_verification.get("meets_threshold"):
+                actions.append("improve KYC field coverage to at least 60%")
+            if foreign_key_check.get("can_check") and foreign_key_check.get("fk_mismatch"):
+                actions.append("resolve account_number ↔ customer_id foreign-key mismatches")
+            next_steps = "Action required: " + "; ".join(actions) + "." if actions else \
+                "Action required: review and resolve the highlighted data quality issues before approval."
+        else:
+            next_steps = (
+                "Dataset is not suitable for banking-grade processing in its current form; "
+                "fix account-number structure and other critical issues, then re-upload a corrected file."
+            )
+
+        ordered_summary = {
+            "1_domain_detection_result": domain_summary,
+            "2_dataset_purpose_detection": purpose_summary,
+            "3_account_number_validation": acc_validation_summary,
+            "4_customer_id_validation": cust_validation_summary,
+            "5_foreign_key_linking_check": fk_summary,
+            "6_mandatory_column_check": mandatory_summary,
+            "7_kyc_completeness": kyc_summary,
+            "8_risk_assessment": risk_summary,
+            "9_final_decision": final_decision_summary,
+            "10_next_action_steps": next_steps
+        }
 
         return {
             "domain": self.domain if decision != "UNKNOWN" else "Unknown",
@@ -1189,6 +1441,8 @@ class BankingDomainDetector:
             "fraud_detection": fraud_detection,
             "foreign_key_check": foreign_key_check,
             "purpose_detection": purpose_detection,
+            "column_purpose_report": column_purpose_report,
             "final_decision": final_decision,
-            "risk_assessment": risk_assessment
+            "risk_assessment": risk_assessment,
+            "ordered_summary": ordered_summary
         }
