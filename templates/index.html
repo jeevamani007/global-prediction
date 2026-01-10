@@ -340,6 +340,12 @@ uploadBtn.onclick = async () => {
         if (data.banking_column_purpose_report) {
             sessionStorage.setItem("columnPurposeReport", JSON.stringify(data.banking_column_purpose_report));
         }
+        if (data.banking_probability_explanations) {
+            sessionStorage.setItem("probabilityExplanations", JSON.stringify(data.banking_probability_explanations));
+        }
+        if (data.banking_transaction_rules) {
+            sessionStorage.setItem("bankingTransactionRules", JSON.stringify(data.banking_transaction_rules));
+        }
 
         // Display domain results on index.html page
         // Always show results if any domain data exists

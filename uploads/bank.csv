@@ -1,61 +1,51 @@
-account_id,customer_name,account_type,balance,currency,branch_code,account_status,opening_date,email,phone,city,country,credit_score,last_transaction_date,transaction_amount,transaction_type
-ACC001,Rajesh Kumar,Savings,125000.50,INR,BR001,Active,2020-03-15,rajesh.kumar@email.com,+91-9876543210,Mumbai,India,750,2026-01-07,5000.00,Credit
-ACC002,Priya Sharma,Current,450000.75,INR,BR002,Active,2019-07-22,priya.sharma@email.com,+91-9876543211,Delhi,India,720,2026-01-06,15000.00,Debit
-ACC003,Amit Patel,Savings,87500.25,INR,BR003,Active,2021-01-10,amit.patel@email.com,+91-9876543212,Ahmedabad,India,680,2026-01-05,2500.00,Credit
-ACC004,Sneha Desai,Fixed Deposit,500000.00,INR,BR001,Active,2022-05-18,sneha.desai@email.com,+91-9876543213,Mumbai,India,800,2026-01-04,500000.00,Credit
-ACC005,Vikram Singh,Current,320000.50,INR,BR004,Active,2018-11-30,vikram.singh@email.com,+91-9876543214,Bangalore,India,710,2026-01-07,8000.00,Debit
-ACC006,Anita Reddy,Savings,95000.00,INR,BR005,Active,2020-09-12,anita.reddy@email.com,+91-9876543215,Hyderabad,India,690,2026-01-06,3000.00,Credit
-ACC007,Rahul Gupta,Salary,65000.75,INR,BR002,Active,2021-06-25,rahul.gupta@email.com,+91-9876543216,Delhi,India,730,2026-01-07,65000.00,Credit
-ACC008,Deepika Menon,Savings,180000.25,INR,BR006,Active,2019-03-08,deepika.menon@email.com,+91-9876543217,Kochi,India,760,2026-01-05,12000.00,Debit
-ACC009,Sanjay Verma,Current,275000.50,INR,BR003,Active,2020-12-15,sanjay.verma@email.com,+91-9876543218,Ahmedabad,India,700,2026-01-06,20000.00,Credit
-ACC010,Kavita Joshi,Savings,142000.00,INR,BR001,Active,2022-02-20,kavita.joshi@email.com,+91-9876543219,Mumbai,India,740,2026-01-07,7500.00,Debit
-ACC011,Arjun Nair,Fixed Deposit,750000.00,INR,BR004,Active,2021-08-10,arjun.nair@email.com,+91-9876543220,Bangalore,India,820,2026-01-04,750000.00,Credit
-ACC012,Pooja Iyer,Savings,98500.50,INR,BR005,Active,2020-04-18,pooja.iyer@email.com,+91-9876543221,Hyderabad,India,695,2026-01-06,4500.00,Credit
-ACC013,Manoj Tiwari,Current,385000.75,INR,BR002,Active,2019-10-05,manoj.tiwari@email.com,+91-9876543222,Delhi,India,725,2026-01-07,18000.00,Debit
-ACC014,Ritu Saxena,Salary,72000.00,INR,BR006,Active,2021-11-12,ritu.saxena@email.com,+91-9876543223,Kochi,India,710,2026-01-07,72000.00,Credit
-ACC015,Karan Mehta,Savings,156000.25,INR,BR003,Active,2020-07-28,karan.mehta@email.com,+91-9876543224,Ahmedabad,India,750,2026-01-05,9000.00,Debit
-ACC016,Divya Pillai,Current,420000.50,INR,BR001,Active,2018-05-14,divya.pillai@email.com,+91-9876543225,Mumbai,India,780,2026-01-06,25000.00,Credit
-ACC017,Suresh Rao,Savings,112000.75,INR,BR004,Active,2022-01-22,suresh.rao@email.com,+91-9876543226,Bangalore,India,705,2026-01-07,5500.00,Credit
-ACC018,Meera Kapoor,Fixed Deposit,600000.00,INR,BR005,Active,2021-04-30,meera.kapoor@email.com,+91-9876543227,Hyderabad,India,810,2026-01-04,600000.00,Credit
-ACC019,Aditya Bhatt,Current,295000.25,INR,BR002,Active,2019-12-08,aditya.bhatt@email.com,+91-9876543228,Delhi,India,720,2026-01-06,14000.00,Debit
-ACC020,Nisha Agarwal,Savings,88000.50,INR,BR006,Active,2020-08-16,nisha.agarwal@email.com,+91-9876543229,Kochi,India,685,2026-01-05,3500.00,Credit
-ACC021,Rohit Bansal,Salary,78000.00,INR,BR003,Active,2021-03-25,rohit.bansal@email.com,+91-9876543230,Ahmedabad,India,735,2026-01-07,78000.00,Credit
-ACC022,Swati Malhotra,Savings,165000.75,INR,BR001,Active,2020-11-10,swati.malhotra@email.com,+91-9876543231,Mumbai,India,755,2026-01-06,10000.00,Debit
-ACC023,Nikhil Chopra,Current,340000.25,INR,BR004,Active,2019-06-18,nikhil.chopra@email.com,+91-9876543232,Bangalore,India,715,2026-01-07,16000.00,Credit
-ACC024,Anjali Bhargava,Savings,125000.50,INR,BR005,Active,2022-03-05,anjali.bhargava@email.com,+91-9876543233,Hyderabad,India,745,2026-01-05,6000.00,Debit
-ACC025,Vishal Sinha,Fixed Deposit,850000.00,INR,BR002,Active,2021-09-20,vishal.sinha@email.com,+91-9876543234,Delhi,India,830,2026-01-04,850000.00,Credit
-ACC026,Preeti Dubey,Savings,92000.75,INR,BR006,Active,2020-05-28,preeti.dubey@email.com,+91-9876543235,Kochi,India,690,2026-01-06,4000.00,Credit
-ACC027,Gaurav Mishra,Current,410000.50,INR,BR003,Active,2018-08-12,gaurav.mishra@email.com,+91-9876543236,Ahmedabad,India,775,2026-01-07,22000.00,Debit
-ACC028,Simran Kaur,Salary,68000.25,INR,BR001,Active,2021-07-15,simran.kaur@email.com,+91-9876543237,Mumbai,India,725,2026-01-07,68000.00,Credit
-ACC029,Harish Bhatia,Savings,138000.00,INR,BR004,Active,2020-10-22,harish.bhatia@email.com,+91-9876543238,Bangalore,India,740,2026-01-05,8500.00,Debit
-ACC030,Tanvi Shah,Current,365000.75,INR,BR005,Active,2019-02-14,tanvi.shah@email.com,+91-9876543239,Hyderabad,India,765,2026-01-06,19000.00,Credit
-ACC031,Akash Pandey,Savings,105000.50,INR,BR002,Active,2022-04-18,akash.pandey@email.com,+91-9876543240,Delhi,India,700,2026-01-07,5200.00,Credit
-ACC032,Ritika Jain,Fixed Deposit,550000.00,INR,BR006,Active,2021-10-30,ritika.jain@email.com,+91-9876543241,Kochi,India,795,2026-01-04,550000.00,Credit
-ACC033,Manish Kumar,Current,285000.25,INR,BR003,Active,2019-11-25,manish.kumar@email.com,+91-9876543242,Ahmedabad,India,710,2026-01-06,13000.00,Debit
-ACC034,Sonali Rane,Savings,118000.75,INR,BR001,Active,2020-06-08,sonali.rane@email.com,+91-9876543243,Mumbai,India,735,2026-01-05,6500.00,Credit
-ACC035,Abhishek Nanda,Salary,75000.50,INR,BR004,Active,2021-12-12,abhishek.nanda@email.com,+91-9876543244,Bangalore,India,720,2026-01-07,75000.00,Credit
-ACC036,Neha Kulkarni,Savings,148000.00,INR,BR005,Active,2020-02-20,neha.kulkarni@email.com,+91-9876543245,Hyderabad,India,750,2026-01-06,9500.00,Debit
-ACC037,Rajeev Dhawan,Current,395000.25,INR,BR002,Active,2018-09-05,rajeev.dhawan@email.com,+91-9876543246,Delhi,India,770,2026-01-07,21000.00,Credit
-ACC038,Pallavi Sood,Savings,82000.75,INR,BR006,Active,2022-05-15,pallavi.sood@email.com,+91-9876543247,Kochi,India,680,2026-01-05,3800.00,Credit
-ACC039,Varun Arora,Fixed Deposit,700000.00,INR,BR003,Active,2021-06-28,varun.arora@email.com,+91-9876543248,Ahmedabad,India,815,2026-01-04,700000.00,Credit
-ACC040,Shruti Bajaj,Current,315000.50,INR,BR001,Active,2019-04-10,shruti.bajaj@email.com,+91-9876543249,Mumbai,India,725,2026-01-06,15500.00,Debit
-ACC041,Pranav Deshmukh,Savings,132000.25,INR,BR004,Active,2020-12-18,pranav.deshmukh@email.com,+91-9876543250,Bangalore,India,745,2026-01-07,7800.00,Credit
-ACC042,Isha Sethi,Salary,71000.00,INR,BR005,Active,2021-08-22,isha.sethi@email.com,+91-9876543251,Hyderabad,India,715,2026-01-07,71000.00,Credit
-ACC043,Mohit Garg,Savings,96000.75,INR,BR002,Active,2020-03-30,mohit.garg@email.com,+91-9876543252,Delhi,India,695,2026-01-05,4200.00,Debit
-ACC044,Aditi Thakur,Current,445000.50,INR,BR006,Active,2018-07-14,aditi.thakur@email.com,+91-9876543253,Kochi,India,785,2026-01-06,24000.00,Credit
-ACC045,Siddharth Prasad,Savings,155000.25,INR,BR003,Active,2022-01-08,siddharth.prasad@email.com,+91-9876543254,Ahmedabad,India,760,2026-01-07,9200.00,Credit
-ACC046,Kritika Mahajan,Fixed Deposit,650000.00,INR,BR001,Active,2021-05-20,kritika.mahajan@email.com,+91-9876543255,Mumbai,India,805,2026-01-04,650000.00,Credit
-ACC047,Yash Tripathi,Current,305000.75,INR,BR004,Active,2019-08-28,yash.tripathi@email.com,+91-9876543256,Bangalore,India,720,2026-01-06,14500.00,Debit
-ACC048,Riya Khanna,Savings,108000.50,INR,BR005,Active,2020-09-15,riya.khanna@email.com,+91-9876543257,Hyderabad,India,705,2026-01-05,5600.00,Credit
-ACC049,Ashish Bose,Salary,79000.25,INR,BR002,Active,2021-11-30,ashish.bose@email.com,+91-9876543258,Delhi,India,730,2026-01-07,79000.00,Credit
-ACC050,Tanya Mathur,Savings,142000.00,INR,BR006,Active,2020-07-12,tanya.mathur@email.com,+91-9876543259,Kochi,India,755,2026-01-06,8800.00,Debit
-ACC051,Kunal Ghosh,Current,425000.75,INR,BR003,Active,2018-10-20,kunal.ghosh@email.com,+91-9876543260,Ahmedabad,India,780,2026-01-07,23000.00,Credit
-ACC052,Payal Saxena,Savings,89000.50,INR,BR001,Active,2022-02-25,payal.saxena@email.com,+91-9876543261,Mumbai,India,685,2026-01-05,3900.00,Credit
-ACC053,Aryan Kohli,Fixed Deposit,800000.00,INR,BR004,Active,2021-07-18,aryan.kohli@email.com,+91-9876543262,Bangalore,India,825,2026-01-04,800000.00,Credit
-ACC054,Priyanka Naik,Current,335000.25,INR,BR005,Active,2019-12-05,priyanka.naik@email.com,+91-9876543263,Hyderabad,India,735,2026-01-06,17000.00,Debit
-ACC055,Vivek Chawla,Savings,122000.50,INR,BR002,Active,2020-04-22,vivek.chawla@email.com,+91-9876543264,Delhi,India,740,2026-01-07,6800.00,Credit
-ACC056,Aishwarya Rao,Salary,73000.75,INR,BR006,Active,2021-09-10,aishwarya.rao@email.com,+91-9876543265,Kochi,India,725,2026-01-07,73000.00,Credit
-ACC057,Sandeep Mistry,Savings,168000.00,INR,BR003,Active,2020-11-28,sandeep.mistry@email.com,+91-9876543266,Ahmedabad,India,765,2026-01-05,10500.00,Debit
-ACC058,Nidhi Banerjee,Current,455000.25,INR,BR001,Active,2018-06-15,nidhi.banerjee@email.com,+91-9876543267,Mumbai,India,790,2026-01-06,26000.00,Credit
-ACC059,Kartik Vyas,Savings,135000.50,INR,BR004,Active,2022-03-20,kartik.vyas@email.com,+91-9876543268,Bangalore,India,750,2026-01-07,8200.00,Credit
-ACC060,Snehal Patil,Fixed Deposit,900000.00,INR,BR005,Active,2021-10-12,snehal.patil@email.com,+91-9876543269,Hyderabad,India,840,2026-01-04,900000.00,Credit
+customer_id,customer_name,age,gender,city,account_number,account_type,kyc_status,balance,loan_type,loan_amount,interest_rate,due_date,last_transaction_date,account_status
+1,Ravi Kumar,34,Male,Chennai,ACC10001,Savings,Verified,45000,Home Loan,2500000,8.5,2035-12-31,2025-01-10,Active
+2,Anitha Sharma,36,Female,Bangalore,ACC10002,Savings,Verified,120000,Personal Loan,300000,12.0,2028-06-30,2025-01-12,Active
+3,Suresh Patel,29,Male,Ahmedabad,ACC10003,Current,Pending,35000,Education Loan,600000,6.75,2030-03-31,2025-01-11,Inactive
+4,Meena Iyer,32,Female,Coimbatore,ACC10004,Savings,Verified,9800,Car Loan,450000,9.25,2029-08-15,2025-01-09,Active
+5,Arjun Singh,39,Male,Delhi,ACC10005,Current,Rejected,560000,Business Loan,1500000,11.5,2032-11-20,2025-01-05,Frozen
+6,Priya Nair,28,Female,Kochi,ACC10006,Savings,Verified,67000,Personal Loan,200000,11.0,2027-05-30,2025-01-08,Active
+7,Karthik Raj,41,Male,Salem,ACC10007,Current,Verified,890000,Business Loan,2500000,10.5,2034-04-10,2025-01-13,Active
+8,Sneha Gupta,35,Female,Pune,ACC10008,Savings,Verified,15000,Home Loan,1800000,8.25,2036-09-15,2025-01-07,Active
+9,Vikram Rao,31,Male,Hyderabad,ACC10009,Savings,Pending,23000,Personal Loan,150000,13.5,2027-12-01,2025-01-04,Inactive
+10,Divya Menon,27,Female,Trivandrum,ACC10010,Savings,Verified,54000,Education Loan,400000,7.2,2031-06-20,2025-01-06,Active
+11,Ajay Verma,38,Male,Jaipur,ACC10011,Current,Verified,760000,Business Loan,1200000,11.0,2033-10-10,2025-01-14,Active
+12,Pooja Shah,33,Female,Surat,ACC10012,Savings,Verified,82000,Personal Loan,220000,12.8,2028-01-31,2025-01-03,Active
+13,Naveen Kumar,45,Male,Madurai,ACC10013,Current,Verified,990000,Home Loan,3200000,8.4,2038-05-15,2025-01-02,Active
+14,Keerthi S,26,Female,Erode,ACC10014,Savings,Pending,12000,Education Loan,350000,6.9,2030-11-30,2025-01-01,Inactive
+15,Manoj Tiwari,42,Male,Varanasi,ACC10015,Current,Verified,640000,Business Loan,900000,10.9,2031-09-01,2025-01-15,Active
+16,Aishwarya R,30,Female,Trichy,ACC10016,Savings,Verified,73000,Personal Loan,180000,11.5,2027-08-12,2025-01-11,Active
+17,Santosh Patil,37,Male,Nagpur,ACC10017,Current,Verified,480000,Car Loan,520000,9.8,2029-02-28,2025-01-10,Active
+18,Neha Joshi,34,Female,Udaipur,ACC10018,Savings,Verified,91000,Home Loan,2100000,8.6,2037-03-25,2025-01-12,Active
+19,Rahul Das,28,Male,Kolkata,ACC10019,Savings,Pending,19000,Personal Loan,100000,14.0,2026-12-31,2025-01-05,Inactive
+20,Lakshmi Devi,40,Female,Nellore,ACC10020,Current,Verified,870000,Business Loan,1300000,11.2,2033-07-19,2025-01-14,Active
+21,Rohit Mehta,35,Male,Mumbai,ACC10021,Savings,Verified,68000,Personal Loan,250000,12.5,2028-03-31,2025-01-09,Active
+22,Sunita Rao,44,Female,Mysore,ACC10022,Current,Verified,540000,Business Loan,1100000,11.1,2032-06-15,2025-01-08,Active
+23,Amit Kulkarni,39,Male,Pune,ACC10023,Savings,Verified,92000,Car Loan,600000,9.4,2030-12-10,2025-01-13,Active
+24,Deepa S,29,Female,Vellore,ACC10024,Savings,Pending,16000,Education Loan,300000,6.8,2031-04-30,2025-01-06,Inactive
+25,Harish N,46,Male,Tirunelveli,ACC10025,Current,Verified,1200000,Business Loan,2000000,10.2,2034-09-20,2025-01-15,Active
+26,Swathi P,31,Female,Warangal,ACC10026,Savings,Verified,57000,Personal Loan,160000,12.1,2027-10-31,2025-01-11,Active
+27,Imran Khan,34,Male,Hyderabad,ACC10027,Savings,Verified,83000,Home Loan,1900000,8.7,2036-02-28,2025-01-07,Active
+28,Kavya R,26,Female,Bellary,ACC10028,Savings,Pending,14000,Education Loan,280000,7.0,2031-07-31,2025-01-03,Inactive
+29,Joseph Mathew,48,Male,Kottayam,ACC10029,Current,Verified,670000,Business Loan,1400000,11.3,2033-05-10,2025-01-14,Active
+30,Shalini G,37,Female,Noida,ACC10030,Savings,Verified,96000,Personal Loan,240000,12.4,2028-09-30,2025-01-12,Active
+31,Suresh Babu,52,Male,Tirupati,ACC10031,Current,Verified,430000,Car Loan,480000,9.6,2029-11-30,2025-01-10,Active
+32,Preethi V,28,Female,Karur,ACC10032,Savings,Verified,51000,Education Loan,360000,6.95,2032-03-31,2025-01-08,Active
+33,Vinod K,41,Male,Hubli,ACC10033,Current,Verified,780000,Business Loan,1250000,10.8,2034-01-15,2025-01-14,Active
+34,Nithya M,35,Female,Dindigul,ACC10034,Savings,Verified,88000,Home Loan,1700000,8.3,2035-06-30,2025-01-09,Active
+35,Anand J,27,Male,Thoothukudi,ACC10035,Savings,Pending,13000,Personal Loan,90000,14.2,2026-08-31,2025-01-02,Inactive
+36,Revathi S,43,Female,Thanjavur,ACC10036,Current,Verified,520000,Business Loan,1000000,11.0,2032-12-31,2025-01-15,Active
+37,Prakash R,38,Male,Kanchipuram,ACC10037,Savings,Verified,64000,Car Loan,550000,9.9,2030-04-30,2025-01-11,Active
+38,Farzana Begum,32,Female,Vijayawada,ACC10038,Savings,Verified,72000,Personal Loan,190000,12.7,2027-11-30,2025-01-13,Active
+39,Ramesh G,50,Male,Tanjore,ACC10039,Current,Verified,810000,Business Loan,1600000,10.6,2034-08-20,2025-01-14,Active
+40,Sharmila K,29,Female,Cuddalore,ACC10040,Savings,Pending,18000,Education Loan,320000,7.1,2032-05-31,2025-01-04,Inactive
+41,Naresh P,36,Male,Ongole,ACC10041,Savings,Verified,86000,Personal Loan,210000,12.9,2028-02-28,2025-01-10,Active
+42,Latha R,47,Female,Chidambaram,ACC10042,Current,Verified,690000,Business Loan,1350000,11.4,2033-11-30,2025-01-15,Active
+43,Sanjay D,34,Male,Indore,ACC10043,Savings,Verified,77000,Home Loan,1600000,8.45,2036-07-31,2025-01-12,Active
+44,Mahalakshmi S,39,Female,Pollachi,ACC10044,Savings,Verified,93000,Car Loan,580000,9.7,2031-01-31,2025-01-11,Active
+45,Faizal A,28,Male,Malappuram,ACC10045,Savings,Pending,21000,Personal Loan,120000,13.8,2027-03-31,2025-01-06,Inactive
+46,Gowtham R,42,Male,Hosur,ACC10046,Current,Verified,510000,Business Loan,980000,10.4,2032-08-31,2025-01-14,Active
+47,Saranya V,31,Female,Tenkasi,ACC10047,Savings,Verified,60000,Education Loan,420000,7.3,2033-06-30,2025-01-09,Active
+48,Murugan T,55,Male,Ramanathapuram,ACC10048,Current,Verified,870000,Home Loan,2800000,8.2,2039-12-31,2025-01-15,Active
+49,Kiran P,33,Male,Nizamabad,ACC10049,Savings,Verified,74000,Personal Loan,175000,12.6,2027-09-30,2025-01-10,Active
+50,Uma Maheshwari,45,Female,Krishnagiri,ACC10050,Current,Verified,660000,Business Loan,1150000,11.1,2033-04-30,2025-01-14,Active

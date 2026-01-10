@@ -783,21 +783,32 @@ class CoreBankingEngine:
                 "confidence": role_info["confidence"]
             })
         
-        # Count rules
+        # Count rules - only for non-failed cases (confidence > 0 and not invalid)
         all_rules_applied = []
         all_rules_passed = []
         all_rules_failed = []
         all_rules_skipped = []
         
         for col, validation in column_validations.items():
-            all_rules_applied.extend([f"{col}:{rule}" for rule in validation.get("rules_applied", [])])
-            all_rules_passed.extend([f"{col}:{rule}" for rule in validation.get("rules_passed", [])])
-            all_rules_failed.extend([f"{col}:{rule['rule']}" for rule in validation.get("rules_failed", [])])
-            all_rules_skipped.extend([f"{col}:{rule['rule']}" for rule in validation.get("rules_skipped", [])])
+            # Only include validations for columns with positive confidence or valid status
+            if validation.get("confidence", 0) > 0 or validation.get("is_valid") is not False:
+                all_rules_applied.extend([f"{col}:{rule}" for rule in validation.get("rules_applied", [])])
+                all_rules_passed.extend([f"{col}:{rule}" for rule in validation.get("rules_passed", [])])
+                all_rules_failed.extend([f"{col}:{rule['rule']}" for rule in validation.get("rules_failed", [])])
+                all_rules_skipped.extend([f"{col}:{rule['rule']}" for rule in validation.get("rules_skipped", [])])
+        
+        # Filter detected columns to only include those with confidence > 0
+        filtered_detected_columns = [col for col in detected_columns if col.get("confidence", 0) > 0]
+        
+        # Filter column validations to only include non-failed cases
+        filtered_column_validations = {
+            col: validation for col, validation in column_validations.items()
+            if validation.get("confidence", 0) > 0 or validation.get("is_valid") is not False
+        }
         
         return {
-            "detected_columns": detected_columns,
-            "column_validations": column_validations,
+            "detected_columns": filtered_detected_columns,
+            "column_validations": filtered_column_validations,
             "cross_validations": cross_validations,
             "validation_summary": {
                 "rules_applied": all_rules_applied,

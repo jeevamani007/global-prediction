@@ -168,6 +168,8 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_transaction_type_validation": banking_result.get("transaction_type_validation"),
                 "banking_debit_credit_validation": banking_result.get("debit_credit_validation"),
                 "banking_purpose_detection": banking_result.get("purpose_detection"),
+                "banking_probability_explanations": banking_result.get("probability_explanations"),
+                "banking_transaction_rules": banking_result.get("banking_transaction_rules"),
                 "banking_column_purpose_report": banking_result.get("column_purpose_report"),
                 
                 # 🔥 CORE BANKING ENGINE RESULTS (PRIMARY OUTPUT - KYC REMOVED)

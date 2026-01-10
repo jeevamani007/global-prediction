@@ -284,7 +284,7 @@
     </div>
 
     <script>
-        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, branchCodeData, customerIdData, transactionData, transactionTypeData, panData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData, columnPurposeReport) {
+        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, branchCodeData, customerIdData, transactionData, transactionTypeData, panData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData, columnPurposeReport, probabilityExplanationsData, bankingTransactionRulesData) {
             // Use risk assessment and final decision from backend
             const riskLevel = riskAssessmentData?.risk_level || "HIGH";
             const decisionText = finalDecisionData?.decision || "REJECT";
@@ -602,6 +602,7 @@
                 const columnFound = transactionTypeData.column_found || false;
                 const columnName = transactionTypeData.column_name || "N/A";
                 const probability = transactionTypeData.probability_percentage || 0;
+                const overallConfidence = transactionTypeData.overall_confidence || transactionTypeData.confidence_percentage || 0;
                 const isValid = transactionTypeData.is_valid || false;
                 const decision = transactionTypeData.decision || "unknown";
                 const validCount = transactionTypeData.valid_count || 0;
@@ -610,7 +611,8 @@
                 const validTypes = transactionTypeData.valid_types_found || [];
                 const invalidTypes = transactionTypeData.invalid_types_found || [];
                 
-                if (columnFound) {
+                    // Only show if confidence is above threshold (70%) or if it's a valid match
+                if (columnFound && overallConfidence >= 70) {
                     const bgColor = isValid ? '#d4edda' : (probability >= 50 ? '#fff3cd' : '#f8d7da');
                     const borderColor = isValid ? '#28a745' : (probability >= 50 ? '#ffc107' : '#dc3545');
                     const icon = isValid ? '✅' : (probability >= 50 ? '⚠️' : '❌');
@@ -640,6 +642,16 @@
                             <p style="margin-top:12px; font-size:0.9rem; color:#495057;">
                                 <b>Note:</b> Valid transaction types are: <b>deposit</b>, <b>withdraw</b>, <b>withdrawal</b>, and <b>transfer</b> (case-insensitive).
                             </p>
+                        </div>
+                    `;
+                } else if (columnFound && overallConfidence < 70) {
+                    // Show a muted message when confidence is too low
+                    transactionTypeHtml = `
+                        <div class="col-card" style="background:#f8f9fa; border-left-color:#6c757d; margin-bottom:20px; opacity: 0.7;">
+                            <h3>🔹 Transaction Type Validation</h3>
+                            <p>⚠️ Low confidence match for column: ${columnName}</p>
+                            <p>Overall confidence: ${overallConfidence}% (below 70% threshold)</p>
+                            <p>This match was filtered out due to low confidence.</p>
                         </div>
                     `;
                 } else {
@@ -862,32 +874,21 @@
                 `;
             }
 
-            // Risk Assessment (STEP-7)
-            const riskClass = riskLevel === 'HIGH' ? 'high' : 'low';
-            const riskFactors = riskAssessmentData?.risk_factors || [];
-            const riskHtml = `
-                <div class="risk-assessment ${riskClass}">
-                    <div class="section-title">🔍 STEP-7: Risk Assessment</div>
-                    <div class="info-item">
-                        <span class="info-label">Risk Level</span>
-                        <span class="badge ${riskLevel === 'HIGH' ? 'error' : 'success'}">${riskLevel}</span>
-                    </div>
-                    ${riskFactors.length > 0 ? `
-                        <p style="margin-top: 12px; font-size: 0.95rem;"><b>Risk Factors:</b></p>
-                        <ul style="margin-top: 8px; padding-left: 20px;">
-                            ${riskFactors.map(factor => `<li>${factor}</li>`).join("")}
-                        </ul>
-                    ` : '<p style="margin-top: 12px; font-size: 0.95rem;">✅ No risk factors identified.</p>'}
-                </div>
-            `;
+            const riskHtml = ``;
 
             // Final Decision (STEP-8)
+            // Only show final decision if we have high confidence in our analysis
+            const hasHighConfidence = (transactionData && transactionData.confidence_percentage >= 70) || 
+                                  (transactionTypeData && transactionTypeData.overall_confidence >= 70) ||
+                                  (data && data.summary?.best_match?.probability_account_number >= 70);
+            
             const decisionClass = decisionText === 'APPROVE' ? 'success' : (decisionText === 'HOLD' ? 'warning' : 'error');
             const decisionHtml = `
                 <div class="col-card" style="background:${decisionText === 'APPROVE' ? '#d4edda' : (decisionText === 'HOLD' ? '#fff3cd' : '#f8d7da')}; border-left-color:${decisionText === 'APPROVE' ? '#28a745' : (decisionText === 'HOLD' ? '#ffc107' : '#dc3545')}; margin-bottom:20px;">
                     <h3>🔹 STEP-8: Final Decision</h3>
                     <p><b>Decision:</b> <span class="badge ${decisionClass}">${decisionText}</span></p>
                     <p style="margin-top: 8px;"><b>Reason:</b> ${reasonText}</p>
+                    ${!hasHighConfidence ? '<p style="margin-top: 8px; font-style: italic; color: #856404;">Note: This decision is based on low-confidence matches. Consider reviewing the data.</p>' : ''}
                 </div>
             `;
 
@@ -914,7 +915,159 @@
                 </div>
             ` : '';
 
-            return statusBannerHtml + purposeHtml + columnPurposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + transactionTypeHtml + branchCodeHtml + panHtml + riskHtml + decisionHtml + nextActionHtml;
+            // Column Purpose Explanations Section (for matched columns with predefined patterns)
+            let columnPurposeExplanationsHtml = "";
+            if (probabilityExplanationsData && Object.keys(probabilityExplanationsData).length > 0) {
+                // Create chart container
+                const chartContainer = `
+                    <div id="probabilityChart" style="width:100%;height:400px;margin-bottom:20px;"></div>
+                `;
+                // Filter for purpose explanations (columns that match predefined patterns)
+                const purposeExplanations = {};
+                const generalExplanations = {};
+                
+                for (const [key, explanationObj] of Object.entries(probabilityExplanationsData)) {
+                    if (key.startsWith('purpose_')) {
+                        purposeExplanations[key] = explanationObj;
+                    } else {
+                        generalExplanations[key] = explanationObj;
+                    }
+                }
+                
+                // Show purpose explanations (matched column patterns) in a dedicated section
+                // Only show if confidence is high enough (threshold of 0.5 or 50%)
+                if (Object.keys(purposeExplanations).length > 0) {
+                    columnPurposeExplanationsHtml = `
+                        <div class="col-card" style="background:white; border-left: 4px solid #007bff; margin-bottom:20px;">
+                            <h3>🔍 Column Purposes (Predefined Patterns)</h3>
+                            <p style="color: #666; margin-top: 10px; margin-bottom: 15px;">The following columns were matched against predefined banking patterns:</p>
+                            <div style="margin-top: 15px;">
+                    `;
+                    
+                    for (const [key, explanationObj] of Object.entries(purposeExplanations)) {
+                        // Skip if confidence is too low (less than 0.7 or 70%) - only show high confidence matches
+                        if (explanationObj.confidence < 0.7) {
+                            continue;
+                        }
+                        
+                        const explanation = explanationObj.explanation || "No explanation available";
+                        
+                        // Extract column name from key (remove 'purpose_' prefix)
+                        const columnName = key.replace('purpose_', '');
+                        
+                        // Extract the column type from the explanation (first word before colon)
+                        const columnTypeMatch = explanation.match(/^([^:]+)/);
+                        const columnType = columnTypeMatch ? columnTypeMatch[1].trim() : 'unknown';
+                        
+                        // Split the explanation into parts by commas and create bullet points
+                        const explanationParts = explanation.split(',').map(part => part.trim());
+                        
+                        let explanationList = '';
+                        for (const part of explanationParts) {
+                            if (part) {
+                                explanationList += `<li style="margin-bottom: 5px; font-size: 0.85rem; color: #555; line-height: 1.4;">• ${part}</li>`;
+                            }
+                        }
+                        
+                        columnPurposeExplanationsHtml += `
+                            <div style="margin-bottom: 15px; border: 1px solid #eee; border-radius: 6px; padding: 12px; background: white;">
+                                <div style="margin-bottom: 8px;">
+                                    <strong style="font-size: 1.0rem; color: #333;">Column: ${columnName}</strong>
+                                    <div style="font-size: 0.9rem; color: #007bff; margin-top: 4px; font-weight: 500;">${columnType}</div>
+                                </div>
+                                <ul style="padding-left: 20px; margin: 10px 0 0 0;">${explanationList}</ul>
+                            </div>
+                        `;
+                    }
+                    
+                    columnPurposeExplanationsHtml += `</div></div>`;
+                }
+                
+                // Show general explanations in another section
+                if (Object.keys(generalExplanations).length > 0) {
+                    let generalProbHtml = `
+                        <div class="col-card" style="background:white; border-left: 4px solid #6c757d; margin-bottom:20px;">
+                            <h3>📊 Other Data Points</h3>
+                            <div style="margin-top: 15px;">
+                    `;
+                    
+                    for (const [key, explanationObj] of Object.entries(generalExplanations)) {
+                        // Skip if confidence is too low (less than 0.7 or 70%) - only show high confidence matches
+                        if (explanationObj.confidence < 0.7) {
+                            continue;
+                        }
+                        
+                        const explanation = explanationObj.explanation || "No explanation available";
+                        
+                        // Split the explanation into parts by commas and create bullet points
+                        const explanationParts = explanation.split(',').map(part => part.trim());
+                        
+                        let explanationList = '';
+                        for (const part of explanationParts) {
+                            if (part) {
+                                explanationList += `<li style="margin-bottom: 5px; font-size: 0.85rem; color: #555; line-height: 1.4;">• ${part}</li>`;
+                            }
+                        }
+                        
+                        generalProbHtml += `
+                            <div style="margin-bottom: 12px; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #fafafa;">
+                                <div style="margin-bottom: 5px;">
+                                    <strong style="font-size: 0.95rem; color: #333;">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong>
+                                </div>
+                                <ul style="padding-left: 20px; margin: 10px 0 0 0;">${explanationList}</ul>
+                            </div>
+                        `;
+                    }
+                    
+                    generalProbHtml += `</div></div>`;
+                    
+                    // Combine both sections
+                    probabilityExplanationsHtml = columnPurposeExplanationsHtml + generalProbHtml;
+                } else {
+                    probabilityExplanationsHtml = columnPurposeExplanationsHtml;
+                }
+            }
+            
+            // If no specific purpose explanations, show general section
+            if (!probabilityExplanationsHtml && probabilityExplanationsData && Object.keys(probabilityExplanationsData).length > 0) {
+                probabilityExplanationsHtml = `
+                    <div class="col-card" style="background:white; border-left: 4px solid #6c757d; margin-bottom:20px;">
+                        <h3>📊 Data Points</h3>
+                        <div style="margin-top: 15px;">
+                `;
+                
+                for (const [key, explanationObj] of Object.entries(probabilityExplanationsData)) {
+                    // Skip if confidence is too low (less than 0.7 or 70%) - only show high confidence matches
+                    if (explanationObj.confidence < 0.7) {
+                        continue;
+                    }
+                    
+                    const explanation = explanationObj.explanation || "No explanation available";
+                    
+                        // Split the explanation into parts by commas and create bullet points
+                        const explanationParts = explanation.split(',').map(part => part.trim());
+                        
+                        let explanationList = '';
+                        for (const part of explanationParts) {
+                            if (part) {
+                                explanationList += `<li style="margin-bottom: 5px; font-size: 0.85rem; color: #555; line-height: 1.4;">• ${part}</li>`;
+                            }
+                        }
+                        
+                        probabilityExplanationsHtml += `
+                            <div style="margin-bottom: 12px; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #fafafa;">
+                                <div style="margin-bottom: 5px;">
+                                    <strong style="font-size: 0.95rem; color: #333;">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong>
+                                </div>
+                                <ul style="padding-left: 20px; margin: 10px 0 0 0;">${explanationList}</ul>
+                            </div>
+                        `;
+                }
+                
+                probabilityExplanationsHtml += `</div></div>`;
+            }
+            
+            return statusBannerHtml + purposeHtml + columnPurposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + transactionTypeHtml + branchCodeHtml + panHtml + riskHtml + decisionHtml + probabilityExplanationsHtml + nextActionHtml;
         }
 
         (function init() {
@@ -959,7 +1112,10 @@
                 console.log("Risk Assessment:", parsedRiskAssessment);
                 console.log("Column Purpose Report:", parsedColumnPurpose);
                 
-                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedBranchCode, parsedCustomerId, parsedTransaction, parsedTransactionType, parsedPan, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment, parsedColumnPurpose);
+                const parsedProbabilityExplanations = JSON.parse(sessionStorage.getItem("probabilityExplanations") || "null");
+                const parsedBankingTransactionRules = JSON.parse(sessionStorage.getItem("bankingTransactionRules") || "null");
+                
+                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedBranchCode, parsedCustomerId, parsedTransaction, parsedTransactionType, parsedPan, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment, parsedColumnPurpose, parsedProbabilityExplanations, parsedBankingTransactionRules);
 
                 // Render PyCharts / ECharts column‑purpose chart
                 if (parsedColumnPurpose && parsedColumnPurpose.category_counts) {
@@ -1032,6 +1188,82 @@
                         chart.setOption(option);
                     } else {
                         chartDom.style.display = "none";
+                    }
+                }
+                
+                // Render probability explanations chart
+                if (parsedProbabilityExplanations && Object.keys(parsedProbabilityExplanations).length > 0) {
+                    const probChartDom = document.getElementById("probabilityChart");
+                    if (probChartDom) {
+                        probChartDom.style.display = "block";
+                        const probChart = echarts.init(probChartDom);
+                        
+                        // Prepare data for the chart
+                        const probData = Object.entries(parsedProbabilityExplanations).map(([key, obj]) => ({
+                            name: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                            value: obj.probability || 0
+                        }));
+                        
+                        const probOption = {
+                            title: {
+                                text: "Probability Distribution",
+                                left: "center",
+                                textStyle: { fontSize: 16 }
+                            },
+                            tooltip: {
+                                trigger: "axis",
+                                axisPointer: {
+                                    type: "shadow"
+                                },
+                                formatter: function(params) {
+                                    const param = params[0];
+                                    return `${param.name}: ${param.value}%`;
+                                }
+                            },
+                            xAxis: {
+                                type: "category",
+                                data: probData.map(item => item.name),
+                                axisLabel: {
+                                    rotate: 45,
+                                    fontSize: 12
+                                }
+                            },
+                            yAxis: {
+                                type: "value",
+                                name: "Probability %",
+                                min: 0,
+                                max: 100
+                            },
+                            series: [{
+                                data: probData.map(item => item.value),
+                                type: "bar",
+                                itemStyle: {
+                                    color: function(params) {
+                                        const value = params.value;
+                                        if (value >= 70) return '#27ae60';
+                                        if (value >= 50) return '#f39c12';
+                                        return '#e74c3c';
+                                    }
+                                },
+                                label: {
+                                    show: true,
+                                    position: "top",
+                                    formatter: "{c}%"
+                                }
+                            }]
+                        };
+                        
+                        probChart.setOption(probOption);
+                        
+                        // Make chart responsive
+                        window.addEventListener('resize', function() {
+                            probChart.resize();
+                        });
+                    }
+                } else {
+                    const probChartDom = document.getElementById("probabilityChart");
+                    if (probChartDom) {
+                        probChartDom.style.display = "none";
                     }
                 }
             } catch (e) {

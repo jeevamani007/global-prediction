@@ -99,6 +99,263 @@ class BankingDomainDetector:
 
         return score
 
+    def _matches_account_number_pattern(self, series):
+        """Check if series matches account number pattern: digits only, length 6-18."""
+        try:
+            non_null = series.dropna().astype(str)
+            if len(non_null) == 0:
+                return False
+            digit_only_ratio = non_null.str.fullmatch(r"\d+").mean()
+            length_ok_ratio = non_null.str.len().between(6, 18).mean()
+            return digit_only_ratio >= 0.8 and length_ok_ratio >= 0.8
+        except:
+            return False
+    
+    def _matches_customer_id_pattern(self, series):
+        """Check if series matches customer ID pattern: alphanumeric, 3-10 chars."""
+        try:
+            non_null = series.dropna().astype(str)
+            if len(non_null) == 0:
+                return False
+            # Pattern: letters followed by numbers (e.g., C001, C002)
+            pattern_match = non_null.str.fullmatch(r"[A-Za-z]{1,2}\d{1,4}").mean()
+            alphanumeric_ratio = non_null.str.fullmatch(r"[A-Za-z0-9]+").mean()
+            length_ok = non_null.str.len().between(3, 10).mean()
+            return (pattern_match >= 0.5 or alphanumeric_ratio >= 0.8) and length_ok >= 0.8
+        except:
+            return False
+    
+    def _matches_date_pattern(self, series):
+        """Check if series matches date pattern."""
+        try:
+            non_null = series.dropna()
+            if len(non_null) == 0:
+                return False
+            # Try to parse as date
+            date_parsed = pd.to_datetime(non_null, errors="coerce")
+            valid_date_ratio = date_parsed.notna().mean()
+            return valid_date_ratio >= 0.7
+        except:
+            return False
+    
+    def _matches_transaction_type_pattern(self, series):
+        """Check if series contains transaction type values."""
+        try:
+            non_null = series.dropna().astype(str).str.lower().str.strip()
+            if len(non_null) == 0:
+                return False
+            valid_types = ["deposit", "withdraw", "withdrawal", "transfer", "credit", "debit", "payment", "purchase", "sale"]
+            match_ratio = non_null.isin(valid_types).mean()
+            return match_ratio >= 0.5
+        except:
+            return False
+    
+    def _matches_numeric_balance_pattern(self, series):
+        """Check if series matches numeric balance/debit/credit pattern."""
+        try:
+            numeric_series = pd.to_numeric(series, errors="coerce")
+            non_null = numeric_series.dropna()
+            if len(non_null) == 0:
+                return False
+            numeric_ratio = len(non_null) / len(series) if len(series) > 0 else 0
+            non_negative_ratio = (non_null >= 0).mean()
+            return numeric_ratio >= 0.8 and non_negative_ratio >= 0.9
+        except:
+            return False
+    
+    def _matches_status_pattern(self, series):
+        """Check if series matches account status pattern."""
+        try:
+            non_null = series.dropna().astype(str).str.upper().str.strip()
+            if len(non_null) == 0:
+                return False
+            valid_statuses = ["ACTIVE", "INACTIVE", "CLOSED", "FROZEN", "1", "0", "TRUE", "FALSE", "YES", "NO"]
+            match_ratio = non_null.isin(valid_statuses).mean()
+            return match_ratio >= 0.5
+        except:
+            return False
+    
+    def _matches_name_pattern(self, series):
+        """Check if series matches name pattern."""
+        try:
+            non_null = series.dropna().astype(str)
+            if len(non_null) == 0:
+                return False
+            # Check if values look like names (contain alphabetic characters, possibly spaces)
+            alpha_char_ratio = non_null.str.contains(r'[A-Za-z]', na=False).mean()
+            space_ratio = non_null.str.contains(r'\s', na=False).mean()
+            length_ok = non_null.str.len().between(2, 50).mean()
+            return alpha_char_ratio >= 0.8 and length_ok >= 0.8
+        except:
+            return False
+    
+    def _matches_account_type_pattern(self, series):
+        """Check if series matches account type pattern."""
+        try:
+            non_null = series.dropna().astype(str).str.lower().str.strip()
+            if len(non_null) == 0:
+                return False
+            valid_types = ["savings", "current", "checking", "loan", "credit", "fixed", "fd", "rd", "deposit"]
+            match_ratio = non_null.str.contains('|'.join(valid_types), case=False, na=False).mean()
+            return match_ratio >= 0.5
+        except:
+            return False
+    
+    def _matches_transaction_id_pattern(self, series):
+        """Check if series matches transaction ID pattern"""
+        try:
+            non_null = series.dropna().astype(str)
+            if len(non_null) == 0:
+                return False
+            # Transaction IDs are usually alphanumeric or numeric
+            alphanumeric_ratio = non_null.str.match(r'[A-Za-z0-9]+').mean()
+            unique_ratio = non_null.nunique() / len(non_null)
+            return alphanumeric_ratio >= 0.8 and unique_ratio >= 0.7
+        except:
+            return False
+    
+    def explain_column_purpose(self, column_name: str, series: pd.Series = None):
+        """
+        Explain the purpose of a column based on predefined patterns and matches.
+        """
+        norm_col = self.normalize(column_name)
+        purpose_explanations = {
+            "customer_id": "CUSTOMER_ID: Internal customer identifier - Usually alphanumeric like CUST1001, Each customer has unique ID, Same ID appears across multiple accounts for same customer, Required field, Not used in balance calculations",
+            "customer_name": "CUSTOMER_NAME: Customer's full name - Contains letters and spaces, Same name may appear for multiple accounts of same person, Must be at least 3 characters, Not numeric data, Connected to customer ID",
+            "account_number": "ACCOUNT_NUMBER: Unique bank account number - Numbers only, Between 6 to 18 digits long, Same account number appears in multiple transaction rows, Required field, Used to connect transactions to accounts",
+            "account_type": "ACCOUNT_TYPE: Type of account like Savings or Current - Text values only, Limited options like Savings, Current, Salary, Same type repeats for same account, Connected to account number",
+            "account_status": "ACCOUNT_STATUS: Is account active - Options like ACTIVE, INACTIVE, CLOSED, One status per account, Required field, Changes rarely, Not numeric data",
+            "transaction_id": "TRANSACTION_ID: Unique ID for each transaction - Different for most transactions, Mix of letters and numbers, Appears once per transaction row, Not used in math, Connected to account number",
+            "transaction_date": "TRANSACTION_DATE: When transaction happened - Format like YYYY-MM-DD, May repeat for same day, Not money amounts, Connected to debit/credit, Helps order transactions",
+            "transaction_type": "TRANSACTION_TYPE: Type of transaction like deposit or withdraw - Text only like deposit, withdraw, transfer, Few different types, Same type repeats many times, Not date data, Controls debit/credit logic",
+            "debit": "DEBIT: Money going out - Numbers only, Zero or positive amounts, Zero allowed often, Only debit OR credit has value (not both), Reduces account balance",
+            "credit": "CREDIT: Money coming in - Numbers only, Zero or positive amounts, Zero allowed often, Only credit OR debit has value (not both), Increases account balance",
+            "opening_balance": "OPENING_BALANCE: Starting balance - Numbers only, Zero or positive amounts, Same for first transaction of each account, Used in balance calculation formula, Required field",
+            "closing_balance": "CLOSING_BALANCE: Ending balance - Numbers only, Calculated value, Depends on debit and credit amounts, Rarely missing, Must follow formula rules",
+            "branch_code": "BRANCH_CODE: Bank branch identifier - Mix of letters and numbers, Short length, Same branch code for multiple customers, Not balance related, Connected to account",
+            "ifsc_code": "IFSC_CODE: Indian bank branch code - Exactly 11 characters, Mix of letters and numbers, Same code per branch, Required field, Not used in calculations",
+            "mode_of_transaction": "MODE_OF_TRANSACTION: How transaction happened like CASH or UPI - Text options like CASH, UPI, NEFT, IMPS, Few different modes, Same mode repeats, Not numeric data, Only in transaction rows"
+        }
+        
+        # Check for direct matches with predefined column types
+        for col_type, explanation in purpose_explanations.items():
+            norm_type = self.normalize(col_type)
+            if norm_type in norm_col or norm_col in norm_type or fuzz.ratio(norm_col, norm_type) >= 85:
+                return {
+                    "column_type": col_type,
+                    "explanation": explanation,
+                    "confidence": fuzz.ratio(norm_col, norm_type) / 100.0
+                }
+        
+        # Check for keyword matches
+        for keyword in self.keywords:
+            if keyword in norm_col or fuzz.ratio(norm_col, keyword) >= 85:
+                # Determine type based on the keyword
+                if any(t in keyword for t in ["customer", "cust", "client"]):
+                    return {
+                        "column_type": "customer_id",
+                        "explanation": purpose_explanations["customer_id"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["name", "holder"]):
+                    return {
+                        "column_type": "customer_name",
+                        "explanation": purpose_explanations["customer_name"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["account", "acc", "acct"]):
+                    return {
+                        "column_type": "account_number",
+                        "explanation": purpose_explanations["account_number"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["type", "account_type", "savings", "current"]):
+                    return {
+                        "column_type": "account_type",
+                        "explanation": purpose_explanations["account_type"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["status", "state", "active"]):
+                    return {
+                        "column_type": "account_status",
+                        "explanation": purpose_explanations["account_status"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["transaction", "txn", "trans"]):
+                    if any(t in keyword for t in ["date", "time"]):
+                        return {
+                            "column_type": "transaction_date",
+                            "explanation": purpose_explanations["transaction_date"],
+                            "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                        }
+                    elif any(t in keyword for t in ["type", "mode"]):
+                        return {
+                            "column_type": "transaction_type",
+                            "explanation": purpose_explanations["transaction_type"],
+                            "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                        }
+                    elif any(t in keyword for t in ["id"]):
+                        return {
+                            "column_type": "transaction_id",
+                            "explanation": purpose_explanations["transaction_id"],
+                            "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                        }
+                    else:
+                        return {
+                            "column_type": "transaction_id",
+                            "explanation": purpose_explanations["transaction_id"],
+                            "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                        }
+                elif any(t in keyword for t in ["debit", "dr", "withdraw"]):
+                    return {
+                        "column_type": "debit",
+                        "explanation": purpose_explanations["debit"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["credit", "cr", "deposit"]):
+                    return {
+                        "column_type": "credit",
+                        "explanation": purpose_explanations["credit"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["opening", "open"]):
+                    return {
+                        "column_type": "opening_balance",
+                        "explanation": purpose_explanations["opening_balance"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["closing", "close", "balance"]):
+                    return {
+                        "column_type": "closing_balance",
+                        "explanation": purpose_explanations["closing_balance"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["branch"]):
+                    return {
+                        "column_type": "branch_code",
+                        "explanation": purpose_explanations["branch_code"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["ifsc"]):
+                    return {
+                        "column_type": "ifsc_code",
+                        "explanation": purpose_explanations["ifsc_code"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+                elif any(t in keyword for t in ["mode"]):
+                    return {
+                        "column_type": "mode_of_transaction",
+                        "explanation": purpose_explanations["mode_of_transaction"],
+                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                    }
+        
+        # If no match found, return unknown
+        return {
+            "column_type": "unknown",
+            "explanation": f"Column '{column_name}' purpose could not be determined from predefined patterns",
+            "confidence": 0.0
+        }
+    
     def _looks_account_like_name(self, column_name: str) -> bool:
         norm = self.normalize(column_name)
         candidates = ["account", "acct", "accno", "custaccount", "customeraccount", "accnumber"]
@@ -878,12 +1135,456 @@ class BankingDomainDetector:
             "is_valid": bool(len(validation_results["violations"]) == 0)  # Convert to Python bool
         }
     
+    def validate_banking_transaction_rules(self, df: pd.DataFrame, account_col=None):
+        """
+        Banking Transaction Rule Engine
+        Validates transaction-related columns using 7 rules per category
+        """
+        # STEP-1: TRANSACTION IDENTIFICATION RULES (7 RULES)
+        transaction_data = {}
+        for col in df.columns:
+            rules_passed = 0
+            
+            # Rule 1: Column name contains keywords
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in ['transaction', 'txn', 'trans', 'reference', 'ref']):
+                rules_passed += 1
+            
+            # Rule 2: Column values are mostly UNIQUE (>80%)
+            unique_ratio = df[col].nunique() / len(df) if len(df) > 0 else 0
+            if unique_ratio > 0.8:
+                rules_passed += 1
+            
+            # Rule 3: Column values repeat per account_number
+            if account_col and account_col in df.columns:
+                try:
+                    group_stats = df.groupby(account_col)[col].nunique()
+                    avg_unique_per_account = group_stats.mean()
+                    if avg_unique_per_account < df[col].nunique() * 0.5:  # Values repeat across accounts
+                        rules_passed += 1
+                except:
+                    pass
+            
+            # Rule 4: Column is NOT numeric-only balance
+            if not self._matches_numeric_balance_pattern(df[col]):
+                rules_passed += 1
+            
+            # Rule 5: Column is NOT customer identity data
+            if not self._matches_customer_id_pattern(df[col]):
+                rules_passed += 1
+            
+            # Rule 6: Column appears together with date + debit/credit
+            date_cols = [c for c in df.columns if any(d in self.normalize(c) for d in ['date', 'time'])]
+            amount_cols = [c for c in df.columns if any(a in self.normalize(c) for a in ['debit', 'credit', 'amount'])]
+            if date_cols and amount_cols:
+                rules_passed += 1
+            
+            # Rule 7: Row count > unique account_number count
+            if account_col and account_col in df.columns:
+                if len(df) > df[account_col].nunique():
+                    rules_passed += 1
+            
+            # If ≥4 rules pass → mark as TRANSACTION DATA = VALID
+            transaction_data[col] = {
+                "rules_passed": rules_passed,
+                "is_transaction_data": rules_passed >= 4,
+                "rules_total": 7
+            }
+        
+        # STEP-2: TRANSACTION TYPE RULES (7 RULES)
+        transaction_type_data = {}
+        for col in df.columns:
+            rules_passed = 0
+            
+            # Rule 1: Column name contains transaction type keywords
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in ['type', 'txn_type', 'transaction_type', 'mode']):
+                rules_passed += 1
+            
+            # Rule 2: Column values are TEXT (not numeric)
+            try:
+                numeric_ratio = pd.to_numeric(df[col], errors='coerce').notna().mean()
+                if numeric_ratio < 0.8:  # Less than 80% numeric
+                    rules_passed += 1
+            except:
+                rules_passed += 1  # If conversion fails, likely text
+            
+            # Rule 3: Unique values count is LOW (<10)
+            unique_count = df[col].nunique()
+            if unique_count < 10:
+                rules_passed += 1
+            
+            # Rule 4: Values may include common transaction types
+            if df[col].dtype == 'object':
+                sample_values = df[col].dropna().astype(str).str.lower().unique()
+                common_types = {'deposit', 'withdraw', 'withdrawal', 'credit', 'debit', 'transfer'}
+                if any(tv in common_types for tv in sample_values):
+                    rules_passed += 1
+            
+            # Rule 5: Do NOT mark date values as transaction_type
+            date_keywords = ['date', 'time', 'day', 'month', 'year']
+            if not any(keyword in norm_col for keyword in date_keywords):
+                rules_passed += 1
+            
+            # Rule 6: If date-like values found → classify column as DATE, not TYPE
+            try:
+                date_check = pd.to_datetime(df[col], errors='coerce')
+                if date_check.isna().mean() > 0.5:  # Not a date column
+                    rules_passed += 1
+            except:
+                rules_passed += 1
+            
+            # Rule 7: If values repeat across rows → high confidence transaction_type
+            if unique_count < len(df) * 0.8:
+                rules_passed += 1
+            
+            # If ≥4 rules pass → TRANSACTION TYPE = VALID
+            transaction_type_data[col] = {
+                "rules_passed": rules_passed,
+                "is_transaction_type": rules_passed >= 4,
+                "rules_total": 7
+            }
+        
+        # STEP-3: DEBIT COLUMN RULES (7 RULES)
+        debit_data = {}
+        for col in df.columns:
+            rules_passed = 0
+            
+            # Rule 1: Column name contains debit keywords
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in ['debit', 'withdrawal', 'dr_amount', 'amount_debit']):
+                rules_passed += 1
+            
+            # Rule 2: Values are numeric
+            try:
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                numeric_ratio = numeric_series.notna().mean()
+                if numeric_ratio >= 0.8:
+                    rules_passed += 1
+            except:
+                pass
+            
+            # Rule 3: Values are >= 0
+            try:
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                non_negative_ratio = (numeric_series >= 0).mean()
+                if non_negative_ratio >= 0.8:
+                    rules_passed += 1
+            except:
+                pass
+            
+            # Rule 4: Majority rows have ZERO values allowed
+            try:
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                zero_ratio = (numeric_series == 0).mean()
+                if zero_ratio >= 0.1:  # At least 10% zeros are acceptable
+                    rules_passed += 1
+            except:
+                pass
+            
+            # Rule 5: Debit and credit are NOT both non-zero in same row
+            # Need to find potential credit columns to check this rule
+            
+            # Rule 6: Debit reduces balance when applied
+            
+            # Rule 7: Debit appears with transaction rows (not master rows)
+            if len(df) > 10:  # Assuming transaction data if more than 10 rows
+                rules_passed += 1
+            
+            debit_data[col] = {
+                "rules_passed": rules_passed,
+                "is_debit_column": rules_passed >= 4,
+                "rules_total": 7
+            }
+        
+        # STEP-4: CREDIT COLUMN RULES (7 RULES)
+        credit_data = {}
+        for col in df.columns:
+            rules_passed = 0
+            
+            # Rule 1: Column name contains credit keywords
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in ['credit', 'deposit', 'cr_amount', 'amount_credit']):
+                rules_passed += 1
+            
+            # Rule 2: Values are numeric
+            try:
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                numeric_ratio = numeric_series.notna().mean()
+                if numeric_ratio >= 0.8:
+                    rules_passed += 1
+            except:
+                pass
+            
+            # Rule 3: Values are >= 0
+            try:
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                non_negative_ratio = (numeric_series >= 0).mean()
+                if non_negative_ratio >= 0.8:
+                    rules_passed += 1
+            except:
+                pass
+            
+            # Rule 4: Majority rows have ZERO values allowed
+            try:
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                zero_ratio = (numeric_series == 0).mean()
+                if zero_ratio >= 0.1:  # At least 10% zeros are acceptable
+                    rules_passed += 1
+            except:
+                pass
+            
+            # Rule 5: Credit increases balance when applied
+            
+            # Rule 6: Debit and credit are NOT both non-zero in same row
+            
+            # Rule 7: Appears only in transaction rows
+            if len(df) > 10:  # Assuming transaction data if more than 10 rows
+                rules_passed += 1
+            
+            credit_data[col] = {
+                "rules_passed": rules_passed,
+                "is_credit_column": rules_passed >= 4,
+                "rules_total": 7
+            }
+        
+        # STEP-5: BALANCE COLUMN RULES (7 RULES)
+        balance_data = {}
+        for col in df.columns:
+            rules_passed = 0
+            
+            # Rule 1: Column name contains balance keywords
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in ['balance', 'closing_balance', 'available_balance']):
+                rules_passed += 1
+            
+            # Rule 2: Values are numeric
+            try:
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                numeric_ratio = numeric_series.notna().mean()
+                if numeric_ratio >= 0.8:
+                    rules_passed += 1
+            except:
+                pass
+            
+            # Rule 3: Balance values are monotonically changing per account
+            # Rule 4: closing_balance = opening_balance + credit − debit
+            # Rule 5: Balance never becomes NULL
+            # Rule 6: Balance rarely negative (unless overdraft)
+            # Rule 7: Balance repeats only across different accounts, not same txn
+            
+            balance_data[col] = {
+                "rules_passed": rules_passed,
+                "is_balance_column": rules_passed >= 4,
+                "rules_total": 7
+            }
+        
+        # STEP-6: CONFIDENCE FIX
+        # Determine overall transaction validity and confidence
+        valid_components = 0
+        detected_columns = {}
+        
+        # Find transaction-related columns
+        for col, data in transaction_data.items():
+            if data["is_transaction_data"]:
+                detected_columns["transaction_id"] = col
+                valid_components += 1
+                break
+        
+        # Find transaction type columns
+        for col, data in transaction_type_data.items():
+            if data["is_transaction_type"]:
+                detected_columns["transaction_type"] = col
+                valid_components += 1
+                break
+        
+        # Find debit columns
+        for col, data in debit_data.items():
+            if data["is_debit_column"]:
+                detected_columns["debit"] = col
+                valid_components += 1
+                break
+        
+        # Find credit columns
+        for col, data in credit_data.items():
+            if data["is_credit_column"]:
+                detected_columns["credit"] = col
+                valid_components += 1
+                break
+        
+        # Find balance columns
+        for col, data in balance_data.items():
+            if data["is_balance_column"]:
+                detected_columns["balance"] = col
+                valid_components += 1
+                break
+        
+        # Calculate confidence based on minimum confidence rules
+        if valid_components == 0:
+            confidence = 0
+        elif valid_components == 1:
+            confidence = max(40, 0)  # Min 40%
+        elif valid_components == 2:
+            confidence = max(60, 40)  # Min 60%
+        else:  # 3+ components
+            confidence = max(80, 60)  # Min 80%
+        
+        # Determine overall transaction status
+        transaction_status = "VALID" if valid_components >= 1 else "INVALID"
+        
+        # STEP-7: FINAL OUTPUT
+        return {
+            "transaction_status": transaction_status,
+            "confidence_percentage": confidence,
+            "detected_columns": detected_columns,
+            "valid_components_count": valid_components,
+            "transaction_data_analysis": transaction_data,
+            "transaction_type_analysis": transaction_type_data,
+            "debit_analysis": debit_data,
+            "credit_analysis": credit_data,
+            "balance_analysis": balance_data,
+            "reason": f"Found {valid_components} valid transaction components out of 5 possible types. Minimum 1 required for VALID status."
+        }
+    
     def validate_transaction_type(self, df: pd.DataFrame):
         """
         Validate Transaction Type Column
         Check if transaction_type column exists and contains valid values: deposit, withdraw, transfer
         Calculate probability percentage based on valid values
         """
+        
+        # STEP-2: TRANSACTION TYPE RULES (7 RULES)
+        transaction_type_data = {}
+        for col in df.columns:
+            rules_passed = 0
+            
+            # Rule 1: Column name contains transaction type keywords
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in ['type', 'txn_type', 'transaction_type', 'mode']):
+                rules_passed += 1
+            
+            # Rule 2: Column values are TEXT (not numeric)
+            try:
+                numeric_ratio = pd.to_numeric(df[col], errors='coerce').notna().mean()
+                if numeric_ratio < 0.8:  # Less than 80% numeric
+                    rules_passed += 1
+            except:
+                rules_passed += 1  # If conversion fails, likely text
+            
+            # Rule 3: Unique values count is LOW (<10)
+            unique_count = df[col].nunique()
+            if unique_count < 10:
+                rules_passed += 1
+            
+            # Rule 4: Values may include common transaction types
+            if df[col].dtype == 'object':
+                sample_values = df[col].dropna().astype(str).str.lower().unique()
+                common_types = {'deposit', 'withdraw', 'withdrawal', 'credit', 'debit', 'transfer', 'cash', 'neft', 'imps', 'rtgs', 'upi', 'online', 'cheque', 'card'}
+                if any(tv in common_types for tv in sample_values):
+                    rules_passed += 1
+            
+            # Rule 5: Do NOT mark date values as transaction_type
+            date_keywords = ['date', 'time', 'day', 'month', 'year']
+            if not any(keyword in norm_col for keyword in date_keywords):
+                rules_passed += 1
+            
+            # Rule 6: If date-like values found → classify column as DATE, not TYPE
+            try:
+                date_check = pd.to_datetime(df[col], errors='coerce')
+                if date_check.isna().mean() > 0.5:  # Not a date column
+                    rules_passed += 1
+            except:
+                rules_passed += 1
+            
+            # Rule 7: If values repeat across rows → high confidence transaction_type
+            if unique_count < len(df) * 0.8:
+                rules_passed += 1
+            
+            # If ≥4 rules pass → TRANSACTION TYPE = VALID
+            transaction_type_data[col] = {
+                "rules_passed": rules_passed,
+                "is_transaction_type": rules_passed >= 4,
+                "rules_total": 7,
+                "confidence_percentage": round((rules_passed / 7) * 100, 2)
+            }
+        
+        # Find the best transaction type column
+        best_transaction_type_col = None
+        best_confidence = 0
+        for col, data in transaction_type_data.items():
+            if data["is_transaction_type"] and data["confidence_percentage"] > best_confidence:
+                best_confidence = data["confidence_percentage"]
+                best_transaction_type_col = col
+        
+        if best_transaction_type_col is None:
+            return {
+                "column_found": False,
+                "column_name": None,
+                "total_rows": int(len(df)),  # Convert to Python int
+                "valid_count": 0,
+                "invalid_count": 0,
+                "valid_types_found": [],
+                "invalid_types_found": [],
+                "probability_percentage": 0.0,
+                "is_valid": False,
+                "decision": "column_not_found"
+            }
+        
+        # Analyze the best transaction type column
+        series = df[best_transaction_type_col].dropna().astype(str).str.lower().str.strip()
+        total_rows = int(len(series))  # Convert to Python int
+        
+        if total_rows == 0:
+            return {
+                "column_found": True,
+                "column_name": best_transaction_type_col,
+                "total_rows": int(len(df)),  # Convert to Python int
+                "valid_count": 0,
+                "invalid_count": 0,
+                "valid_types_found": [],
+                "invalid_types_found": [],
+                "probability_percentage": 0.0,
+                "is_valid": False,
+                "decision": "empty_column"
+            }
+        
+        # Check for valid transaction types
+        valid_types = ["deposit", "withdraw", "withdrawal", "transfer", "credit", "debit", "cash", "neft", "imps", "rtgs", "upi", "online", "cheque", "card"]
+        valid_mask = series.isin(valid_types)
+        valid_count = int(valid_mask.sum())  # Convert to Python int
+        invalid_count = int((~valid_mask).sum())  # Convert to Python int
+        
+        # Get unique valid and invalid types found
+        valid_types_found = sorted(series[valid_mask].unique().tolist())
+        invalid_types_found = sorted(series[~valid_mask].unique().tolist()[:10])  # Limit to first 10
+        
+        # Calculate probability percentage
+        probability_percentage = round((valid_count / total_rows) * 100, 2) if total_rows > 0 else 0.0
+        
+        # Decision logic: valid if >= 80% of values match valid types
+        is_valid = bool(probability_percentage >= 80.0)  # Convert to Python bool
+        decision = "valid" if is_valid else ("partial" if probability_percentage >= 50.0 else "invalid")
+        
+        # Calculate overall confidence based on both rule-based confidence and value validation
+        overall_confidence = min(best_confidence, probability_percentage)
+        
+        return {
+            "column_found": True,
+            "column_name": best_transaction_type_col,
+            "total_rows": int(total_rows),  # Convert to Python int
+            "valid_count": int(valid_count),  # Convert to Python int
+            "invalid_count": int(invalid_count),  # Convert to Python int
+            "valid_types_found": valid_types_found,
+            "invalid_types_found": invalid_types_found,
+            "probability_percentage": probability_percentage,
+            "is_valid": is_valid,
+            "decision": decision,
+            "confidence_percentage": best_confidence,
+            "rules_passed": transaction_type_data[best_transaction_type_col]["rules_passed"],
+            "overall_confidence": overall_confidence
+        }
+    
+    def validate_pan_number(self, df: pd.DataFrame):
         # Valid transaction types (case-insensitive)
         valid_types = ["deposit", "withdraw", "withdrawal", "transfer"]
         
@@ -1655,6 +2356,91 @@ class BankingDomainDetector:
             "confidence_scores": confidence_scores
         }
 
+    def generate_probability_explanations(self, account_validation, customer_validation, 
+                                           transaction_validation, transaction_type_validation,
+                                           debit_credit_validation, balance_analysis, core_analysis, df=None):
+        """
+        Generate human-readable explanations for probability data of different aspects.
+        """
+        explanations = {}
+        
+        # Account number validation probability
+        if account_validation:
+            best_match = account_validation.get("summary", {}).get("best_match")
+            if best_match:
+                prob = best_match.get("probability_account_number", 0)
+                explanations["account_number"] = {
+                    "probability": prob,
+                    "explanation": f"Account number validation shows {prob}% confidence that this dataset contains valid account numbers suitable for banking operations."
+                }
+        
+        # Customer ID validation probability
+        if customer_validation:
+            col_exists = customer_validation.get("column_exists", False)
+            prob = customer_validation.get("probability_customer_id", 0)
+            if col_exists:
+                explanations["customer_id"] = {
+                    "probability": prob,
+                    "explanation": f"Customer ID validation shows {prob}% confidence that this dataset contains valid customer identifiers."
+                }
+        
+        # Transaction validation probability
+        if transaction_validation:
+            prob = transaction_validation.get("probability_percentage", 0)
+            is_valid = transaction_validation.get("is_valid", False)
+            explanations["transaction"] = {
+                "probability": prob,
+                "explanation": f"Transaction validation shows {prob}% confidence that this dataset contains valid transaction data. Status: {'Valid' if is_valid else 'Invalid'}"
+            }
+        
+        # Transaction type validation probability
+        if transaction_type_validation:
+            prob = transaction_type_validation.get("probability_percentage", 0)
+            is_valid = transaction_type_validation.get("is_valid", False)
+            explanations["transaction_type"] = {
+                "probability": prob,
+                "explanation": f"Transaction type validation shows {prob}% confidence that transaction types are correctly formatted. Status: {'Valid' if is_valid else 'Invalid'}"
+            }
+        
+        # Debit/credit validation probability
+        if debit_credit_validation:
+            prob = debit_credit_validation.get("probability_percentage", 0)
+            is_valid = debit_credit_validation.get("is_valid", False)
+            explanations["debit_credit"] = {
+                "probability": prob,
+                "explanation": f"Debit/credit validation shows {prob}% confidence in the balance calculations. Status: {'Valid' if is_valid else 'Invalid'}"
+            }
+        
+        # Balance analysis probability
+        if balance_analysis:
+            prob = balance_analysis.get("confidence_percentage", 0)
+            explanations["balance"] = {
+                "probability": prob,
+                "explanation": f"Balance analysis shows {prob}% confidence in the presence of balance-related columns suitable for banking operations."
+            }
+        
+        # Core banking analysis probabilities
+        if core_analysis:
+            core_validations = core_analysis.get("column_validations", {})
+            for col_name, validation in core_validations.items():
+                if validation.get("confidence", 0) > 0:
+                    explanations[f"core_{col_name}"] = {
+                        "probability": validation["confidence"],
+                        "explanation": f"Core analysis for column '{col_name}' shows {validation['confidence']}% confidence in its role classification."
+                    }
+        
+        # Add purpose explanations for matched columns
+        if df is not None:
+            for col_name in df.columns:
+                purpose_info = self.explain_column_purpose(col_name, df[col_name])
+                if purpose_info["confidence"] > 0.5:  # Only include if confidence is above 50%
+                    explanations[f"purpose_{col_name}"] = {
+                        "probability": purpose_info["confidence"] * 100,
+                        "explanation": f"Column '{col_name}' identified as {purpose_info['column_type']}: {purpose_info['explanation']} (Confidence: {purpose_info['confidence']:.2f})"
+                    }
+        
+        return explanations
+
     def generate_column_purpose_report(self, df: pd.DataFrame,
                                        transaction_check: dict,
                                        kyc_check: dict = None):
@@ -1998,6 +2784,11 @@ class BankingDomainDetector:
         opening_debit_credit_detection = self.detect_opening_debit_credit_columns(df)
         transaction_validation = self.validate_transaction_data(df)
         transaction_type_validation = self.validate_transaction_type(df)
+        
+        # Banking Transaction Rule Engine
+        account_number_col = account_number_check.get("best_match_column")
+        banking_transaction_rules = self.validate_banking_transaction_rules(df, account_number_col)
+        
         balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
         debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
         
@@ -2013,6 +2804,28 @@ class BankingDomainDetector:
             {}  # Empty dict instead of kyc_verification
         )
 
+        # Generate probability explanations
+        probability_explanations = self.generate_probability_explanations(
+            account_number_validation,
+            customer_id_validation,
+            transaction_validation,
+            transaction_type_validation,
+            debit_credit_validation,
+            balance_analysis,
+            core_analysis,
+            df  # Pass the dataframe for purpose explanations
+        )
+        
+        # Add banking transaction rules probability explanations
+        if banking_transaction_rules:
+            prob = banking_transaction_rules.get("confidence_percentage", 0)
+            status = banking_transaction_rules.get("transaction_status", "INVALID")
+            if "banking_transaction" not in probability_explanations:
+                probability_explanations["banking_transaction"] = {
+                    "probability": prob,
+                    "explanation": f"Banking Transaction Rule Engine shows {prob}% confidence in transaction data validity. Status: {status}"
+                }
+        
         # Column‑purpose report for UI / charts (no KYC reference)
         column_purpose_report = self.generate_column_purpose_report(df, transaction_validation, {})
 
@@ -2054,6 +2867,31 @@ class BankingDomainDetector:
             "5_final_decision": f"Final decision: {core_decision} – {core_reason}"
         }
         
+        # Filter results to show only columns with probability > 0%
+        filtered_core_detected_columns = [
+            col for col in core_analysis.get("detected_columns", []) 
+            if col.get("confidence", 0) > 0
+        ]
+        
+        # Filter core column validations to only include non-failed cases
+        filtered_core_column_validations = {
+            col: validation for col, validation in core_analysis.get("column_validations", {}).items()
+            if validation.get("confidence", 0) > 0 or validation.get("is_valid", True) is not False
+        }
+        
+        # Create filtered summary focusing on non-failed cases
+        filtered_ordered_summary = {}
+        for key, value in ordered_summary.items():
+            if key == "2_column_role_classification":
+                # Update the column classification summary to reflect filtered results
+                filtered_ordered_summary[key] = (
+                    f"Detected {len(filtered_core_detected_columns)} "
+                    f"columns with confidence > 0% (confidence >= 70% for confirmed roles). "
+                    f"Filtered columns: {'; '.join([f'{col["column_name"]} → {col["role"]} ({col["confidence"]:.1f}%)' for col in filtered_core_detected_columns[:5]])}"
+                )
+            else:
+                filtered_ordered_summary[key] = value
+        
         return {
             "domain": self.domain if decision != "UNKNOWN" else "Unknown",
             "confidence_percentage": confidence_100,
@@ -2080,17 +2918,19 @@ class BankingDomainDetector:
             "debit_credit_validation": debit_credit_validation,
             "customer_id_validation": customer_id_validation,
             "purpose_detection": purpose_detection,
+            "banking_transaction_rules": banking_transaction_rules,
+            "probability_explanations": probability_explanations,
             "column_purpose_report": column_purpose_report,
             
             # 🔥 CORE ENGINE RESULTS (PRIMARY OUTPUT - KYC REMOVED)
             "core_banking_analysis": core_analysis,
-            "core_detected_columns": core_analysis.get("detected_columns", []),
-            "core_column_validations": core_analysis.get("column_validations", {}),
+            "core_detected_columns": filtered_core_detected_columns,
+            "core_column_validations": filtered_core_column_validations,
             "core_cross_validations": core_analysis.get("cross_validations", {}),
             "core_validation_summary": core_analysis.get("validation_summary", {}),
             "core_final_decision": core_analysis.get("final_decision", {}),
             
-            "ordered_summary": ordered_summary
+            "ordered_summary": filtered_ordered_summary
         }
     
     def _format_cross_validation_summary(self, cross_validations):
