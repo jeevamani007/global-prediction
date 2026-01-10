@@ -5,6 +5,7 @@ import numpy as np
 from rapidfuzz import fuzz
 from sqlalchemy import text
 from database import engine
+from banking_core_engine import CoreBankingEngine
 
 
 class BankingDomainDetector:
@@ -101,7 +102,9 @@ class BankingDomainDetector:
     def _looks_account_like_name(self, column_name: str) -> bool:
         norm = self.normalize(column_name)
         candidates = ["account", "acct", "accno", "custaccount", "customeraccount", "accnumber"]
-        return any(key in norm for key in candidates)
+        # Normalize candidates for proper matching
+        norm_candidates = [self.normalize(c) for c in candidates]
+        return any(norm_c in norm or norm in norm_c or fuzz.ratio(norm, norm_c) >= 85 for norm_c in norm_candidates)
 
     def _looks_account_like_values(self, series: pd.Series) -> bool:
         col = series.dropna().astype(str)
@@ -116,6 +119,8 @@ class BankingDomainDetector:
         Detect account status column (active/inactive) and analyze status values
         """
         status_keywords = ["status", "state", "active", "inactive", "account_status", "acc_status", "account_state"]
+        # Normalize keywords for proper matching
+        norm_status_keywords = [self.normalize(kw) for kw in status_keywords]
         status_column = None
         status_values = []
         active_count = 0
@@ -123,7 +128,7 @@ class BankingDomainDetector:
         
         for col in df.columns:
             norm_col = self.normalize(col)
-            if any(keyword in norm_col for keyword in status_keywords):
+            if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_status_keywords):
                 status_column = col
                 series = df[col].dropna().astype(str).str.lower()
                 status_values = series.unique().tolist()
@@ -179,9 +184,12 @@ class BankingDomainDetector:
         # Check mandatory columns
         for col_type, keywords in mandatory_columns.items():
             found = False
+            # Normalize keywords for proper matching
+            norm_keywords = [self.normalize(kw) for kw in keywords]
             for col in df.columns:
                 norm_col = self.normalize(col)
-                if any(keyword in norm_col for keyword in keywords):
+                # Check if any normalized keyword matches the normalized column name
+                if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_keywords):
                     found_mandatory[col_type] = col
                     found = True
                     break
@@ -191,9 +199,12 @@ class BankingDomainDetector:
         # Check optional columns
         for col_type, keywords in optional_columns.items():
             found = False
+            # Normalize keywords for proper matching
+            norm_keywords = [self.normalize(kw) for kw in keywords]
             for col in df.columns:
                 norm_col = self.normalize(col)
-                if any(keyword in norm_col for keyword in keywords):
+                # Check if any normalized keyword matches the normalized column name
+                if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_keywords):
                     found_optional[col_type] = col
                     found = True
                     break
@@ -205,7 +216,7 @@ class BankingDomainDetector:
             "missing_mandatory": missing_mandatory,
             "found_optional": found_optional,
             "missing_optional": missing_optional,
-            "all_mandatory_present": len(missing_mandatory) == 0
+            "all_mandatory_present": bool(len(missing_mandatory) == 0)  # Convert to Python bool
         }
     
     def verify_kyc(self, df: pd.DataFrame):
@@ -225,9 +236,12 @@ class BankingDomainDetector:
         
         for kyc_type, keywords in kyc_fields.items():
             found = False
+            # Normalize keywords for proper matching
+            norm_keywords = [self.normalize(kw) for kw in keywords]
             for col in df.columns:
                 norm_col = self.normalize(col)
-                if any(keyword in norm_col for keyword in keywords):
+                # Check if any normalized keyword matches the normalized column name
+                if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_keywords):
                     found_kyc[kyc_type] = col
                     found = True
                     break
@@ -235,9 +249,9 @@ class BankingDomainDetector:
                 missing_kyc.append(kyc_type)
         
         # Check if user_name is present (critical for KYC)
-        has_user_name = "user_name" in found_kyc
+        has_user_name = bool("user_name" in found_kyc)  # Convert to Python bool
         kyc_completeness = round((len(found_kyc) / len(kyc_fields)) * 100, 2)
-        kyc_verified = kyc_completeness >= 60.0  # STEP-6: >= 60% threshold
+        kyc_verified = bool(kyc_completeness >= 60.0)  # STEP-6: >= 60% threshold - convert to Python bool
         
         return {
             "kyc_verified": kyc_verified,
@@ -245,7 +259,7 @@ class BankingDomainDetector:
             "found_kyc_fields": found_kyc,
             "missing_kyc_fields": missing_kyc,
             "kyc_completeness": kyc_completeness,
-            "meets_threshold": kyc_completeness >= 60.0
+            "meets_threshold": bool(kyc_completeness >= 60.0)  # Convert to Python bool
         }
     
     def validate_customer_id(self, df: pd.DataFrame):
@@ -260,12 +274,14 @@ class BankingDomainDetector:
         7. Data Type Check
         """
         customer_id_keywords = ["customer_id", "cust_id", "customerid", "custid", "client_id"]
+        # Normalize keywords for proper matching
+        norm_customer_keywords = [self.normalize(kw) for kw in customer_id_keywords]
         customer_id_col = None
         
         # Rule 1: Column Exists
         for col in df.columns:
             norm_col = self.normalize(col)
-            if any(keyword in norm_col for keyword in customer_id_keywords):
+            if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_customer_keywords):
                 customer_id_col = col
                 break
         
@@ -298,29 +314,29 @@ class BankingDomainDetector:
         
         # Rule 2: Not Null
         not_null_ratio = float(non_null_count / total_rows) if total_rows > 0 else 0.0
-        not_null = not_null_ratio >= 0.95  # 95% threshold
+        not_null = bool(not_null_ratio >= 0.95)  # 95% threshold - convert to Python bool
         
         # Rule 3: Unique (optional - usually one customer can have multiple accounts)
-        unique_count = series.nunique()
+        unique_count = int(series.nunique())  # Convert to Python int
         unique_ratio = float(unique_count / non_null_count) if non_null_count > 0 else 0.0
-        unique = unique_ratio >= 0.5  # Optional, so lower threshold
+        unique = bool(unique_ratio >= 0.5)  # Optional, so lower threshold - convert to Python bool
         
         # Rule 4: Format/Pattern Check (letter(s) + numbers, e.g., C001, C002)
         # Pattern: starts with 1-2 letters, followed by 1-4 digits
         format_pattern = r'^[A-Za-z]{1,2}\d{1,4}$'
         format_matches = series.str.fullmatch(format_pattern, na=False)
         format_valid_ratio = float(format_matches.sum() / non_null_count) if non_null_count > 0 else 0.0
-        format_valid = format_valid_ratio >= 0.8
+        format_valid = bool(format_valid_ratio >= 0.8)  # Convert to Python bool
         
         # Rule 5: No Symbols/Special Characters (only letters + numbers)
         no_symbols_matches = series.str.fullmatch(r'^[A-Za-z0-9]+$', na=False)
         no_symbols_ratio = float(no_symbols_matches.sum() / non_null_count) if non_null_count > 0 else 0.0
-        no_symbols = no_symbols_ratio >= 0.95
+        no_symbols = bool(no_symbols_ratio >= 0.95)  # Convert to Python bool
         
         # Rule 6: Length Check (Min: 3, Max: 6 characters)
         length_valid_matches = series.str.len().between(3, 6, inclusive='both')
         length_valid_ratio = float(length_valid_matches.sum() / non_null_count) if non_null_count > 0 else 0.0
-        length_valid = length_valid_ratio >= 0.9
+        length_valid = bool(length_valid_ratio >= 0.9)  # Convert to Python bool
         
         # Rule 7: Data Type Check (should be string/text, not numeric only)
         # Check if it's stored as string and has mixed alphanumeric
@@ -367,9 +383,9 @@ class BankingDomainDetector:
             "length_valid_ratio": round(length_valid_ratio, 3),
             "data_type_valid": data_type_valid,
             "data_type_valid_ratio": round(data_type_valid_ratio, 3),
-            "total_rows": total_rows,
-            "non_null_count": non_null_count,
-            "rules_passed": rules_passed,
+            "total_rows": int(total_rows),  # Convert to Python int
+            "non_null_count": int(non_null_count),  # Convert to Python int
+            "rules_passed": int(rules_passed),  # Convert to Python int
             "rules_total": 7,
             "probability_customer_id": probability,
             "decision": decision
@@ -377,7 +393,7 @@ class BankingDomainDetector:
     
     def validate_account_numbers(self, df: pd.DataFrame):
         results = []
-        total_rows = len(df)
+        total_rows = int(len(df))  # Convert to Python int
 
         for col in df.columns:
             series = df[col]
@@ -391,7 +407,8 @@ class BankingDomainDetector:
 
             digit_only_ratio = float(non_null.str.fullmatch(r"\d+").mean())
             length_ok_ratio = float(non_null.str.len().between(6, 16).mean())
-            no_symbol_ratio = float(non_null.str.contains(r"[^0-9]").apply(lambda x: not x).mean())
+            # Check if values contain only digits (no special characters or letters)
+            no_symbol_ratio = float(non_null.str.fullmatch(r"\d+").mean())
             unique_ratio = float(non_null.nunique() / len(non_null))
             not_null_ratio = float(len(non_null) / max(len(series), 1))
             randomized_flag = bool(unique_ratio > 0.85 and digit_only_ratio > 0.8)
@@ -430,8 +447,8 @@ class BankingDomainDetector:
             })
 
         summary = {
-            "total_rows": total_rows,
-            "checked_columns": len(results),
+            "total_rows": int(total_rows),  # Convert to Python int
+            "checked_columns": int(len(results)),  # Convert to Python int
             "best_match": None
         }
 
@@ -453,11 +470,13 @@ class BankingDomainDetector:
         Analyze balance column: presence and count of zero/negative balances.
         """
         balance_keywords = ["balance", "bal", "account_balance", "current_balance"]
+        # Normalize keywords for proper matching
+        norm_balance_keywords = [self.normalize(k) for k in balance_keywords]
         balance_col = None
 
         for col in df.columns:
             norm_col = self.normalize(col)
-            if any(k in norm_col for k in balance_keywords):
+            if any(norm_k in norm_col or norm_col in norm_k or fuzz.ratio(norm_col, norm_k) >= 85 for norm_k in norm_balance_keywords):
                 balance_col = col
                 break
 
@@ -466,23 +485,313 @@ class BankingDomainDetector:
                 "has_balance_column": False,
                 "balance_column": None,
                 "zero_or_negative_count": 0,
-                "total_rows": len(df),
+                "total_rows": int(len(df)),  # Convert to Python int
                 "zero_or_negative_pct": 0.0
             }
 
         series = pd.to_numeric(df[balance_col], errors="coerce")
-        total = len(series)
+        total = int(len(series))  # Convert to Python int
         zero_neg = series.fillna(0) <= 0
-        zero_neg_count = int(zero_neg.sum())
+        zero_neg_count = int(zero_neg.sum())  # Already converted, but ensure Python int
         pct = round((zero_neg_count / total) * 100, 2) if total else 0.0
 
         return {
             "has_balance_column": True,
             "balance_column": balance_col,
-            "zero_or_negative_count": zero_neg_count,
-            "total_rows": total,
+            "zero_or_negative_count": int(zero_neg_count),  # Convert to Python int
+            "total_rows": int(total),  # Convert to Python int
             "zero_or_negative_pct": pct
         }
+
+    def detect_opening_debit_credit_columns(self, df: pd.DataFrame):
+        """
+        Banking Data Column Detection Engine
+        Following .md file specifications to detect:
+        1) opening_balance
+        2) debit (withdrawal / amount_out)
+        3) credit (deposit / amount_in)
+        """
+        opening_balance_synonyms = [
+            "opening_balance", "open_balance", "balance_before", 
+            "previous_balance", "prev_balance"
+        ]
+        debit_synonyms = [
+            "debit", "withdrawal", "withdraw_amount", "amount_out", "dr_amount"
+        ]
+        credit_synonyms = [
+            "credit", "deposit", "amount_in", "cr_amount"
+        ]
+        
+        # Normalize all synonyms
+        norm_opening_synonyms = [self.normalize(kw) for kw in opening_balance_synonyms]
+        norm_debit_synonyms = [self.normalize(kw) for kw in debit_synonyms]
+        norm_credit_synonyms = [self.normalize(kw) for kw in credit_synonyms]
+        
+        opening_balance_candidates = []
+        debit_candidates = []
+        credit_candidates = []
+        
+        # Step 1: Column Name Analysis
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            
+            # Check opening balance
+            for syn in norm_opening_synonyms:
+                if syn in norm_col or norm_col in syn or fuzz.ratio(norm_col, syn) >= 85:
+                    opening_balance_candidates.append(col)
+                    break
+            
+            # Check debit
+            for syn in norm_debit_synonyms:
+                if syn in norm_col or norm_col in syn or fuzz.ratio(norm_col, syn) >= 85:
+                    debit_candidates.append(col)
+                    break
+            
+            # Check credit
+            for syn in norm_credit_synonyms:
+                if syn in norm_col or norm_col in syn or fuzz.ratio(norm_col, syn) >= 85:
+                    credit_candidates.append(col)
+                    break
+        
+        # Step 2: Data Pattern Analysis
+        def analyze_pattern(series, col_name):
+            """Analyze if column matches expected pattern"""
+            try:
+                numeric_series = pd.to_numeric(series, errors="coerce").dropna()
+                if len(numeric_series) == 0:
+                    return 0, "No numeric values found"
+                
+                total = len(series)
+                non_null = len(numeric_series)
+                numeric_ratio = non_null / total if total > 0 else 0
+                
+                if numeric_ratio < 0.8:
+                    return 0, "Less than 80% numeric values"
+                
+                non_negative_ratio = (numeric_series >= 0).sum() / non_null if non_null > 0 else 0
+                mostly_zero_ratio = (numeric_series == 0).sum() / non_null if non_null > 0 else 0
+                
+                score = 0
+                reasons = []
+                
+                # Numeric check (40% weight)
+                if numeric_ratio >= 0.95:
+                    score += 40
+                    reasons.append("highly numeric")
+                elif numeric_ratio >= 0.8:
+                    score += 30
+                    reasons.append("mostly numeric")
+                
+                # Non-negative check (30% weight)
+                if non_negative_ratio >= 0.95:
+                    score += 30
+                    reasons.append("all non-negative")
+                elif non_negative_ratio >= 0.9:
+                    score += 20
+                    reasons.append("mostly non-negative")
+                
+                # Mostly zero check (30% weight) - for debit/credit
+                if 0.3 <= mostly_zero_ratio <= 0.9:
+                    score += 30
+                    reasons.append("mixed zero and non-zero values")
+                elif mostly_zero_ratio < 0.3:
+                    score += 20
+                    reasons.append("mostly non-zero values")
+                
+                reason_str = ", ".join(reasons) if reasons else "numeric pattern detected"
+                return min(score, 100), reason_str
+                
+            except Exception as e:
+                return 0, f"Error analyzing: {str(e)}"
+        
+        # Analyze candidates
+        opening_results = []
+        for col in opening_balance_candidates:
+            score, reason = analyze_pattern(df[col], col)
+            opening_results.append({
+                "column": col,
+                "confidence": score,
+                "reason": reason
+            })
+        
+        debit_results = []
+        for col in debit_candidates:
+            score, reason = analyze_pattern(df[col], col)
+            debit_results.append({
+                "column": col,
+                "confidence": score,
+                "reason": reason
+            })
+        
+        credit_results = []
+        for col in credit_candidates:
+            score, reason = analyze_pattern(df[col], col)
+            credit_results.append({
+                "column": col,
+                "confidence": score,
+                "reason": reason
+            })
+        
+        # Step 3: Cross-Column Logic (debit/credit mutual exclusivity)
+        # Find numeric columns that could be debit/credit
+        numeric_cols = []
+        for col in df.columns:
+            try:
+                numeric_series = pd.to_numeric(df[col], errors="coerce")
+                if int(numeric_series.notna().sum()) / len(df) >= 0.8:  # Convert to Python int
+                    numeric_cols.append(col)
+            except:
+                pass
+        
+        # Check cross-column logic for debit/credit
+        if len(numeric_cols) >= 2:
+            for i, col1 in enumerate(numeric_cols):
+                if col1 in debit_candidates or col1 in credit_candidates:
+                    continue
+                    
+                for col2 in numeric_cols[i+1:]:
+                    if col2 in debit_candidates or col2 in credit_candidates:
+                        continue
+                    
+                    try:
+                        series1 = pd.to_numeric(df[col1], errors="coerce").fillna(0)
+                        series2 = pd.to_numeric(df[col2], errors="coerce").fillna(0)
+                        
+                        # Check if col1 > 0 when col2 = 0 (potential debit vs credit)
+                        col1_when_col2_zero = int(((series1 > 0) & (series2 == 0)).sum())  # Convert to Python int
+                        col2_when_col1_zero = int(((series2 > 0) & (series1 == 0)).sum())  # Convert to Python int
+                        both_positive = int(((series1 > 0) & (series2 > 0)).sum())  # Convert to Python int
+                        both_zero = int(((series1 == 0) & (series2 == 0)).sum())  # Convert to Python int
+                        
+                        total = int(len(df))  # Convert to Python int
+                        mutual_exclusive_ratio = (col1_when_col2_zero + col2_when_col1_zero) / total if total > 0 else 0
+                        both_positive_ratio = both_positive / total if total > 0 else 0
+                        
+                        if mutual_exclusive_ratio > 0.7 and both_positive_ratio < 0.1:
+                            # High mutual exclusivity - could be debit/credit pair
+                            score1, reason1 = analyze_pattern(series1, col1)
+                            score2, reason2 = analyze_pattern(series2, col2)
+                            
+                            # Determine which is debit and which is credit based on higher values or patterns
+                            col1_avg = float(series1.mean()) if len(series1) > 0 else 0
+                            col2_avg = float(series2.mean()) if len(series2) > 0 else 0
+                            
+                            # Boost scores for cross-column validation
+                            existing_debit_cols = [r["column"] for r in debit_results]
+                            existing_credit_cols = [r["column"] for r in credit_results]
+                            
+                            if col1 not in existing_debit_cols + existing_credit_cols:
+                                if score1 >= 50:
+                                    # Assign as debit or credit based on mutual exclusivity pattern
+                                    if col1_when_col2_zero > col2_when_col1_zero:
+                                        debit_results.append({
+                                            "column": col1,
+                                            "confidence": min(score1 + 20, 100),
+                                            "reason": f"{reason1}, mutually exclusive with {col2} (debit pattern)"
+                                        })
+                                        if col2 not in existing_debit_cols + existing_credit_cols and score2 >= 50:
+                                            credit_results.append({
+                                                "column": col2,
+                                                "confidence": min(score2 + 20, 100),
+                                                "reason": f"{reason2}, mutually exclusive with {col1} (credit pattern)"
+                                            })
+                                    else:
+                                        credit_results.append({
+                                            "column": col1,
+                                            "confidence": min(score1 + 20, 100),
+                                            "reason": f"{reason1}, mutually exclusive with {col2} (credit pattern)"
+                                        })
+                                        if col2 not in existing_debit_cols + existing_credit_cols and score2 >= 50:
+                                            debit_results.append({
+                                                "column": col2,
+                                                "confidence": min(score2 + 20, 100),
+                                                "reason": f"{reason2}, mutually exclusive with {col1} (debit pattern)"
+                                            })
+                    except:
+                        pass
+        
+        # Step 4: Balance Formula Validation (if closing balance exists)
+        closing_balance_keywords = ["closing_balance", "closing", "balance_after", "final_balance", "end_balance"]
+        norm_closing_keywords = [self.normalize(kw) for kw in closing_balance_keywords]
+        closing_col = None
+        
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_closing_keywords):
+                closing_col = col
+                break
+        
+        # If closing balance found, validate formula: closing ≈ opening + credit − debit
+        if closing_col:
+            try:
+                closing_series = pd.to_numeric(df[closing_col], errors="coerce").fillna(0)
+                
+                for opening_res in opening_results:
+                    if opening_res["confidence"] >= 60:
+                        opening_col = opening_res["column"]
+                        opening_series = pd.to_numeric(df[opening_col], errors="coerce").fillna(0)
+                        
+                        for debit_res in debit_results:
+                            debit_col = debit_res["column"]
+                            debit_series = pd.to_numeric(df[debit_col], errors="coerce").fillna(0)
+                            
+                            for credit_res in credit_results:
+                                credit_col = credit_res["column"]
+                                credit_series = pd.to_numeric(df[credit_col], errors="coerce").fillna(0)
+                                
+                                # Calculate: closing ≈ opening + credit − debit
+                                calculated_closing = opening_series + credit_series - debit_series
+                                diff = abs(closing_series - calculated_closing)
+                                
+                                # Tolerance: within 0.01 or 1% of value
+                                tolerance = closing_series.abs() * 0.01 + 0.01
+                                matches = int((diff <= tolerance).sum())  # Convert to Python int
+                                match_ratio = float(matches / len(df)) if len(df) > 0 else 0.0  # Convert to Python float
+                                
+                                if match_ratio >= 0.8:
+                                    # Formula matches! Boost confidence
+                                    opening_res["confidence"] = min(float(opening_res["confidence"]) + 15, 100.0)  # Ensure float
+                                    opening_res["reason"] += f", validates balance formula (match: {match_ratio*100:.1f}%)"
+                                    
+                                    debit_res["confidence"] = min(float(debit_res["confidence"]) + 15, 100.0)  # Ensure float
+                                    debit_res["reason"] += f", validates balance formula"
+                                    
+                                    credit_res["confidence"] = min(float(credit_res["confidence"]) + 15, 100.0)  # Ensure float
+                                    credit_res["reason"] += f", validates balance formula"
+            except:
+                pass
+        
+        # Select best candidates (confidence >= 60%)
+        opening_best = max(opening_results, key=lambda x: x["confidence"]) if opening_results and max(opening_results, key=lambda x: x["confidence"])["confidence"] >= 60 else None
+        debit_best = max(debit_results, key=lambda x: x["confidence"]) if debit_results and max(debit_results, key=lambda x: x["confidence"])["confidence"] >= 60 else None
+        credit_best = max(credit_results, key=lambda x: x["confidence"]) if credit_results and max(credit_results, key=lambda x: x["confidence"])["confidence"] >= 60 else None
+        
+        # Format output according to .md file specification
+        result = {
+            "opening_balance": {
+                "column_name": opening_best["column"] if opening_best else "NOT FOUND",
+                "confidence": round(opening_best["confidence"], 2) if opening_best else 0.0,
+                "reason": opening_best["reason"] if opening_best else "No column found with confidence >= 60%"
+            },
+            "debit": {
+                "column_name": debit_best["column"] if debit_best else "NOT FOUND",
+                "confidence": round(debit_best["confidence"], 2) if debit_best else 0.0,
+                "reason": debit_best["reason"] if debit_best else "No column found with confidence >= 60%"
+            },
+            "credit": {
+                "column_name": credit_best["column"] if credit_best else "NOT FOUND",
+                "confidence": round(credit_best["confidence"], 2) if credit_best else 0.0,
+                "reason": credit_best["reason"] if credit_best else "No column found with confidence >= 60%"
+            },
+            # Additional details for debugging
+            "all_candidates": {
+                "opening_balance": opening_results,
+                "debit": debit_results,
+                "credit": credit_results
+            }
+        }
+        
+        return result
 
     def validate_transaction_data(self, df: pd.DataFrame):
         """
@@ -502,9 +811,12 @@ class BankingDomainDetector:
         
         for col_type, keywords in transaction_columns.items():
             found = False
+            # Normalize keywords for proper matching
+            norm_keywords = [self.normalize(kw) for kw in keywords]
             for col in df.columns:
                 norm_col = self.normalize(col)
-                if any(keyword in norm_col for keyword in keywords):
+                # Check if any normalized keyword matches the normalized column name
+                if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_keywords):
                     found_columns[col_type] = col
                     found = True
                     break
@@ -527,22 +839,22 @@ class BankingDomainDetector:
             debit_series = pd.to_numeric(df[debit_col], errors="coerce").fillna(0)
             credit_series = pd.to_numeric(df[credit_col], errors="coerce").fillna(0)
             both_present = (debit_series > 0) & (credit_series > 0)
-            validation_results["debit_credit_same_row"] = not both_present.any()
+            validation_results["debit_credit_same_row"] = bool(not both_present.any())  # Convert numpy bool to Python bool
             if both_present.any():
-                validation_results["violations"].append(f"Found {both_present.sum()} rows with both debit and credit > 0")
+                validation_results["violations"].append(f"Found {int(both_present.sum())} rows with both debit and credit > 0")  # Convert to Python int
         
         if "debit" in found_columns:
             debit_col = found_columns["debit"]
             debit_series = pd.to_numeric(df[debit_col], errors="coerce")
-            negative_debits = (debit_series < 0).sum()
-            validation_results["amount_positive"] = negative_debits == 0
+            negative_debits = int((debit_series < 0).sum())  # Convert to Python int
+            validation_results["amount_positive"] = bool(negative_debits == 0)  # Convert to Python bool
             if negative_debits > 0:
                 validation_results["violations"].append(f"Found {negative_debits} negative debit amounts")
         
         if "credit" in found_columns:
             credit_col = found_columns["credit"]
             credit_series = pd.to_numeric(df[credit_col], errors="coerce")
-            negative_credits = (credit_series < 0).sum()
+            negative_credits = int((credit_series < 0).sum())  # Convert to Python int
             if negative_credits > 0:
                 validation_results["violations"].append(f"Found {negative_credits} negative credit amounts")
         
@@ -551,19 +863,19 @@ class BankingDomainDetector:
             try:
                 dates = pd.to_datetime(df[date_col], errors="coerce")
                 future_dates = dates > pd.Timestamp.now()
-                validation_results["date_not_future"] = not future_dates.any()
+                validation_results["date_not_future"] = bool(not future_dates.any())  # Convert numpy bool to Python bool
                 if future_dates.any():
-                    validation_results["violations"].append(f"Found {future_dates.sum()} future dates")
+                    validation_results["violations"].append(f"Found {int(future_dates.sum())} future dates")  # Convert to Python int
             except:
-                validation_results["date_not_future"] = True
+                validation_results["date_not_future"] = True  # Already Python bool
         
         return {
-            "has_transaction_data": len(found_columns) > 0,
+            "has_transaction_data": bool(len(found_columns) > 0),  # Convert to Python bool
             "found_columns": found_columns,
             "missing_columns": missing_columns,
             "completeness": round((len(found_columns) / len(transaction_columns)) * 100, 2),
             "validation_results": validation_results,
-            "is_valid": len(validation_results["violations"]) == 0
+            "is_valid": bool(len(validation_results["violations"]) == 0)  # Convert to Python bool
         }
     
     def validate_transaction_type(self, df: pd.DataFrame):
@@ -580,6 +892,9 @@ class BankingDomainDetector:
         primary_keywords = ["transaction_type", "txn_type", "trans_type", "transactiontype"]
         # Secondary keywords (generic "type" but must validate values)
         secondary_keywords = ["type"]
+        # Normalize keywords for proper matching
+        norm_primary_keywords = [self.normalize(kw) for kw in primary_keywords]
+        norm_secondary_keywords = [self.normalize(kw) for kw in secondary_keywords]
         
         transaction_type_col = None
         
@@ -589,7 +904,7 @@ class BankingDomainDetector:
             # Exclude account-related columns
             if "account" in norm_col:
                 continue
-            if any(keyword in norm_col for keyword in primary_keywords):
+            if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_primary_keywords):
                 transaction_type_col = col
                 break
         
@@ -601,7 +916,7 @@ class BankingDomainDetector:
                 if "account" in norm_col:
                     continue
                 # Check if it's a generic "type" column
-                if any(keyword in norm_col for keyword in secondary_keywords):
+                if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_secondary_keywords):
                     # Validate that this column actually contains transaction type values
                     series = df[col].dropna().astype(str).str.lower().str.strip()
                     if len(series) > 0:
@@ -616,7 +931,7 @@ class BankingDomainDetector:
             return {
                 "column_found": False,
                 "column_name": None,
-                "total_rows": len(df),
+                "total_rows": int(len(df)),  # Convert to Python int
                 "valid_count": 0,
                 "invalid_count": 0,
                 "valid_types_found": [],
@@ -628,13 +943,13 @@ class BankingDomainDetector:
         
         # Get the series and normalize values
         series = df[transaction_type_col].dropna().astype(str).str.lower().str.strip()
-        total_rows = len(series)
+        total_rows = int(len(series))  # Convert to Python int
         
         if total_rows == 0:
             return {
                 "column_found": True,
                 "column_name": transaction_type_col,
-                "total_rows": len(df),
+                "total_rows": int(len(df)),  # Convert to Python int
                 "valid_count": 0,
                 "invalid_count": 0,
                 "valid_types_found": [],
@@ -646,8 +961,8 @@ class BankingDomainDetector:
         
         # Check each value against valid types
         valid_mask = series.isin(valid_types)
-        valid_count = int(valid_mask.sum())
-        invalid_count = int((~valid_mask).sum())
+        valid_count = int(valid_mask.sum())  # Convert to Python int
+        invalid_count = int((~valid_mask).sum())  # Convert to Python int
         
         # Get unique valid and invalid types found
         valid_types_found = sorted(series[valid_mask].unique().tolist())
@@ -657,15 +972,15 @@ class BankingDomainDetector:
         probability_percentage = round((valid_count / total_rows) * 100, 2) if total_rows > 0 else 0.0
         
         # Decision logic: valid if >= 80% of values match valid types
-        is_valid = probability_percentage >= 80.0
+        is_valid = bool(probability_percentage >= 80.0)  # Convert to Python bool
         decision = "valid" if is_valid else ("partial" if probability_percentage >= 50.0 else "invalid")
         
         return {
             "column_found": True,
             "column_name": transaction_type_col,
-            "total_rows": total_rows,
-            "valid_count": valid_count,
-            "invalid_count": invalid_count,
+            "total_rows": int(total_rows),  # Convert to Python int
+            "valid_count": int(valid_count),  # Convert to Python int
+            "invalid_count": int(invalid_count),  # Convert to Python int
             "valid_types_found": valid_types_found,
             "invalid_types_found": invalid_types_found,
             "probability_percentage": probability_percentage,
@@ -684,12 +999,14 @@ class BankingDomainDetector:
         """
         # PAN column keywords
         pan_keywords = ["pan", "pan_number", "pan_no", "pannumber", "panno", "permanent_account_number"]
+        # Normalize keywords for proper matching
+        norm_pan_keywords = [self.normalize(kw) for kw in pan_keywords]
         
         # Find PAN column
         pan_col = None
         for col in df.columns:
             norm_col = self.normalize(col)
-            if any(keyword in norm_col for keyword in pan_keywords):
+            if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_pan_keywords):
                 pan_col = col
                 break
         
@@ -697,7 +1014,7 @@ class BankingDomainDetector:
             return {
                 "column_found": False,
                 "column_name": None,
-                "total_rows": len(df),
+                "total_rows": int(len(df)),  # Convert to Python int
                 "valid_pan_count": 0,
                 "invalid_pan_count": 0,
                 "total_pan_found": 0,
@@ -710,13 +1027,13 @@ class BankingDomainDetector:
         
         # Get the series and convert to string, remove whitespace, convert to uppercase
         series = df[pan_col].dropna().astype(str).str.strip().str.upper()
-        total_rows = len(series)
+        total_rows = int(len(series))  # Convert to Python int
         
         if total_rows == 0:
             return {
                 "column_found": True,
                 "column_name": pan_col,
-                "total_rows": total_rows,
+                "total_rows": int(total_rows),  # Convert to Python int
                 "valid_pan_count": 0,
                 "invalid_pan_count": 0,
                 "total_pan_found": 0,
@@ -732,8 +1049,8 @@ class BankingDomainDetector:
         
         # Check each value against PAN pattern
         valid_mask = series.str.fullmatch(pan_pattern, na=False)
-        valid_pan_count = int(valid_mask.sum())
-        invalid_pan_count = int((~valid_mask).sum())
+        valid_pan_count = int(valid_mask.sum())  # Convert to Python int
+        invalid_pan_count = int((~valid_mask).sum())  # Convert to Python int
         
         # Get list of valid PAN numbers (unique, limit to 50 for display)
         valid_pans = series[valid_mask].unique().tolist()
@@ -747,16 +1064,16 @@ class BankingDomainDetector:
         probability_percentage = round((valid_pan_count / total_rows) * 100, 2) if total_rows > 0 else 0.0
         
         # Decision logic: valid if >= 80% of values match PAN format
-        is_valid = probability_percentage >= 80.0
+        is_valid = bool(probability_percentage >= 80.0)  # Convert to Python bool
         decision = "valid" if is_valid else ("partial" if probability_percentage >= 50.0 else "invalid")
         
         return {
             "column_found": True,
             "column_name": pan_col,
-            "total_rows": total_rows,
-            "valid_pan_count": valid_pan_count,
-            "invalid_pan_count": invalid_pan_count,
-            "total_pan_found": valid_pan_count,
+            "total_rows": int(total_rows),  # Convert to Python int
+            "valid_pan_count": int(valid_pan_count),  # Convert to Python int
+            "invalid_pan_count": int(invalid_pan_count),  # Convert to Python int
+            "total_pan_found": int(valid_pan_count),  # Convert to Python int
             "pan_list": pan_list,
             "invalid_pan_list": invalid_pan_list,
             "probability_percentage": probability_percentage,
@@ -791,11 +1108,13 @@ class BankingDomainDetector:
         
         # Find branch_code column
         branch_keywords = ["branch_code", "branchcode", "branch", "br_code", "brcode", "branch_id", "branchid"]
+        # Normalize keywords for proper matching
+        norm_branch_keywords = [self.normalize(kw) for kw in branch_keywords]
         branch_col = None
         
         for col in df.columns:
             norm_col = self.normalize(col)
-            if any(keyword in norm_col for keyword in branch_keywords):
+            if any(norm_kw in norm_col or norm_col in norm_kw or fuzz.ratio(norm_col, norm_kw) >= 85 for norm_kw in norm_branch_keywords):
                 branch_col = col
                 break
         
@@ -818,7 +1137,7 @@ class BankingDomainDetector:
         
         # Get series and convert to string, uppercase
         series = df[branch_col].dropna().astype(str).str.strip().str.upper()
-        total_rows = len(series)
+        total_rows = int(len(series))  # Convert to Python int
         
         if total_rows == 0:
             return {
@@ -837,7 +1156,7 @@ class BankingDomainDetector:
         # Match pattern
         valid_mask = series.str.fullmatch(branch_pattern, na=False)
         valid_branch_codes = series[valid_mask].tolist()
-        total_matches = len(valid_branch_codes)
+        total_matches = int(len(valid_branch_codes))  # Convert to Python int
         
         if total_matches == 0:
             return {
@@ -866,7 +1185,7 @@ class BankingDomainDetector:
             if support >= support_threshold:
                 frequent_branch_codes.append({
                     "branch_code": branch_code,
-                    "count": count,
+                    "count": int(count),  # Convert to Python int
                     "support": round(support * 100, 2)  # Percentage
                 })
         
@@ -878,7 +1197,7 @@ class BankingDomainDetector:
         
         # Validation: At least 50% of values should match pattern
         match_ratio = total_matches / total_rows
-        is_valid = match_ratio >= 0.5
+        is_valid = bool(match_ratio >= 0.5)  # Convert to Python bool
         
         return {
             "can_analyze": True,
@@ -888,8 +1207,8 @@ class BankingDomainDetector:
             "branch_codes": unique_branch_codes[:50],  # Limit to 50 for display
             "frequent_branch_codes": frequent_branch_codes,
             "support_threshold": support_threshold * 100,  # As percentage
-            "total_matches": total_matches,
-            "total_rows": total_rows,
+            "total_matches": int(total_matches),  # Convert to Python int
+            "total_rows": int(total_rows),  # Convert to Python int
             "match_ratio": round(match_ratio * 100, 2),
             "is_valid": is_valid,
             "pattern": "[A-Z]{2,3}[0-9]{2,3}",
@@ -904,10 +1223,12 @@ class BankingDomainDetector:
         if balance_col_name is None:
             # Find balance column
             balance_keywords = ["balance", "bal", "account_balance", "current_balance"]
+            # Normalize keywords for proper matching
+            norm_balance_keywords = [self.normalize(k) for k in balance_keywords]
             balance_col_name = None
             for col in df.columns:
                 norm_col = self.normalize(col)
-                if any(k in norm_col for k in balance_keywords):
+                if any(norm_k in norm_col or norm_col in norm_k or fuzz.ratio(norm_col, norm_k) >= 85 for norm_k in norm_balance_keywords):
                     balance_col_name = col
                     break
         
@@ -923,11 +1244,13 @@ class BankingDomainDetector:
         # Find debit and credit columns
         debit_col = None
         credit_col = None
+        norm_debit = self.normalize("debit")
+        norm_credit = self.normalize("credit")
         for col in df.columns:
             norm_col = self.normalize(col)
-            if "debit" in norm_col:
+            if norm_debit in norm_col or fuzz.ratio(norm_col, norm_debit) >= 85:
                 debit_col = col
-            if "credit" in norm_col:
+            if norm_credit in norm_col or fuzz.ratio(norm_col, norm_credit) >= 85:
                 credit_col = col
         
         balance_series = pd.to_numeric(df[balance_col_name], errors="coerce").fillna(0)
@@ -936,18 +1259,18 @@ class BankingDomainDetector:
         
         if debit_col:
             debit_series = pd.to_numeric(df[debit_col], errors="coerce").fillna(0)
-            total_debits = (debit_series > 0).sum()
+            total_debits = int((debit_series > 0).sum())  # Convert to Python int
             # Check if debit > balance
             insufficient = (debit_series > balance_series) & (debit_series > 0)
-            insufficient_count = int(insufficient.sum())
+            insufficient_count = int(insufficient.sum())  # Convert to Python int
         
         return {
             "has_balance": True,
             "balance_column": balance_col_name,
-            "can_validate": debit_col is not None or credit_col is not None,
-            "insufficient_funds_count": insufficient_count,
-            "total_debit_transactions": total_debits,
-            "validation_passed": insufficient_count == 0,
+            "can_validate": bool(debit_col is not None or credit_col is not None),  # Convert to Python bool
+            "insufficient_funds_count": int(insufficient_count),  # Convert to Python int
+            "total_debit_transactions": int(total_debits),  # Convert to Python int
+            "validation_passed": bool(insufficient_count == 0),  # Convert to Python bool
             "debit_column": debit_col,
             "credit_column": credit_col
         }
@@ -960,9 +1283,11 @@ class BankingDomainDetector:
         if account_col is None:
             # Find account column
             account_keywords = ["account", "account_number", "account_id", "acc_no"]
+            # Normalize keywords for proper matching
+            norm_account_keywords = [self.normalize(k) for k in account_keywords]
             for col in df.columns:
                 norm_col = self.normalize(col)
-                if any(k in norm_col for k in account_keywords):
+                if any(norm_k in norm_col or norm_col in norm_k or fuzz.ratio(norm_col, norm_k) >= 85 for norm_k in norm_account_keywords):
                     account_col = col
                     break
         
@@ -978,13 +1303,17 @@ class BankingDomainDetector:
         debit_col = None
         credit_col = None
         
+        norm_date = self.normalize("date")
+        norm_transaction = self.normalize("transaction")
+        norm_debit = self.normalize("debit")
+        norm_credit = self.normalize("credit")
         for col in df.columns:
             norm_col = self.normalize(col)
-            if "date" in norm_col and "transaction" in norm_col:
+            if norm_date in norm_col and norm_transaction in norm_col:
                 date_col = col
-            if "debit" in norm_col:
+            if norm_debit in norm_col or fuzz.ratio(norm_col, norm_debit) >= 85:
                 debit_col = col
-            if "credit" in norm_col:
+            if norm_credit in norm_col or fuzz.ratio(norm_col, norm_credit) >= 85:
                 credit_col = col
         
         suspicious_patterns = []
@@ -1002,7 +1331,7 @@ class BankingDomainDetector:
                     account_transactions = df_with_dates.groupby(account_col).size()
                     high_frequency = account_transactions[account_transactions > 10]
                     if len(high_frequency) > 0:
-                        suspicious_patterns.append(f"High transaction frequency: {len(high_frequency)} accounts with >10 transactions")
+                        suspicious_patterns.append(f"High transaction frequency: {int(len(high_frequency))} accounts with >10 transactions")  # Convert to Python int
                         risk_factors += 1
             except:
                 pass
@@ -1017,7 +1346,7 @@ class BankingDomainDetector:
                     if std_debit > 0:
                         high_amounts = debit_series[debit_series > (mean_debit + 3 * std_debit)]
                         if len(high_amounts) > 0:
-                            suspicious_patterns.append(f"Unusually high amounts: {len(high_amounts)} transactions >3 standard deviations")
+                            suspicious_patterns.append(f"Unusually high amounts: {int(len(high_amounts))} transactions >3 standard deviations")  # Convert to Python int
                             risk_factors += 1
             except:
                 pass
@@ -1027,7 +1356,7 @@ class BankingDomainDetector:
             try:
                 dates = pd.to_datetime(df[date_col], errors="coerce")
                 midnight_hours = dates.dt.hour.between(0, 3)
-                midnight_count = midnight_hours.sum()
+                midnight_count = int(midnight_hours.sum())  # Convert to Python int
                 if midnight_count > len(df) * 0.3:  # More than 30% at midnight
                     suspicious_patterns.append(f"High midnight transaction rate: {midnight_count} transactions ({(midnight_count/len(df)*100).round(1)}%)")
                     risk_factors += 1
@@ -1046,7 +1375,7 @@ class BankingDomainDetector:
             "can_analyze": True,
             "suspicious_patterns": suspicious_patterns,
             "fraud_risk": fraud_risk,
-            "risk_factors": risk_factors
+            "risk_factors": int(risk_factors)  # Convert to Python int
         }
     
     def check_foreign_key_linking(self, df: pd.DataFrame, account_col: str = None, customer_col: str = None):
@@ -1059,12 +1388,15 @@ class BankingDomainDetector:
             # Try to find columns
             account_keywords = ["account", "account_number", "acc_no", "acct_no"]
             customer_keywords = ["customer_id", "cust_id", "user_id", "customerid"]
+            # Normalize keywords for proper matching
+            norm_account_keywords = [self.normalize(k) for k in account_keywords]
+            norm_customer_keywords = [self.normalize(k) for k in customer_keywords]
             
             for col in df.columns:
                 norm_col = self.normalize(col)
-                if account_col is None and any(k in norm_col for k in account_keywords):
+                if account_col is None and any(norm_k in norm_col or norm_col in norm_k or fuzz.ratio(norm_col, norm_k) >= 85 for norm_k in norm_account_keywords):
                     account_col = col
-                if customer_col is None and any(k in norm_col for k in customer_keywords):
+                if customer_col is None and any(norm_k in norm_col or norm_col in norm_k or fuzz.ratio(norm_col, norm_k) >= 85 for norm_k in norm_customer_keywords):
                     customer_col = col
         
         if account_col is None or customer_col is None:
@@ -1083,8 +1415,8 @@ class BankingDomainDetector:
         
         # Check for missing links
         pairs = df[[account_col, customer_col]].dropna()
-        missing_accounts = pairs[pairs[account_col].isna()].shape[0]
-        missing_customers = pairs[pairs[customer_col].isna()].shape[0]
+        missing_accounts = int(pairs[pairs[account_col].isna()].shape[0])  # Convert to Python int
+        missing_customers = int(pairs[pairs[customer_col].isna()].shape[0])  # Convert to Python int
         missing_links = missing_accounts + missing_customers
         
         # Check FK constraint: one account_number must map to only one customer_id
@@ -1097,11 +1429,11 @@ class BankingDomainDetector:
         
         if len(accounts_with_multiple_customers) > 0:
             fk_mismatch = True
-            violations.append(f"{len(accounts_with_multiple_customers)} account(s) map to multiple customers (FK violation)")
+            violations.append(f"{int(len(accounts_with_multiple_customers))} account(s) map to multiple customers (FK violation)")  # Convert to Python int
         
         # Determine relationship type
-        unique_accounts = pairs[account_col].nunique()
-        unique_customers = pairs[customer_col].nunique()
+        unique_accounts = int(pairs[account_col].nunique())  # Convert to Python int
+        unique_customers = int(pairs[customer_col].nunique())  # Convert to Python int
         
         # Check if one-to-many (one customer, many accounts) - this is VALID
         if unique_customers > 0:
@@ -1114,7 +1446,7 @@ class BankingDomainDetector:
             relationship_type = "UNKNOWN"
         
         # Linking is valid if no missing links AND no FK mismatch
-        linking_valid = missing_links == 0 and not fk_mismatch
+        linking_valid = bool(missing_links == 0 and not fk_mismatch)  # Convert to Python bool
         
         return {
             "can_check": True,
@@ -1125,7 +1457,7 @@ class BankingDomainDetector:
             "total_accounts": int(unique_accounts),
             "total_customers": int(unique_customers),
             "accounts_per_customer": round(accounts_per_customer, 2) if unique_customers > 0 else 0.0,
-            "fk_mismatch": fk_mismatch,
+            "fk_mismatch": bool(fk_mismatch),  # Ensure Python bool
             "linking_valid": linking_valid,
             "violations": violations
         }
@@ -1142,16 +1474,16 @@ class BankingDomainDetector:
         - Otherwise, LOW RISK
         """
         missing_mandatory = missing_columns_check.get("missing_mandatory", [])
-        missing_account_number = "account_number" in missing_mandatory
-        missing_customer_id = "customer_id" in missing_mandatory
-        missing_account_status = "account_status" in missing_mandatory
-        missing_balance = "balance" in missing_mandatory
+        missing_account_number = bool("account_number" in missing_mandatory)  # Convert to Python bool
+        missing_customer_id = bool("customer_id" in missing_mandatory)  # Convert to Python bool
+        missing_account_status = bool("account_status" in missing_mandatory)  # Convert to Python bool
+        missing_balance = bool("balance" in missing_mandatory)  # Convert to Python bool
 
-        account_valid = account_check.get("best_match_decision") == "match"
+        account_valid = bool(account_check.get("best_match_decision") == "match")  # Convert to Python bool
 
-        kyc_below_threshold = not kyc_check.get("meets_threshold", False)
+        kyc_below_threshold = bool(not kyc_check.get("meets_threshold", False))  # Convert to Python bool
 
-        can_fk_check = foreign_key_check.get("can_check", False)
+        can_fk_check = bool(foreign_key_check.get("can_check", False))  # Convert to Python bool
         fk_mismatch = bool(foreign_key_check.get("fk_mismatch", False)) if can_fk_check else False
 
         risk_factors = []
@@ -1235,36 +1567,37 @@ class BankingDomainDetector:
             "account_valid": account_valid,
             "mandatory_present": all_mandatory_present,
             "kyc_meets_threshold": kyc_meets_threshold,
-            "no_fk_mismatch": not fk_mismatch
+            "no_fk_mismatch": bool(not fk_mismatch)  # Convert to Python bool
         }
     
     def detect_purpose(self, df: pd.DataFrame, account_check: dict, customer_check: dict,
                        transaction_check: dict, balance_check: dict, status_check: dict,
-                       kyc_check: dict):
+                       kyc_check: dict = None):
         """
-        STEP-8: Purpose Detection Logic (updated)
+        STEP-8: Purpose Detection Logic (KYC REMOVED)
 
         New rules:
-        - account_number + customer details → "Account Management Data"
+        - account_number + customer_id → "Account Management Data"
         - transaction_id / debit / credit / transaction_type → "Transaction Data"
         - withdrawal / deposit / transfer keywords → "Transaction Operations"
         - mix of account + transaction → "Core Banking Dataset"
 
         Purpose must NEVER be "Unknown" if an account_number column is detected.
+        KYC check parameter kept for backward compatibility but not used.
         """
-        has_account = account_check.get("has_account_number_column", False)
-        has_customer_id = customer_check.get("column_exists", False)
+        has_account = bool(account_check.get("has_account_number_column", False))  # Convert to Python bool
+        has_customer_id = bool(customer_check.get("column_exists", False))  # Convert to Python bool
 
-        kyc_fields_found = (kyc_check or {}).get("found_kyc_fields", {})
-        has_customer_details = bool(has_customer_id or kyc_fields_found)
+        # KYC removed - only use customer_id
+        has_customer_details = bool(has_customer_id)  # KYC removed
 
         transaction_cols = transaction_check.get("found_columns", {}) if transaction_check else {}
-        tx_has_id = "transaction_id" in transaction_cols
-        tx_has_debit = "debit" in transaction_cols
-        tx_has_credit = "credit" in transaction_cols
-        tx_has_type = "transaction_type" in transaction_cols
+        tx_has_id = bool("transaction_id" in transaction_cols)  # Convert to Python bool
+        tx_has_debit = bool("debit" in transaction_cols)  # Convert to Python bool
+        tx_has_credit = bool("credit" in transaction_cols)  # Convert to Python bool
+        tx_has_type = bool("transaction_type" in transaction_cols)  # Convert to Python bool
 
-        has_transaction_data = any([tx_has_id, tx_has_debit, tx_has_credit, tx_has_type])
+        has_transaction_data = bool(any([tx_has_id, tx_has_debit, tx_has_credit, tx_has_type]))  # Convert to Python bool
 
         cols_lower = [self.normalize(c) for c in df.columns]
         wdt_keywords = ["withdraw", "withdrawal", "deposit", "transfer", "transfer_to", "transfer_from"]
@@ -1324,32 +1657,29 @@ class BankingDomainDetector:
 
     def generate_column_purpose_report(self, df: pd.DataFrame,
                                        transaction_check: dict,
-                                       kyc_check: dict):
+                                       kyc_check: dict = None):
         """
         Extra human-readable explanation for banking reports.
+        KYC removed - only groups account/customer ID columns.
 
         Groups columns into:
-        1) Account / Customer details
+        1) Account / Customer ID columns (KYC removed)
         2) Transaction columns
         3) Withdrawal / Deposit / Transfer specific columns
         """
         columns = [str(c) for c in df.columns]
 
-        # 1️⃣ Account / Customer details
+        # 1️⃣ Account / Customer ID columns (KYC REMOVED)
         account_customer_cols = []
 
-        # From KYC detection
-        kyc_fields = (kyc_check or {}).get("found_kyc_fields", {})
-        account_customer_cols.extend(list(kyc_fields.values()))
+        # KYC fields detection REMOVED - only account/customer ID
 
         # Common id / name / contact patterns
+        # KYC fields (name, email, phone, address, aadhar, pan, passport) REMOVED as per specification
         account_customer_keywords = [
             "account", "acct", "accno", "account_number",
-            "customer", "cust", "client",
-            "name", "fullname", "full_name",
-            "email", "mail",
-            "phone", "mobile", "contact",
-            "address", "id_proof", "idcard", "aadhar", "pan", "passport"
+            "customer_id", "cust_id", "customerid", "custid",
+            "client_id", "clientid"
         ]
         for col in columns:
             norm = self.normalize(col)
@@ -1541,7 +1871,7 @@ class BankingDomainDetector:
         except Exception as e:
             return {"error": str(e)}
 
-        total_cols = len(df.columns)
+        total_cols = int(len(df.columns))  # Convert to Python int
         if total_cols == 0:
             return {"domain": "Unknown", "confidence": 0}
 
@@ -1657,26 +1987,22 @@ class BankingDomainDetector:
                 decision = "UNKNOWN"
                 qualitative = "Weak"
 
-        # 9️⃣ Downstream banking checks (safe on any tabular file)
+        # 🔥 CORE BANKING ENGINE: Role-based column detection and validation (KYC REMOVED)
+        core_engine = CoreBankingEngine()
+        core_analysis = core_engine.analyze_banking_dataset(df)
+        
+        # Legacy validations (kept for backward compatibility but not used in decision)
         account_status = self.detect_account_status(df)
         missing_columns_check = self.check_missing_columns(df)
         balance_analysis = self.analyze_balance(df)
-        kyc_verification = self.verify_kyc(df)
-        # Branch code detection using Apriori (only if user exists)
-        branch_code_detection = self.detect_branch_code_apriori(df, kyc_verification)
+        opening_debit_credit_detection = self.detect_opening_debit_credit_columns(df)
         transaction_validation = self.validate_transaction_data(df)
         transaction_type_validation = self.validate_transaction_type(df)
-        pan_validation = self.validate_pan_number(df)
         balance_col = balance_analysis.get("balance_column") if balance_analysis.get("has_balance_column") else None
         debit_credit_validation = self.validate_debit_credit_balance(df, balance_col)
-        fraud_detection = self.detect_fraud_patterns(df)
-
-        # Foreign key linking check – skip cleanly if customer_id is missing
-        account_col = account_number_check.get("best_match_column")
-        customer_col = customer_id_validation.get("column_name")
-        foreign_key_check = self.check_foreign_key_linking(df, account_col, customer_col)
-
-        # Purpose detection (updated rules)
+        
+        # KYC, PAN, Branch Code, Fraud Detection - ALL REMOVED as per specification
+        # Purpose detection (updated - no KYC reference)
         purpose_detection = self.detect_purpose(
             df,
             account_number_check,
@@ -1684,169 +2010,57 @@ class BankingDomainDetector:
             transaction_validation,
             balance_analysis,
             account_status,
-            kyc_verification
+            {}  # Empty dict instead of kyc_verification
         )
 
-        # Column‑purpose report for UI / charts
-        column_purpose_report = self.generate_column_purpose_report(df, transaction_validation, kyc_verification)
+        # Column‑purpose report for UI / charts (no KYC reference)
+        column_purpose_report = self.generate_column_purpose_report(df, transaction_validation, {})
 
-        # Final decision logic and risk assessment
-        final_decision = self.final_decision_logic(
-            account_number_check,
-            customer_id_validation,
-            missing_columns_check,
-            kyc_verification,
-            foreign_key_check
-        )
-        risk_assessment = self.calculate_risk_assessment(
-            account_number_check,
-            missing_columns_check,
-            kyc_verification,
-            foreign_key_check
-        )
-
-        # 🔟 Ordered, human-readable summary for the banking engine
-        has_account_col = account_number_check.get("has_account_number_column", False)
-        account_match_decision = account_number_check.get("best_match_decision")
-        customer_exists = customer_id_validation.get("column_exists", False)
-
-        # 1. Domain Detection Result
-        if decision == "UNKNOWN":
-            domain_summary = "Banking domain not confidently detected from this file."
-        else:
-            domain_summary = (
-                f"Banking domain detected ({decision.replace('_', ' ').title()}) "
-                f"with overall confidence {confidence_100:.2f}% based on column and value patterns."
-            )
-
-        # 2. Dataset Purpose Detection
-        purpose_summary = (
-            f"{purpose_detection.get('primary_purpose')} "
-            f"(confidence {purpose_detection.get('purpose_confidence', 0)}%). "
-            f"{purpose_detection.get('purpose_statement')}"
-        )
-
-        # 3. Account Number Validation (ML + Rules)
-        if has_account_col and account_match_decision == "match":
-            acc_validation_summary = (
-                f"Account number column detected as `{account_number_check.get('best_match_column')}` "
-                f"with probability {account_number_check.get('best_match_probability', 0)}% "
-                "using rule-based and statistical pattern checks."
-            )
-        elif has_account_col:
-            acc_validation_summary = (
-                f"An account-like column `{account_number_check.get('best_match_column')}` was found, "
-                "but it did not strongly satisfy account-number validation rules."
-            )
-        else:
-            acc_validation_summary = "No strong account number column could be validated in this file."
-
-        # 4. Customer ID Validation (if exists)
-        if customer_exists:
-            cust_validation_summary = (
-                f"Customer ID column detected as `{customer_id_validation.get('column_name')}` with "
-                f"overall probability {customer_id_validation.get('probability_customer_id', 0)}% "
-                "based on completeness, uniqueness and format checks."
-            )
-        else:
-            cust_validation_summary = (
-                "No customer_id column detected; customer-level foreign key checks are skipped, "
-                "but the rest of the pipeline continues with a warning only."
-            )
-
-        # 5. Foreign Key Linking Check (if possible)
-        if foreign_key_check.get("can_check"):
-            if foreign_key_check.get("fk_mismatch"):
-                fk_summary = (
-                    f"Foreign-key relationship between `{foreign_key_check.get('account_column')}` and "
-                    f"`{foreign_key_check.get('customer_column')}` has mismatches and needs correction."
-                )
-            else:
-                fk_summary = (
-                    f"Foreign-key relationship between `{foreign_key_check.get('account_column')}` and "
-                    f"`{foreign_key_check.get('customer_column')}` is consistent (no mismatches detected)."
-                )
-        else:
-            fk_summary = "Foreign-key consistency could not be evaluated (missing account or customer identifier columns)."
-
-        # 6. Mandatory Column Check
-        missing_mand = missing_columns_check.get("missing_mandatory", [])
-        if not missing_mand:
-            mandatory_summary = (
-                "All mandatory banking columns (account_number, customer_id, account_status, balance) "
-                "are present in the dataset."
-            )
-        else:
-            mandatory_summary = (
-                "Missing mandatory banking column(s): "
-                + ", ".join(sorted(missing_mand))
-                + ". Risk is marked HIGH and decision should remain on HOLD until these are provided."
-            )
-
-        # 7. KYC Completeness
-        kyc_summary = (
-            f"KYC completeness is {kyc_verification.get('kyc_completeness', 0):.2f}%; "
-            f"{'meets' if kyc_verification.get('meets_threshold') else 'does not meet'} "
-            "the 60% minimum threshold."
-        )
-
-        # 8. Risk Assessment
-        rf = risk_assessment.get("risk_factors") or []
-        if rf:
-            risk_factors_text = "; ".join(rf)
-        else:
-            risk_factors_text = "No major risk drivers detected."
-        risk_summary = f"Overall risk level: {risk_assessment.get('risk_level')}. {risk_factors_text}"
-
-        # 9. Final Decision (APPROVE / HOLD / REJECT)
-        final_decision_summary = (
-            f"Final decision: {final_decision.get('decision')} – {final_decision.get('reason')}"
-        )
-
-        # 10. Clear Next Action Steps
-        if final_decision.get("decision") == "APPROVE":
-            next_steps = (
-                "Proceed with ingesting this dataset into downstream banking systems, "
-                "and continue monitoring for schema or quality drift."
-            )
-        elif final_decision.get("decision") == "HOLD":
-            actions = []
-            if missing_mand:
-                actions.append(
-                    "provide the missing mandatory columns: " + ", ".join(sorted(missing_mand))
-                )
-            if not kyc_verification.get("meets_threshold"):
-                actions.append("improve KYC field coverage to at least 60%")
-            if foreign_key_check.get("can_check") and foreign_key_check.get("fk_mismatch"):
-                actions.append("resolve account_number ↔ customer_id foreign-key mismatches")
-            next_steps = "Action required: " + "; ".join(actions) + "." if actions else \
-                "Action required: review and resolve the highlighted data quality issues before approval."
-        else:
-            next_steps = (
-                "Dataset is not suitable for banking-grade processing in its current form; "
-                "fix account-number structure and other critical issues, then re-upload a corrected file."
-            )
-
+        # 🔥 CORE ENGINE: Use Core Banking Engine results (KYC REMOVED)
+        core_final_decision = core_analysis.get("final_decision", {})
+        core_decision = core_final_decision.get("decision", "HOLD")
+        core_reason = core_final_decision.get("reason", "Analysis pending")
+        
+        # Format detected columns summary
+        detected_columns_text = []
+        for col_info in core_analysis.get("detected_columns", []):
+            col_name = col_info.get("column_name", "")
+            role = col_info.get("role", "UNKNOWN")
+            conf = col_info.get("confidence", 0.0)
+            detected_columns_text.append(f"{col_name} → {role} ({conf:.1f}%)")
+        
+        # Validation summary
+        validation_summary = core_analysis.get("validation_summary", {})
+        passed_count = len(validation_summary.get("rules_passed", []))
+        failed_count = len(validation_summary.get("rules_failed", []))
+        skipped_count = len(validation_summary.get("rules_skipped", []))
+        
+        # Create summary using Core Engine results
         ordered_summary = {
-            "1_domain_detection_result": domain_summary,
-            "2_dataset_purpose_detection": purpose_summary,
-            "3_account_number_validation": acc_validation_summary,
-            "4_customer_id_validation": cust_validation_summary,
-            "5_foreign_key_linking_check": fk_summary,
-            "6_mandatory_column_check": mandatory_summary,
-            "7_kyc_completeness": kyc_summary,
-            "8_risk_assessment": risk_summary,
-            "9_final_decision": final_decision_summary,
-            "10_next_action_steps": next_steps
+            "1_domain_detection_result": (
+                f"Banking domain detected with overall confidence {confidence_100:.2f}% "
+                f"based on column and value patterns."
+            ),
+            "2_column_role_classification": (
+                f"Detected {len([c for c in core_analysis.get('detected_columns', []) if c.get('role') != 'UNKNOWN'])} "
+                f"columns with confirmed roles (confidence >= 70%). "
+                f"Detected columns: {'; '.join(detected_columns_text[:5])}"
+            ),
+            "3_validation_summary": (
+                f"Validation results: {passed_count} rules passed, {failed_count} rules failed, "
+                f"{skipped_count} rules skipped (UNKNOWN columns)."
+            ),
+            "4_cross_column_validation": self._format_cross_validation_summary(core_analysis.get("cross_validations", {})),
+            "5_final_decision": f"Final decision: {core_decision} – {core_reason}"
         }
-
+        
         return {
             "domain": self.domain if decision != "UNKNOWN" else "Unknown",
             "confidence_percentage": confidence_100,
             "confidence_out_of_10": confidence_10,
             "decision": decision,
             "qualitative": qualitative,
-            "total_columns": total_cols,
+            "total_columns": int(total_cols),  # Convert to Python int
             "empty_columns": empty_cols,
 
             # ✅ IMPORTANT OUTPUTS
@@ -1860,18 +2074,42 @@ class BankingDomainDetector:
             "account_status": account_status,
             "missing_columns_check": missing_columns_check,
             "balance_analysis": balance_analysis,
-            "kyc_verification": kyc_verification,
-            "branch_code_detection": branch_code_detection,
-            "customer_id_validation": customer_id_validation,
+            "opening_debit_credit_detection": opening_debit_credit_detection,
             "transaction_validation": transaction_validation,
             "transaction_type_validation": transaction_type_validation,
-            "pan_validation": pan_validation,
             "debit_credit_validation": debit_credit_validation,
-            "fraud_detection": fraud_detection,
-            "foreign_key_check": foreign_key_check,
+            "customer_id_validation": customer_id_validation,
             "purpose_detection": purpose_detection,
             "column_purpose_report": column_purpose_report,
-            "final_decision": final_decision,
-            "risk_assessment": risk_assessment,
+            
+            # 🔥 CORE ENGINE RESULTS (PRIMARY OUTPUT - KYC REMOVED)
+            "core_banking_analysis": core_analysis,
+            "core_detected_columns": core_analysis.get("detected_columns", []),
+            "core_column_validations": core_analysis.get("column_validations", {}),
+            "core_cross_validations": core_analysis.get("cross_validations", {}),
+            "core_validation_summary": core_analysis.get("validation_summary", {}),
+            "core_final_decision": core_analysis.get("final_decision", {}),
+            
             "ordered_summary": ordered_summary
         }
+    
+    def _format_cross_validation_summary(self, cross_validations):
+        """Format cross-validation results for summary"""
+        results = []
+        
+        if cross_validations.get("debit_credit_exclusivity"):
+            dce = cross_validations["debit_credit_exclusivity"]
+            status = "✓ Valid" if dce.get("valid") else "✗ Invalid" if dce.get("valid") is False else "? Unknown"
+            results.append(f"Debit-Credit Exclusivity: {status} - {dce.get('reason', 'N/A')}")
+        
+        if cross_validations.get("balance_formula_validation"):
+            bfv = cross_validations["balance_formula_validation"]
+            status = "✓ Valid" if bfv.get("valid") else "✗ Invalid" if bfv.get("valid") is False else "? Unknown"
+            results.append(f"Balance Formula: {status} - {bfv.get('reason', 'N/A')}")
+        
+        if cross_validations.get("balance_continuity"):
+            bc = cross_validations["balance_continuity"]
+            status = "✓ Valid" if bc.get("valid") else "✗ Invalid" if bc.get("valid") is False else "? Unknown"
+            results.append(f"Balance Continuity: {status} - {bc.get('reason', 'N/A')}")
+        
+        return "; ".join(results) if results else "No cross-column validations applicable"
