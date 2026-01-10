@@ -764,6 +764,138 @@ class BankingDomainDetector:
             "decision": decision
         }
     
+    def detect_branch_code_apriori(self, df: pd.DataFrame, kyc_check: dict = None):
+        """
+        Apriori Algorithm for Branch Code Detection
+        Only applies if user exists (from KYC check)
+        Pattern: [A-Z]{2,3}[0-9]{2,3} (2-3 uppercase letters followed by 2-3 digits)
+        Uses Apriori-like frequent pattern mining to find branch codes
+        """
+        # Check if user exists (from KYC check)
+        if kyc_check is None:
+            kyc_check = self.verify_kyc(df)
+        
+        has_user = kyc_check.get("has_user_name", False)
+        
+        if not has_user:
+            return {
+                "can_analyze": False,
+                "reason": "User name not found in KYC check. Branch code detection requires user existence.",
+                "column_found": False,
+                "branch_codes": [],
+                "frequent_branch_codes": [],
+                "support_threshold": 0.0,
+                "total_matches": 0,
+                "is_valid": False
+            }
+        
+        # Find branch_code column
+        branch_keywords = ["branch_code", "branchcode", "branch", "br_code", "brcode", "branch_id", "branchid"]
+        branch_col = None
+        
+        for col in df.columns:
+            norm_col = self.normalize(col)
+            if any(keyword in norm_col for keyword in branch_keywords):
+                branch_col = col
+                break
+        
+        if branch_col is None:
+            return {
+                "can_analyze": True,
+                "user_exists": True,
+                "column_found": False,
+                "column_name": None,
+                "branch_codes": [],
+                "frequent_branch_codes": [],
+                "support_threshold": 0.0,
+                "total_matches": 0,
+                "is_valid": False,
+                "reason": "Branch code column not found"
+            }
+        
+        # Pattern: [A-Z]{2,3}[0-9]{2,3}
+        branch_pattern = r'^[A-Z]{2,3}[0-9]{2,3}$'
+        
+        # Get series and convert to string, uppercase
+        series = df[branch_col].dropna().astype(str).str.strip().str.upper()
+        total_rows = len(series)
+        
+        if total_rows == 0:
+            return {
+                "can_analyze": True,
+                "user_exists": True,
+                "column_found": True,
+                "column_name": branch_col,
+                "branch_codes": [],
+                "frequent_branch_codes": [],
+                "support_threshold": 0.0,
+                "total_matches": 0,
+                "is_valid": False,
+                "reason": "Branch code column is empty"
+            }
+        
+        # Match pattern
+        valid_mask = series.str.fullmatch(branch_pattern, na=False)
+        valid_branch_codes = series[valid_mask].tolist()
+        total_matches = len(valid_branch_codes)
+        
+        if total_matches == 0:
+            return {
+                "can_analyze": True,
+                "user_exists": True,
+                "column_found": True,
+                "column_name": branch_col,
+                "branch_codes": [],
+                "frequent_branch_codes": [],
+                "support_threshold": 0.0,
+                "total_matches": 0,
+                "is_valid": False,
+                "reason": "No branch codes match the pattern [A-Z]{2,3}[0-9]{2,3}"
+            }
+        
+        # Apriori: Calculate frequency (support) for each branch code
+        from collections import Counter
+        branch_code_counts = Counter(valid_branch_codes)
+        
+        # Calculate support (frequency / total rows)
+        support_threshold = 0.1  # Minimum 10% support (can be adjusted)
+        frequent_branch_codes = []
+        
+        for branch_code, count in branch_code_counts.items():
+            support = count / total_rows
+            if support >= support_threshold:
+                frequent_branch_codes.append({
+                    "branch_code": branch_code,
+                    "count": count,
+                    "support": round(support * 100, 2)  # Percentage
+                })
+        
+        # Sort by support (descending)
+        frequent_branch_codes.sort(key=lambda x: x["support"], reverse=True)
+        
+        # Get unique branch codes list (for display)
+        unique_branch_codes = sorted(list(branch_code_counts.keys()))
+        
+        # Validation: At least 50% of values should match pattern
+        match_ratio = total_matches / total_rows
+        is_valid = match_ratio >= 0.5
+        
+        return {
+            "can_analyze": True,
+            "user_exists": True,
+            "column_found": True,
+            "column_name": branch_col,
+            "branch_codes": unique_branch_codes[:50],  # Limit to 50 for display
+            "frequent_branch_codes": frequent_branch_codes,
+            "support_threshold": support_threshold * 100,  # As percentage
+            "total_matches": total_matches,
+            "total_rows": total_rows,
+            "match_ratio": round(match_ratio * 100, 2),
+            "is_valid": is_valid,
+            "pattern": "[A-Z]{2,3}[0-9]{2,3}",
+            "decision": "valid" if is_valid else ("partial" if match_ratio >= 0.3 else "invalid")
+        }
+    
     def validate_debit_credit_balance(self, df: pd.DataFrame, balance_col_name: str = None):
         """
         STEP-3: Debit/Credit vs Balance Check
@@ -1530,6 +1662,8 @@ class BankingDomainDetector:
         missing_columns_check = self.check_missing_columns(df)
         balance_analysis = self.analyze_balance(df)
         kyc_verification = self.verify_kyc(df)
+        # Branch code detection using Apriori (only if user exists)
+        branch_code_detection = self.detect_branch_code_apriori(df, kyc_verification)
         transaction_validation = self.validate_transaction_data(df)
         transaction_type_validation = self.validate_transaction_type(df)
         pan_validation = self.validate_pan_number(df)
@@ -1727,6 +1861,7 @@ class BankingDomainDetector:
             "missing_columns_check": missing_columns_check,
             "balance_analysis": balance_analysis,
             "kyc_verification": kyc_verification,
+            "branch_code_detection": branch_code_detection,
             "customer_id_validation": customer_id_validation,
             "transaction_validation": transaction_validation,
             "transaction_type_validation": transaction_type_validation,

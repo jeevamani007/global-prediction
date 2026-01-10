@@ -162,6 +162,7 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_missing_columns": banking_result.get("missing_columns_check"),
                 "banking_balance_analysis": banking_result.get("balance_analysis"),
                 "banking_kyc_verification": banking_result.get("kyc_verification"),
+                "banking_branch_code_detection": banking_result.get("branch_code_detection"),
                 "banking_customer_id_validation": banking_result.get("customer_id_validation"),
                 "banking_transaction_validation": banking_result.get("transaction_validation"),
                 "banking_transaction_type_validation": banking_result.get("transaction_type_validation"),

@@ -304,6 +304,9 @@ uploadBtn.onclick = async () => {
         if (data.banking_kyc_verification) {
             sessionStorage.setItem("kycVerification", JSON.stringify(data.banking_kyc_verification));
         }
+        if (data.banking_branch_code_detection) {
+            sessionStorage.setItem("branchCodeDetection", JSON.stringify(data.banking_branch_code_detection));
+        }
         if (data.banking_customer_id_validation) {
             sessionStorage.setItem("customerIdValidation", JSON.stringify(data.banking_customer_id_validation));
         }

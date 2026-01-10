@@ -284,7 +284,7 @@
     </div>
 
     <script>
-        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, customerIdData, transactionData, transactionTypeData, panData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData, columnPurposeReport) {
+        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, branchCodeData, customerIdData, transactionData, transactionTypeData, panData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData, columnPurposeReport) {
             // Use risk assessment and final decision from backend
             const riskLevel = riskAssessmentData?.risk_level || "HIGH";
             const decisionText = finalDecisionData?.decision || "REJECT";
@@ -655,6 +655,118 @@
                 }
             }
 
+            // Branch Code Detection (Apriori Algorithm)
+            let branchCodeHtml = "";
+            if (branchCodeData) {
+                const canAnalyze = branchCodeData.can_analyze || false;
+                const userExists = branchCodeData.user_exists || false;
+                const columnFound = branchCodeData.column_found || false;
+                const columnName = branchCodeData.column_name || "N/A";
+                const isValid = branchCodeData.is_valid || false;
+                const decision = branchCodeData.decision || "unknown";
+                const totalMatches = branchCodeData.total_matches || 0;
+                const totalRows = branchCodeData.total_rows || 0;
+                const matchRatio = branchCodeData.match_ratio || 0;
+                const branchCodes = branchCodeData.branch_codes || [];
+                const frequentBranchCodes = branchCodeData.frequent_branch_codes || [];
+                const supportThreshold = branchCodeData.support_threshold || 0;
+                const pattern = branchCodeData.pattern || "[A-Z]{2,3}[0-9]{2,3}";
+                
+                if (!canAnalyze) {
+                    branchCodeHtml = `
+                        <div class="col-card" style="background:#fff3cd; border-left-color:#ffc107; margin-bottom:20px;">
+                            <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
+                            <p>⚠️ ${branchCodeData.reason || "Cannot analyze branch codes."}</p>
+                            <p style="margin-top:8px; font-size:0.9rem; color:#856404;">
+                                Branch code detection requires user name to exist (from KYC check).
+                            </p>
+                        </div>
+                    `;
+                } else if (!columnFound) {
+                    branchCodeHtml = `
+                        <div class="col-card" style="background:#fff3cd; border-left-color:#ffc107; margin-bottom:20px;">
+                            <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
+                            <p>✅ User exists: ${userExists ? 'Yes' : 'No'}</p>
+                            <p>⚠️ Branch code column not found in the dataset.</p>
+                            <p style="margin-top:8px; font-size:0.9rem; color:#856404;">
+                                Expected column names: branch_code, branchcode, branch, br_code, brcode, branch_id, branchid
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    const bgColor = isValid ? '#d4edda' : (matchRatio >= 30 ? '#fff3cd' : '#f8d7da');
+                    const borderColor = isValid ? '#28a745' : (matchRatio >= 30 ? '#ffc107' : '#dc3545');
+                    const icon = isValid ? '✅' : (matchRatio >= 30 ? '⚠️' : '❌');
+                    const statusText = isValid ? 'VALID' : (matchRatio >= 30 ? 'PARTIAL' : 'INVALID');
+                    
+                    branchCodeHtml = `
+                        <div class="col-card" style="background:${bgColor}; border-left-color:${borderColor}; margin-bottom:20px;">
+                            <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
+                            <p><b>Column:</b> ${columnName}</p>
+                            <p><b>Status:</b> ${icon} ${statusText}</p>
+                            <p><b>Pattern:</b> <code style="background:white; padding:2px 6px; border-radius:3px; font-family:monospace;">${pattern}</code></p>
+                            <p><b>Total Rows:</b> ${totalRows}</p>
+                            <p><b>Total Matches:</b> <span style="font-size:1.1rem; font-weight:bold; color:${isValid ? '#28a745' : (matchRatio >= 30 ? '#856404' : '#dc3545')};">${totalMatches}</span></p>
+                            <p><b>Match Ratio:</b> <span style="font-size:1.2rem; font-weight:bold; color:${isValid ? '#28a745' : (matchRatio >= 30 ? '#856404' : '#dc3545')};">${matchRatio}%</span></p>
+                            
+                            ${frequentBranchCodes.length > 0 ? `
+                                <div style="margin-top:16px;">
+                                    <p style="font-weight:600; margin-bottom:8px;"><b>Frequent Branch Codes (Support ≥ ${supportThreshold}%):</b></p>
+                                    <div style="background:#f7fafc; padding:12px; border-radius:4px; max-height:300px; overflow-y:auto;">
+                                        <table style="width:100%; border-collapse:collapse;">
+                                            <thead>
+                                                <tr style="background:#e2e8f0;">
+                                                    <th style="padding:8px; text-align:left; border-bottom:2px solid #cbd5e0;">Branch Code</th>
+                                                    <th style="padding:8px; text-align:center; border-bottom:2px solid #cbd5e0;">Count</th>
+                                                    <th style="padding:8px; text-align:center; border-bottom:2px solid #cbd5e0;">Support</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${frequentBranchCodes.map(bc => `
+                                                    <tr>
+                                                        <td style="padding:8px; font-family:monospace; font-weight:600;">${bc.branch_code}</td>
+                                                        <td style="padding:8px; text-align:center;">${bc.count}</td>
+                                                        <td style="padding:8px; text-align:center; color:#28a745; font-weight:600;">${bc.support}%</td>
+                                                    </tr>
+                                                `).join("")}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${branchCodes.length > 0 ? `
+                                <div style="margin-top:16px;">
+                                    <p style="font-weight:600; margin-bottom:8px;"><b>All Detected Branch Codes (${branchCodes.length}${branchCodes.length >= 50 ? '+' : ''}):</b></p>
+                                    <div style="background:#f7fafc; padding:12px; border-radius:4px; max-height:300px; overflow-y:auto;">
+                                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; font-family:monospace; font-size:0.9rem;">
+                                            ${branchCodes.map(bc => `<div style="padding:4px; background:white; border:1px solid #d4edda; border-radius:3px; text-align:center; font-weight:600;">${bc}</div>`).join("")}
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            <div style="margin-top:16px; padding:12px; background:#e6f7ff; border-left:4px solid #1890ff; border-radius:4px;">
+                                <p style="font-weight:600; margin-bottom:8px; color:#0050b3;"><b>Branch Code Pattern Specification:</b></p>
+                                <ul style="margin:0; padding-left:20px; color:#0050b3; font-size:0.9rem;">
+                                    <li>Pattern: <code style="background:white; padding:2px 6px; border-radius:3px;">${pattern}</code></li>
+                                    <li>2-3 uppercase letters (A-Z) followed by 2-3 digits (0-9)</li>
+                                    <li>Examples: <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">AB12</code>, <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">XYZ123</code>, <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">ABC45</code> ✅</li>
+                                    <li>Uses Apriori algorithm to find frequent branch codes (support ≥ ${supportThreshold}%)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                branchCodeHtml = `
+                    <div class="col-card" style="background:#f7fafc; border-left-color:#6c757d; margin-bottom:20px;">
+                        <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
+                        <p style="color:#6c757d;">Branch code detection data not available.</p>
+                    </div>
+                `;
+            }
+
             // PAN Number Validation
             let panHtml = "";
             if (panData) {
@@ -802,7 +914,7 @@
                 </div>
             ` : '';
 
-            return statusBannerHtml + purposeHtml + columnPurposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + transactionTypeHtml + panHtml + riskHtml + decisionHtml + nextActionHtml;
+            return statusBannerHtml + purposeHtml + columnPurposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + transactionTypeHtml + branchCodeHtml + panHtml + riskHtml + decisionHtml + nextActionHtml;
         }
 
         (function init() {
@@ -814,6 +926,7 @@
                 const parsedMissing = JSON.parse(sessionStorage.getItem("missingColumns") || "null");
                 const parsedBalance = JSON.parse(sessionStorage.getItem("balanceAnalysis") || "null");
                 const parsedKyc = JSON.parse(sessionStorage.getItem("kycVerification") || "null");
+                const parsedBranchCode = JSON.parse(sessionStorage.getItem("branchCodeDetection") || "null");
                 const parsedCustomerId = JSON.parse(sessionStorage.getItem("customerIdValidation") || "null");
                 const parsedTransaction = JSON.parse(sessionStorage.getItem("transactionValidation") || "null");
                 const parsedTransactionType = JSON.parse(sessionStorage.getItem("transactionTypeValidation") || "null");
@@ -846,7 +959,7 @@
                 console.log("Risk Assessment:", parsedRiskAssessment);
                 console.log("Column Purpose Report:", parsedColumnPurpose);
                 
-                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedCustomerId, parsedTransaction, parsedTransactionType, parsedPan, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment, parsedColumnPurpose);
+                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedBranchCode, parsedCustomerId, parsedTransaction, parsedTransactionType, parsedPan, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment, parsedColumnPurpose);
 
                 // Render PyCharts / ECharts column‑purpose chart
                 if (parsedColumnPurpose && parsedColumnPurpose.category_counts) {
