@@ -96,6 +96,10 @@ class CoreBankingEngine:
         column_series = df[column_name]
         norm_col = self.normalize(column_name)
         
+        # CRITICAL SAFETY RULE: If column name contains financial keywords, never classify as account_number
+        financial_keywords = ["amount", "balance", "loan", "emi", "interest", "rate"]
+        is_financial_amount = any(keyword in norm_col for keyword in financial_keywords)
+        
         role_scores = {}
         
         # 1. Name-based matching (40% weight)
@@ -112,48 +116,71 @@ class CoreBankingEngine:
                     max_name_score = max(max_name_score, fuzzy_score)
             role_scores[role] = max_name_score * 0.4
         
-        # 2. Value pattern analysis (60% weight)
+        # CRITICAL SAFETY RULE: If column contains financial keywords, force classify as financial amount and skip account number classification
+        if is_financial_amount:
+            # Set very high score for appropriate financial amount roles
+            if "opening" in norm_col or "open" in norm_col:
+                role_scores["OPENING_BALANCE"] = max(role_scores.get("OPENING_BALANCE", 0), 95)
+            elif "closing" in norm_col or "close" in norm_col or "current" in norm_col:
+                role_scores["CLOSING_BALANCE"] = max(role_scores.get("CLOSING_BALANCE", 0), 95)
+            elif "debit" in norm_col:
+                role_scores["DEBIT"] = max(role_scores.get("DEBIT", 0), 95)
+            elif "credit" in norm_col:
+                role_scores["CREDIT"] = max(role_scores.get("CREDIT", 0), 95)
+            elif "loan" in norm_col:
+                # Default to CLOSING_BALANCE for loan_amount as a financial amount
+                role_scores["CLOSING_BALANCE"] = max(role_scores.get("CLOSING_BALANCE", 0), 90)
+            else:
+                # Generic financial amount
+                role_scores["CLOSING_BALANCE"] = max(role_scores.get("CLOSING_BALANCE", 0), 85)
+            
+            # CRITICAL: Remove any ACCOUNT_NUMBER score to prevent misclassification
+            if "ACCOUNT_NUMBER" in role_scores:
+                del role_scores["ACCOUNT_NUMBER"]
+        
+        # 2. Value pattern analysis (60% weight) - only for non-financial columns
         try:
-            # ACCOUNT_NUMBER pattern check
-            if self._matches_account_number_pattern(column_series):
-                role_scores["ACCOUNT_NUMBER"] = role_scores.get("ACCOUNT_NUMBER", 0) + 60
-            
-            # TRANSACTION_ID pattern check
-            if self._matches_transaction_id_pattern(column_series):
-                role_scores["TRANSACTION_ID"] = role_scores.get("TRANSACTION_ID", 0) + 60
-            
-            # TRANSACTION_DATE pattern check
-            if self._matches_date_pattern(column_series):
-                role_scores["TRANSACTION_DATE"] = role_scores.get("TRANSACTION_DATE", 0) + 60
-            
-            # TRANSACTION_TYPE pattern check
-            if self._matches_transaction_type_pattern(column_series):
-                role_scores["TRANSACTION_TYPE"] = role_scores.get("TRANSACTION_TYPE", 0) + 60
-            
-            # Numeric balance/debit/credit checks
-            if self._matches_numeric_balance_pattern(column_series):
-                # Distinguish between opening/closing/debit/credit based on context
-                if "opening" in norm_col or "open" in norm_col or "initial" in norm_col:
-                    role_scores["OPENING_BALANCE"] = role_scores.get("OPENING_BALANCE", 0) + 60
-                elif "closing" in norm_col or "closing" in norm_col or "final" in norm_col or "current" in norm_col:
-                    role_scores["CLOSING_BALANCE"] = role_scores.get("CLOSING_BALANCE", 0) + 60
-                elif "debit" in norm_col or "withdraw" in norm_col or "out" in norm_col:
-                    role_scores["DEBIT"] = role_scores.get("DEBIT", 0) + 60
-                elif "credit" in norm_col or "deposit" in norm_col or "in" in norm_col:
-                    role_scores["CREDIT"] = role_scores.get("CREDIT", 0) + 60
-                else:
-                    # Generic numeric - distribute score based on name hints
-                    if not any(role in role_scores for role in ["OPENING_BALANCE", "CLOSING_BALANCE", "DEBIT", "CREDIT"]):
-                        # Default to CLOSING_BALANCE if no hint
-                        role_scores["CLOSING_BALANCE"] = role_scores.get("CLOSING_BALANCE", 0) + 40
-            
-            # ACCOUNT_STATUS pattern check
-            if self._matches_status_pattern(column_series):
-                role_scores["ACCOUNT_STATUS"] = role_scores.get("ACCOUNT_STATUS", 0) + 60
-            
-            # CUSTOMER_ID pattern check
-            if self._matches_customer_id_pattern(column_series):
-                role_scores["CUSTOMER_ID"] = role_scores.get("CUSTOMER_ID", 0) + 60
+            if not is_financial_amount:  # Only apply value pattern analysis for non-financial columns
+                # ACCOUNT_NUMBER pattern check
+                if self._matches_account_number_pattern(column_series):
+                    role_scores["ACCOUNT_NUMBER"] = role_scores.get("ACCOUNT_NUMBER", 0) + 60
+                
+                # TRANSACTION_ID pattern check
+                if self._matches_transaction_id_pattern(column_series):
+                    role_scores["TRANSACTION_ID"] = role_scores.get("TRANSACTION_ID", 0) + 60
+                
+                # TRANSACTION_DATE pattern check
+                if self._matches_date_pattern(column_series):
+                    role_scores["TRANSACTION_DATE"] = role_scores.get("TRANSACTION_DATE", 0) + 60
+                
+                # TRANSACTION_TYPE pattern check
+                if self._matches_transaction_type_pattern(column_series):
+                    role_scores["TRANSACTION_TYPE"] = role_scores.get("TRANSACTION_TYPE", 0) + 60
+                
+                # Numeric balance/debit/credit checks
+                if self._matches_numeric_balance_pattern(column_series):
+                    # Distinguish between opening/closing/debit/credit based on context
+                    if "opening" in norm_col or "open" in norm_col or "initial" in norm_col:
+                        role_scores["OPENING_BALANCE"] = role_scores.get("OPENING_BALANCE", 0) + 60
+                    elif "closing" in norm_col or "closing" in norm_col or "final" in norm_col or "current" in norm_col:
+                        role_scores["CLOSING_BALANCE"] = role_scores.get("CLOSING_BALANCE", 0) + 60
+                    elif "debit" in norm_col or "withdraw" in norm_col or "out" in norm_col:
+                        role_scores["DEBIT"] = role_scores.get("DEBIT", 0) + 60
+                    elif "credit" in norm_col or "deposit" in norm_col or "in" in norm_col:
+                        role_scores["CREDIT"] = role_scores.get("CREDIT", 0) + 60
+                    else:
+                        # Generic numeric - distribute score based on name hints
+                        if not any(role in role_scores for role in ["OPENING_BALANCE", "CLOSING_BALANCE", "DEBIT", "CREDIT"]):
+                            # Default to CLOSING_BALANCE if no hint
+                            role_scores["CLOSING_BALANCE"] = role_scores.get("CLOSING_BALANCE", 0) + 40
+                
+                # ACCOUNT_STATUS pattern check
+                if self._matches_status_pattern(column_series):
+                    role_scores["ACCOUNT_STATUS"] = role_scores.get("ACCOUNT_STATUS", 0) + 60
+                
+                # CUSTOMER_ID pattern check
+                if self._matches_customer_id_pattern(column_series):
+                    role_scores["CUSTOMER_ID"] = role_scores.get("CUSTOMER_ID", 0) + 60
                 
         except Exception as e:
             pass  # If pattern analysis fails, rely on name matching only

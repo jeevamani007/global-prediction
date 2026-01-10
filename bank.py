@@ -358,6 +358,15 @@ class BankingDomainDetector:
     
     def _looks_account_like_name(self, column_name: str) -> bool:
         norm = self.normalize(column_name)
+        
+        # CRITICAL SAFETY RULE: If column name contains financial keywords, never consider as account_number
+        financial_keywords = ["amount", "balance", "loan", "emi", "interest", "rate"]
+        is_financial_amount = any(keyword in norm for keyword in financial_keywords)
+        
+        # If it's a financial amount, return False immediately
+        if is_financial_amount:
+            return False
+        
         candidates = ["account", "acct", "accno", "custaccount", "customeraccount", "accnumber"]
         # Normalize candidates for proper matching
         norm_candidates = [self.normalize(c) for c in candidates]
