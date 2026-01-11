@@ -8,6 +8,7 @@ from insurence import InsuranceDomainDetector
 import os
 from government import GovernmentDomainDetector
 from bank import BankingDomainDetector  # your banking domain detector class
+from banking_dataset_validator import BankingDatasetValidator  # Banking Dataset Validator
 from database import engine
 from sqlalchemy import text
 from health_care import HealthcareDomainDetector
@@ -78,6 +79,16 @@ async def upload_file(file: UploadFile = File(...)):
             # Check if result contains an error
             if isinstance(banking_result, dict) and "error" in banking_result:
                 raise HTTPException(status_code=500, detail=f"Banking analysis error: {banking_result['error']}")
+            
+            # Banking Dataset Validator - run validation on banking datasets
+            banking_validator_result = None
+            if banking_result and isinstance(banking_result, dict) and banking_result.get("decision") not in (None, "UNKNOWN"):
+                try:
+                    validator = BankingDatasetValidator()
+                    banking_validator_result = validator.validate(file_path)
+                except Exception as e:
+                    print(f"Warning: Banking validator error: {str(e)}")
+                    banking_validator_result = {"error": str(e)}
 
             # Financial domain detection (only if banking is NOT clearly detected)
             financial_result = None
@@ -179,6 +190,10 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_core_column_validations": banking_result.get("core_column_validations"),
                 "banking_core_cross_validations": banking_result.get("core_cross_validations"),
                 "banking_core_validation_summary": banking_result.get("core_validation_summary"),
+                
+                # 🔥 BANKING DATASET VALIDATOR RESULTS
+                "banking_dataset_validator": banking_validator_result,
+                
                 "financial": financial_result,
                 "insurance": insurance_result,
                 "government": government_result,

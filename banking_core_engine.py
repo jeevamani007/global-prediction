@@ -709,70 +709,156 @@ class CoreBankingEngine:
         
         return cross_validation_results
     
-    def make_final_decision(self, column_validations: dict, cross_validations: dict):
+    def determine_dataset_type(self, df: pd.DataFrame, column_roles: dict):
         """
-        STEP 6: Risk & Decision Logic
+        Determine dataset type: transaction, master, or mixed
         
-        Decision Rules:
-        - IF account_number invalid → REJECT
-        - ELSE IF balance formula mismatch → HOLD
-        - ELSE IF mandatory business columns missing → HOLD
-        - ELSE → ACCEPT
+        - transaction: Has transaction_id, debit/credit, transaction_type
+        - master: Has account_number, customer_id, account_status (but no transaction columns)
+        - mixed: Has both account and transaction columns
         """
-        # Check account_number validity
-        account_number_valid = None
-        for col, validation in column_validations.items():
-            if validation.get("role") == "ACCOUNT_NUMBER":
-                account_number_valid = validation.get("is_valid")
+        has_transaction_cols = False
+        has_master_cols = False
+        
+        # Check for transaction columns
+        transaction_roles = ["TRANSACTION_ID", "TRANSACTION_TYPE", "DEBIT", "CREDIT"]
+        for col, role_info in column_roles.items():
+            role = role_info.get("role", "")
+            if role in transaction_roles and role_info.get("confidence", 0) >= 70:
+                has_transaction_cols = True
                 break
         
-        if account_number_valid is False:
-            return {
-                "decision": "REJECT",
-                "reason": "Account number validation failed. Dataset cannot be processed."
-            }
+        # Check for master columns
+        master_roles = ["ACCOUNT_NUMBER", "CUSTOMER_ID", "ACCOUNT_STATUS"]
+        master_count = 0
+        for col, role_info in column_roles.items():
+            role = role_info.get("role", "")
+            if role in master_roles and role_info.get("confidence", 0) >= 70:
+                master_count += 1
         
-        # Check balance formula
-        balance_formula_validation = cross_validations.get("balance_formula_validation")
-        balance_formula_valid = balance_formula_validation.get("valid") if balance_formula_validation else None
-        if balance_formula_valid is False:
-            reason = balance_formula_validation.get("reason", "Balance formula mismatch detected.") if balance_formula_validation else "Balance formula mismatch detected."
-            return {
-                "decision": "HOLD",
-                "reason": reason
-            }
+        if master_count >= 2:  # At least 2 master columns
+            has_master_cols = True
         
-        # Check mandatory columns (ACCOUNT_NUMBER is mandatory)
-        has_account_number = False
-        for col, validation in column_validations.items():
-            if validation.get("role") == "ACCOUNT_NUMBER" and validation.get("confidence", 0) >= 70:
-                has_account_number = True
-                break
+        if has_transaction_cols and has_master_cols:
+            return "mixed"
+        elif has_transaction_cols:
+            return "transaction"
+        elif has_master_cols:
+            return "master"
+        else:
+            return "unknown"
+    
+    def make_final_decision(self, column_validations: dict, cross_validations: dict, 
+                           column_roles: dict, df: pd.DataFrame):
+        """
+        STEP-8: Final Decision Logic
         
-        if not has_account_number:
-            return {
-                "decision": "HOLD",
-                "reason": "Mandatory column ACCOUNT_NUMBER not found or confidence < 70%"
-            }
+        New Rules:
+        1. Determine dataset_type first (transaction/master/mixed)
+        2. For TRANSACTION datasets: account_number uniqueness is NOT required
+        3. Use score-based acceptance: IF average confidence of core banking columns >= 70% THEN ACCEPT
+        4. Provide rejection ONLY if: no account identifier, no transaction type, no monetary columns
+        5. Do NOT reject if: branch_code not detected, PAN not present, Apriori not applicable, dataset size < 20 rows
+        """
+        # STEP 1: Determine dataset type
+        dataset_type = self.determine_dataset_type(df, column_roles)
         
-        # Check if any critical validations failed
-        critical_failures = []
-        for col, validation in column_validations.items():
-            if validation.get("role") != "UNKNOWN" and validation.get("is_valid") is False:
-                failed_rules = validation.get("rules_failed", [])
-                if failed_rules:
-                    critical_failures.append(f"{col} ({validation.get('role')}): {len(failed_rules)} rule(s) failed")
+        # STEP 2: Calculate average confidence of core banking columns
+        core_banking_roles = [
+            "ACCOUNT_NUMBER", "CUSTOMER_ID", "TRANSACTION_ID", "TRANSACTION_DATE",
+            "TRANSACTION_TYPE", "OPENING_BALANCE", "DEBIT", "CREDIT", "CLOSING_BALANCE"
+        ]
         
-        if critical_failures:
-            return {
-                "decision": "HOLD",
-                "reason": f"Validation issues found: {'; '.join(critical_failures[:3])}"
-            }
+        core_column_confidences = []
+        has_account_identifier = False
+        has_transaction_type = False
+        has_monetary_columns = False
         
-        # All checks passed
+        for col, role_info in column_roles.items():
+            role = role_info.get("role", "")
+            confidence = role_info.get("confidence", 0.0)
+            
+            if role in core_banking_roles and confidence > 0:
+                core_column_confidences.append(confidence)
+            
+            # Check for essential columns
+            if role in ["ACCOUNT_NUMBER", "CUSTOMER_ID"] and confidence >= 70:
+                has_account_identifier = True
+            
+            if role == "TRANSACTION_TYPE" and confidence >= 70:
+                has_transaction_type = True
+            
+            if role in ["DEBIT", "CREDIT", "OPENING_BALANCE", "CLOSING_BALANCE"] and confidence >= 70:
+                has_monetary_columns = True
+        
+        # Calculate average confidence
+        avg_confidence = sum(core_column_confidences) / len(core_column_confidences) if core_column_confidences else 0.0
+        
+        # STEP 3: Dataset size check (do NOT reject if < 20 rows)
+        dataset_size = len(df)
+        
+        # STEP 4: Decision Logic
+        # REJECT ONLY if: no account identifier AND (no transaction type OR no monetary columns)
+        if not has_account_identifier and (not has_transaction_type or not has_monetary_columns):
+            decision = "REJECT"
+            reason = "Dataset missing essential banking columns: no account identifier and missing transaction type or monetary columns."
+            dataset_type_display = dataset_type
+        # ACCEPT if average confidence >= 70%
+        elif avg_confidence >= 70.0:
+            decision = "ACCEPT"
+            reasons = []
+            
+            # Add dataset type specific reasons
+            dataset_type_display = {
+                "transaction": "Banking Transaction Dataset",
+                "master": "Banking Master Dataset",
+                "mixed": "Banking Transaction Dataset",
+                "unknown": "Banking Dataset"
+            }.get(dataset_type, "Banking Dataset")
+            
+            if dataset_type == "transaction":
+                if has_account_identifier:
+                    reasons.append("Valid account number detected")
+                if has_transaction_type:
+                    reasons.append("Transaction types validated")
+                if has_monetary_columns:
+                    reasons.append("Debit/Credit and balance logic consistent")
+            elif dataset_type == "master":
+                if has_account_identifier:
+                    reasons.append("Valid account number detected")
+            elif dataset_type == "mixed":
+                if has_account_identifier:
+                    reasons.append("Valid account number detected")
+                if has_transaction_type:
+                    reasons.append("Transaction types validated")
+                if has_monetary_columns:
+                    reasons.append("Debit/Credit and balance logic consistent")
+            
+            # Note: Missing optional patterns are ignored
+            reasons.append("Missing optional patterns ignored")
+            
+            # Format reason with bullet points
+            reason = "\n• ".join(reasons) if reasons else "All validations passed"
+        # HOLD if confidence is between 50-70%
+        elif avg_confidence >= 50.0:
+            decision = "HOLD"
+            reason = f"Average confidence of core banking columns: {avg_confidence:.1f}% (50-70%). Review recommended."
+            dataset_type_display = dataset_type
+        # REJECT if confidence < 50%
+        else:
+            decision = "REJECT"
+            reason = f"Average confidence of core banking columns too low: {avg_confidence:.1f}% (<50%). Insufficient banking data detected."
+            dataset_type_display = dataset_type
+        
         return {
-            "decision": "ACCEPT",
-            "reason": "All validations passed. Dataset is ready for processing."
+            "decision": decision,
+            "reason": reason,
+            "dataset_type": dataset_type_display,
+            "average_confidence": round(avg_confidence, 2),
+            "has_account_identifier": has_account_identifier,
+            "has_transaction_type": has_transaction_type,
+            "has_monetary_columns": has_monetary_columns,
+            "dataset_size": dataset_size
         }
     
     def analyze_banking_dataset(self, df: pd.DataFrame):
@@ -799,7 +885,7 @@ class CoreBankingEngine:
         # STEP 5: Missing column handling (already handled in decision logic)
         
         # STEP 6: Make final decision
-        final_decision = self.make_final_decision(column_validations, cross_validations)
+        final_decision = self.make_final_decision(column_validations, cross_validations, column_roles, df)
         
         # STEP 7: Format output
         detected_columns = []

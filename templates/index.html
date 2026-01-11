@@ -346,6 +346,9 @@ uploadBtn.onclick = async () => {
         if (data.banking_transaction_rules) {
             sessionStorage.setItem("bankingTransactionRules", JSON.stringify(data.banking_transaction_rules));
         }
+        if (data.banking_dataset_validator) {
+            sessionStorage.setItem("bankingDatasetValidator", JSON.stringify(data.banking_dataset_validator));
+        }
 
         // Display domain results on index.html page
         // Always show results if any domain data exists
@@ -362,7 +365,8 @@ uploadBtn.onclick = async () => {
                 data.healthcare,
                 data.retail,
                 data.space,
-                data.human_resource
+                data.human_resource,
+                data.banking_dataset_validator
             );
 
             // Show account button if banking data exists (even if decision is UNKNOWN)
@@ -454,7 +458,7 @@ function renderAccountValidation(accountValidation) {
     `;
 }
 
-function showDomainResults(bankingResult, bankingAccountValidation, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult) {
+function showDomainResults(bankingResult, bankingAccountValidation, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult, bankingValidatorResult) {
     let html = '<div class="results-grid">';
     
     // Banking Results - ALWAYS SHOW FIRST if banking data exists
@@ -488,6 +492,29 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                     <h4 style="margin-top:10px;">Account Number Detection</h4>
                     ${renderAccountValidation(bankingAccountValidation)}
                 ` : '<p style="margin-top:10px;">Account validation data not available.</p>'}
+                
+                ${bankingValidatorResult && !bankingValidatorResult.error ? `
+                    <div style="margin-top:20px; padding:15px; background:#f0f8ff; border-radius:8px; border-left:4px solid #2196F3;">
+                        <h4 style="margin-bottom:10px; color:#1976D2;">📊 Banking Dataset Validator Results</h4>
+                        <p><b>Final Decision:</b> <span style="padding:4px 8px; border-radius:4px; background:${bankingValidatorResult.final_decision === 'PASS' ? '#4CAF50' : bankingValidatorResult.final_decision === 'REVIEW' ? '#FF9800' : '#f44336'}; color:white; font-weight:bold;">${bankingValidatorResult.final_decision}</span></p>
+                        <p><b>Dataset Confidence:</b> ${bankingValidatorResult.dataset_confidence}%</p>
+                        <p><b>Explanation:</b> ${bankingValidatorResult.explanation || 'N/A'}</p>
+                        <p style="margin-top:10px;"><b>Columns Validated:</b> ${bankingValidatorResult.columns ? bankingValidatorResult.columns.length : 0}</p>
+                        <p><b>Relationships Validated:</b> ${bankingValidatorResult.relationships ? bankingValidatorResult.relationships.length : 0}</p>
+                        <details style="margin-top:10px;">
+                            <summary style="cursor:pointer; color:#1976D2; font-weight:bold;">View Detailed Results</summary>
+                            <div style="margin-top:10px; max-height:400px; overflow-y:auto;">
+                                ${bankingValidatorResult.columns ? bankingValidatorResult.columns.map(col => `
+                                    <div style="margin:8px 0; padding:8px; background:white; border-radius:4px; border-left:3px solid ${col.status === 'MATCH' ? '#4CAF50' : col.status === 'WARNING' ? '#FF9800' : '#f44336'};">
+                                        <p><b>${col.name}</b> - ${col.meaning || 'N/A'}</p>
+                                        <p>Confidence: ${col.confidence}% | Rules: ${col.rules_passed}/${col.rules_total} | Status: ${col.status}</p>
+                                        ${col.failures && col.failures.length > 0 ? `<p style="color:#f44336; font-size:0.9em;">Issues: ${col.failures.join(', ')}</p>` : ''}
+                                    </div>
+                                `).join('') : ''}
+                            </div>
+                        </details>
+                    </div>
+                ` : ''}
             </div>
         `;
     } else if (bankingResult !== null && bankingResult !== undefined) {

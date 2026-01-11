@@ -284,7 +284,7 @@
     </div>
 
     <script>
-        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, branchCodeData, customerIdData, transactionData, transactionTypeData, panData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData, columnPurposeReport, probabilityExplanationsData, bankingTransactionRulesData) {
+        function renderContent(data, checkData, statusData, missingData, balanceData, kycData, branchCodeData, customerIdData, transactionData, transactionTypeData, panData, debitCreditData, fraudData, foreignKeyData, purposeData, finalDecisionData, riskAssessmentData, columnPurposeReport, probabilityExplanationsData, bankingTransactionRulesData, validatorData) {
             // Use risk assessment and final decision from backend
             const riskLevel = riskAssessmentData?.risk_level || "HIGH";
             const decisionText = finalDecisionData?.decision || "REJECT";
@@ -1067,7 +1067,57 @@
                 probabilityExplanationsHtml += `</div></div>`;
             }
             
-            return statusBannerHtml + purposeHtml + columnPurposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + transactionTypeHtml + branchCodeHtml + panHtml + riskHtml + decisionHtml + probabilityExplanationsHtml + nextActionHtml;
+            // Banking Dataset Validator Results
+            let validatorHtml = "";
+            if (validatorData && !validatorData.error) {
+                const decisionColor = validatorData.final_decision === 'PASS' ? '#28a745' : validatorData.final_decision === 'REVIEW' ? '#ffc107' : '#dc3545';
+                const decisionBg = validatorData.final_decision === 'PASS' ? '#d4edda' : validatorData.final_decision === 'REVIEW' ? '#fff3cd' : '#f8d7da';
+                
+                validatorHtml = `
+                    <div class="col-card" style="background:${decisionBg}; border-left-color:${decisionColor}; margin-bottom:20px;">
+                        <h3>🔹 Banking Dataset Validator Results</h3>
+                        <p><b>Final Decision:</b> <span class="badge ${validatorData.final_decision === 'PASS' ? 'success' : validatorData.final_decision === 'REVIEW' ? 'warning' : 'error'}">${validatorData.final_decision}</span></p>
+                        <p><b>Dataset Confidence:</b> <span style="font-size:1.2rem; font-weight:bold; color:${decisionColor};">${validatorData.dataset_confidence}%</span></p>
+                        <p style="margin-top:8px;"><b>Explanation:</b> ${validatorData.explanation || 'N/A'}</p>
+                        <p style="margin-top:12px;"><b>Columns Validated:</b> ${validatorData.columns ? validatorData.columns.length : 0}</p>
+                        <p><b>Relationships Validated:</b> ${validatorData.relationships ? validatorData.relationships.length : 0}</p>
+                        
+                        ${validatorData.columns && validatorData.columns.length > 0 ? `
+                            <div style="margin-top:16px;">
+                                <p style="font-weight:600; margin-bottom:8px;"><b>Column Validation Details:</b></p>
+                                <div style="background:#f7fafc; padding:12px; border-radius:4px; max-height:400px; overflow-y:auto;">
+                                    ${validatorData.columns.map(col => {
+                                        const colStatusColor = col.status === 'MATCH' ? '#28a745' : col.status === 'WARNING' ? '#ffc107' : '#dc3545';
+                                        return `
+                                            <div style="margin:8px 0; padding:10px; background:white; border-radius:4px; border-left:3px solid ${colStatusColor};">
+                                                <p style="font-weight:600; margin-bottom:4px;"><b>${col.name}</b> - ${col.meaning || 'N/A'}</p>
+                                                <p style="font-size:0.9rem; margin-bottom:4px;">Confidence: ${col.confidence}% | Rules: ${col.rules_passed}/${col.rules_total} | Status: <span style="color:${colStatusColor}; font-weight:bold;">${col.status}</span></p>
+                                                ${col.failures && col.failures.length > 0 ? `<p style="color:#dc3545; font-size:0.85rem; margin-top:4px;">⚠️ Issues: ${col.failures.slice(0, 3).join(', ')}</p>` : ''}
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${validatorData.relationships && validatorData.relationships.length > 0 ? `
+                            <div style="margin-top:16px;">
+                                <p style="font-weight:600; margin-bottom:8px;"><b>Relationship Validations:</b></p>
+                                <ul class="list-clean">
+                                    ${validatorData.relationships.map(rel => {
+                                        const relKey = Object.keys(rel)[0];
+                                        const relValue = rel[relKey];
+                                        const relIcon = relValue === 'PASS' ? '✅' : relValue === 'FAIL' ? '❌' : '⚠️';
+                                        return `<li>${relIcon} ${relKey}: ${relValue}</li>`;
+                                    }).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            return statusBannerHtml + purposeHtml + columnPurposeHtml + accountRulesHtml + infoGridHtml + foreignKeyHtml + transactionTypeHtml + branchCodeHtml + panHtml + riskHtml + decisionHtml + probabilityExplanationsHtml + validatorHtml + nextActionHtml;
         }
 
         (function init() {
@@ -1091,6 +1141,7 @@
                 const parsedFinalDecision = JSON.parse(sessionStorage.getItem("finalDecision") || "null");
                 const parsedRiskAssessment = JSON.parse(sessionStorage.getItem("riskAssessment") || "null");
                 const parsedColumnPurpose = JSON.parse(sessionStorage.getItem("columnPurposeReport") || "null");
+                const parsedDatasetValidator = JSON.parse(sessionStorage.getItem("bankingDatasetValidator") || "null");
                 
                 if (!parsedValidation && !parsedCheck) {
                     content.innerHTML = `
@@ -1115,7 +1166,10 @@
                 const parsedProbabilityExplanations = JSON.parse(sessionStorage.getItem("probabilityExplanations") || "null");
                 const parsedBankingTransactionRules = JSON.parse(sessionStorage.getItem("bankingTransactionRules") || "null");
                 
-                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedBranchCode, parsedCustomerId, parsedTransaction, parsedTransactionType, parsedPan, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment, parsedColumnPurpose, parsedProbabilityExplanations, parsedBankingTransactionRules);
+                // Pass validator data to renderContent function
+                const validatorData = parsedDatasetValidator;
+                
+                content.innerHTML = renderContent(parsedValidation, parsedCheck, parsedStatus, parsedMissing, parsedBalance, parsedKyc, parsedBranchCode, parsedCustomerId, parsedTransaction, parsedTransactionType, parsedPan, parsedDebitCredit, parsedFraud, parsedForeignKey, parsedPurpose, parsedFinalDecision, parsedRiskAssessment, parsedColumnPurpose, parsedProbabilityExplanations, parsedBankingTransactionRules, validatorData);
 
                 // Render PyCharts / ECharts column‑purpose chart
                 if (parsedColumnPurpose && parsedColumnPurpose.category_counts) {
