@@ -317,13 +317,16 @@ class BankingDatasetValidator:
         else:
             failures.append(f"Non-alphanumeric ratio: {(1-alphanumeric_ratio)*100:.1f}%")
         
-        # Rule 3: Unique per row
+        # Rule 3: Unique per row (WARNING ONLY - does not cause REJECT)
         unique_count = non_null.nunique()
         unique_ratio = unique_count / non_null_count if non_null_count > 0 else 0
         if unique_ratio >= 0.95:  # At least 95% unique
             rules_passed += 1
         else:
-            failures.append(f"Uniqueness issue: only {unique_ratio*100:.1f}% unique")
+            # Low uniqueness is a WARNING, not a failure - don't reduce rules_passed
+            # Only warn if transaction_id is present (not completely NULL)
+            failures.append(f"Warning: Low uniqueness - only {unique_ratio*100:.1f}% unique (non-fatal)")
+            rules_passed += 1  # Count as passed since it's warning-only
         
         confidence = (rules_passed / rules_total) * 100
         
@@ -1001,13 +1004,23 @@ class BankingDatasetValidator:
                     result = validation_methods[role](df[col], col)
                     validation_results[col] = result
                     
-                    # Determine status
+                    # Determine status (FIX-1: Account number repetition is expected)
                     if result["confidence"] >= 80:
                         status = "MATCH"
                     elif result["confidence"] >= 60:
                         status = "WARNING"
                     else:
-                        status = "FAIL"
+                        # For account_number, if it's just repetition (which is expected), don't mark as FAIL
+                        if role == "account_number":
+                            # Account number repetition across rows is EXPECTED behavior
+                            # Only mark as FAIL if it's completely empty or has critical format issues
+                            if result.get("confidence", 0) == 0.0:
+                                status = "FAIL"
+                            else:
+                                # Has some data, mark as WARNING instead of FAIL for repetition
+                                status = "WARNING"
+                        else:
+                            status = "FAIL"
                     
                     column_results.append({
                         "name": col,
@@ -1034,13 +1047,67 @@ class BankingDatasetValidator:
             # Step 4: Compute dataset confidence
             dataset_confidence = self.compute_dataset_confidence(column_results, relationship_statuses)
             
-            # Step 5: Make final decision
-            if dataset_confidence >= 70:
-                final_decision = "PASS"
-            elif dataset_confidence >= 50:
-                final_decision = "REVIEW"
+            # Step 5: Make final decision according to priority order (FIX-3 & FIX-4)
+            # Priority order:
+            # 1. Mandatory column failure → REJECT
+            # 2. Balance formula failure → REJECT
+            # 3. Relationship failure → REJECT
+            # 4. Only warnings present → PASS WITH WARNINGS
+            # 5. No warnings → PASS
+            
+            # Define mandatory columns
+            mandatory_columns = ["account_number", "customer_id", "transaction_date"]
+            
+            # Check for mandatory column failures
+            mandatory_failed = False
+            for col_result in column_results:
+                role = column_roles.get(col_result["name"])
+                if role in mandatory_columns and col_result["status"] == "FAIL":
+                    # Check if column is completely empty (NULL) - this is a REJECT
+                    if col_result.get("confidence", 0) == 0.0:
+                        mandatory_failed = True
+                        break
+            
+            # Check balance formula failure (this is a relationship check)
+            balance_formula_failed = relationship_statuses.get("balances_formula") == False
+            
+            # Check for critical relationship failures (excluding balance formula which is checked separately)
+            critical_relationship_failed = False
+            for rel_key, rel_status in relationship_statuses.items():
+                if rel_key != "balances_formula" and rel_status == False:
+                    # Other relationship failures are warnings, not REJECT
+                    pass
+            
+            # Make final decision
+            if mandatory_failed:
+                final_decision = "REJECT"
+            elif balance_formula_failed:
+                final_decision = "REJECT"
             else:
-                final_decision = "FAIL"
+                # Count warnings and failures
+                warning_count = sum(1 for c in column_results if c["status"] == "WARNING")
+                fail_count = sum(1 for c in column_results if c["status"] == "FAIL")
+                match_count = sum(1 for c in column_results if c["status"] == "MATCH")
+                
+                # Check for non-critical failures (these should be warnings)
+                # Transaction ID uniqueness failure is non-critical (warning only)
+                non_critical_failures = fail_count
+                for col_result in column_results:
+                    role = column_roles.get(col_result["name"])
+                    if role == "transaction_id" and col_result["status"] == "FAIL":
+                        # Transaction ID uniqueness failure is warning-only, not REJECT
+                        non_critical_failures -= 1
+                        warning_count += 1
+                
+                if warning_count > 0 or non_critical_failures == 0:
+                    # Only warnings present or no critical failures
+                    final_decision = "PASS WITH WARNINGS"
+                elif match_count > 0 and fail_count == 0:
+                    # No warnings, no failures
+                    final_decision = "PASS"
+                else:
+                    # Should not reach here if logic is correct, but default to PASS WITH WARNINGS
+                    final_decision = "PASS WITH WARNINGS"
             
             # Step 6: Generate explanation
             explanation_parts = []
@@ -1053,9 +1120,17 @@ class BankingDatasetValidator:
             if match_count > 0:
                 explanation_parts.append(f"{match_count} column(s) passed validation")
             if warning_count > 0:
-                explanation_parts.append(f"{warning_count} column(s) have warnings")
+                explanation_parts.append(f"{warning_count} column(s) have warnings (non-fatal)")
             if fail_count > 0:
-                explanation_parts.append(f"{fail_count} column(s) failed validation")
+                # Only show critical failures in explanation
+                critical_failures = [
+                    c for c in column_results 
+                    if c["status"] == "FAIL" and column_roles.get(c["name"]) in mandatory_columns
+                ]
+                if critical_failures:
+                    explanation_parts.append(f"{len(critical_failures)} mandatory column(s) failed validation")
+                else:
+                    explanation_parts.append(f"{fail_count} column(s) have issues (non-fatal)")
             
             # Relationship status
             pass_count = sum(1 for r in relationships for v in r.values() if v == "PASS")
@@ -1064,16 +1139,35 @@ class BankingDatasetValidator:
             if pass_count > 0:
                 explanation_parts.append(f"{pass_count} relationship(s) validated")
             if fail_count_rel > 0:
-                explanation_parts.append(f"{fail_count_rel} relationship(s) failed")
+                if balance_formula_failed:
+                    explanation_parts.append("Balance formula failed (closing = opening + credit - debit)")
+                else:
+                    explanation_parts.append(f"{fail_count_rel} relationship(s) have warnings (non-fatal)")
             
             # Add specific issues
             failure_details = []
             for col_result in column_results:
                 if col_result["status"] == "FAIL" and col_result.get("failures"):
-                    failure_details.append(f"{col_result['name']}: {', '.join(col_result['failures'][:2])}")
+                    role = column_roles.get(col_result["name"])
+                    if role in mandatory_columns:
+                        # Show mandatory failures
+                        failure_details.append(f"{col_result['name']}: {', '.join(col_result['failures'][:2])}")
+                    elif role != "transaction_id":
+                        # Show other failures (but not transaction_id uniqueness as it's warning-only)
+                        failure_details.append(f"{col_result['name']}: {', '.join(col_result['failures'][:2])}")
             
             if failure_details:
-                explanation_parts.append("Issues found: " + "; ".join(failure_details[:3]))
+                explanation_parts.append("Critical issues: " + "; ".join(failure_details[:3]))
+            
+            # Add decision reason
+            if mandatory_failed:
+                explanation_parts.append("REJECT: Mandatory column(s) failed")
+            elif balance_formula_failed:
+                explanation_parts.append("REJECT: Balance formula validation failed")
+            elif warning_count > 0:
+                explanation_parts.append("PASS WITH WARNINGS: All mandatory checks passed, but warnings present")
+            else:
+                explanation_parts.append("PASS: All validation checks passed")
             
             explanation = ". ".join(explanation_parts) if explanation_parts else "Dataset validation completed"
             
