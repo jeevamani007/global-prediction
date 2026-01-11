@@ -983,49 +983,8 @@
                     columnPurposeExplanationsHtml += `</div></div>`;
                 }
                 
-                // Show general explanations in another section
-                if (Object.keys(generalExplanations).length > 0) {
-                    let generalProbHtml = `
-                        <div class="col-card" style="background:white; border-left: 4px solid #6c757d; margin-bottom:20px;">
-                            <h3>📊 Other Data Points</h3>
-                            <div style="margin-top: 15px;">
-                    `;
-                    
-                    for (const [key, explanationObj] of Object.entries(generalExplanations)) {
-                        // Skip if confidence is too low (less than 0.7 or 70%) - only show high confidence matches
-                        if (explanationObj.confidence < 0.7) {
-                            continue;
-                        }
-                        
-                        const explanation = explanationObj.explanation || "No explanation available";
-                        
-                        // Split the explanation into parts by commas and create bullet points
-                        const explanationParts = explanation.split(',').map(part => part.trim());
-                        
-                        let explanationList = '';
-                        for (const part of explanationParts) {
-                            if (part) {
-                                explanationList += `<li style="margin-bottom: 5px; font-size: 0.85rem; color: #555; line-height: 1.4;">• ${part}</li>`;
-                            }
-                        }
-                        
-                        generalProbHtml += `
-                            <div style="margin-bottom: 12px; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #fafafa;">
-                                <div style="margin-bottom: 5px;">
-                                    <strong style="font-size: 0.95rem; color: #333;">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong>
-                                </div>
-                                <ul style="padding-left: 20px; margin: 10px 0 0 0;">${explanationList}</ul>
-                            </div>
-                        `;
-                    }
-                    
-                    generalProbHtml += `</div></div>`;
-                    
-                    // Combine both sections
-                    probabilityExplanationsHtml = columnPurposeExplanationsHtml + generalProbHtml;
-                } else {
-                    probabilityExplanationsHtml = columnPurposeExplanationsHtml;
-                }
+                // Combine sections without general explanations
+                probabilityExplanationsHtml = columnPurposeExplanationsHtml;
             }
             
             // If no specific purpose explanations, show general section
