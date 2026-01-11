@@ -524,6 +524,7 @@ class CoreBankingDataAnalyzer:
         if unique_customers > 0:
             summary_parts.append(f"The dataset contains {unique_customers} unique customers.")
         
+        
         if unique_accounts > 0:
             summary_parts.append(f"There are {unique_accounts} unique accounts.")
         

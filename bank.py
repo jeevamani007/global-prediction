@@ -6,6 +6,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import text
 from database import engine
 from banking_core_engine import CoreBankingEngine
+from banking_column_mapper import BankingColumnMapper
 
 
 class BankingDomainDetector:
@@ -2837,6 +2838,10 @@ class BankingDomainDetector:
         
         # Column‑purpose report for UI / charts (no KYC reference)
         column_purpose_report = self.generate_column_purpose_report(df, transaction_validation, {})
+        
+        # 🔥 BANKING COLUMN MAPPER: Use Banking Column Mapper for pattern-based column detection
+        banking_column_mapper = BankingColumnMapper()
+        column_mapping_result = banking_column_mapper.map_columns(csv_path)
 
         # 🔥 CORE ENGINE: Use Core Banking Engine results (KYC REMOVED)
         core_final_decision = core_analysis.get("final_decision", {})
@@ -2918,14 +2923,17 @@ class BankingDomainDetector:
             "details": details,
             "account_number_validation": account_number_validation,
             "account_number_check": account_number_check,
-            "account_status": account_status,
-            "missing_columns_check": missing_columns_check,
+            # Only include account_status if status column exists
+            "account_status": account_status if account_status.get("has_status_column") else None,
+            # Only include missing_columns_check if all mandatory columns are present
+            "missing_columns_check": missing_columns_check if missing_columns_check.get("all_mandatory_present") else None,
             "balance_analysis": balance_analysis,
             "opening_debit_credit_detection": opening_debit_credit_detection,
             "transaction_validation": transaction_validation,
             "transaction_type_validation": transaction_type_validation,
             "debit_credit_validation": debit_credit_validation,
-            "customer_id_validation": customer_id_validation,
+            # Only include customer_id_validation if customer_id column exists
+            "customer_id_validation": customer_id_validation if customer_id_validation.get("column_exists") else None,
             "purpose_detection": purpose_detection,
             "banking_transaction_rules": banking_transaction_rules,
             "probability_explanations": probability_explanations,
@@ -2938,6 +2946,9 @@ class BankingDomainDetector:
             "core_cross_validations": core_analysis.get("cross_validations", {}),
             "core_validation_summary": core_analysis.get("validation_summary", {}),
             "core_final_decision": core_analysis.get("final_decision", {}),
+            
+            # 🔥 BANKING COLUMN MAPPER RESULTS (PATTERN-BASED COLUMN DETECTION)
+            "banking_column_mapping": column_mapping_result,
             
             "ordered_summary": filtered_ordered_summary
         }

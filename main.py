@@ -171,6 +171,7 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_probability_explanations": banking_result.get("probability_explanations"),
                 "banking_transaction_rules": banking_result.get("banking_transaction_rules"),
                 "banking_column_purpose_report": banking_result.get("column_purpose_report"),
+                "banking_column_mapping": banking_result.get("banking_column_mapping"),
                 
                 # 🔥 CORE BANKING ENGINE RESULTS (PRIMARY OUTPUT - KYC REMOVED)
                 "banking_core_analysis": banking_result.get("core_banking_analysis"),
@@ -178,7 +179,6 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_core_column_validations": banking_result.get("core_column_validations"),
                 "banking_core_cross_validations": banking_result.get("core_cross_validations"),
                 "banking_core_validation_summary": banking_result.get("core_validation_summary"),
-                "banking_core_final_decision": banking_result.get("core_final_decision"),
                 "financial": financial_result,
                 "insurance": insurance_result,
                 "government": government_result,
