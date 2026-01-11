@@ -9,6 +9,7 @@ import os
 from government import GovernmentDomainDetector
 from bank import BankingDomainDetector  # your banking domain detector class
 from banking_dataset_validator import BankingDatasetValidator  # Banking Dataset Validator
+from core_banking_validator import CoreBankingValidator  # Core Banking Validation Engine
 from database import engine
 from sqlalchemy import text
 from health_care import HealthcareDomainDetector
@@ -104,6 +105,16 @@ async def upload_file(file: UploadFile = File(...)):
                 except Exception as e:
                     print(f"Warning: Banking validator error: {str(e)}")
                     banking_validator_result = {"error": str(e)}
+            
+            # Core Banking Validation Engine - run comprehensive validation
+            core_banking_validator_result = None
+            if banking_result and isinstance(banking_result, dict) and banking_result.get("decision") not in (None, "UNKNOWN"):
+                try:
+                    core_validator = CoreBankingValidator()
+                    core_banking_validator_result = core_validator.validate(file_path)
+                except Exception as e:
+                    print(f"Warning: Core banking validator error: {str(e)}")
+                    core_banking_validator_result = {"error": str(e)}
 
             # Financial domain detection (only if banking is NOT clearly detected)
             financial_result = None
@@ -216,6 +227,9 @@ async def upload_file(file: UploadFile = File(...)):
                 
                 # 🔥 BANKING DATASET VALIDATOR RESULTS
                 "banking_dataset_validator": banking_validator_result,
+                
+                # 🔥 CORE BANKING VALIDATION ENGINE RESULTS
+                "core_banking_validator": core_banking_validator_result,
                 
                 "financial": financial_result,
                 "insurance": insurance_result,

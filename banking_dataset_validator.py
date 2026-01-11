@@ -73,6 +73,22 @@ class BankingDatasetValidator:
         "account_status": {
             "meaning": "Account status",
             "allowed_variations": ["account_status", "acc_status", "status", "account_state", "state"]
+        },
+        "phone": {
+            "meaning": "Phone number",
+            "allowed_variations": ["phone", "mobile", "contact", "telephone", "phone_number", "mobile_number"]
+        },
+        "pan": {
+            "meaning": "PAN card number",
+            "allowed_variations": ["pan", "pan_number", "pan_no", "pannumber", "panno", "permanent_account_number"]
+        },
+        "created_at": {
+            "meaning": "Record creation timestamp",
+            "allowed_variations": ["created_at", "created_date", "created", "date_created", "created_on"]
+        },
+        "updated_at": {
+            "meaning": "Record update timestamp",
+            "allowed_variations": ["updated_at", "updated_date", "updated", "date_updated", "updated_on", "modified_at", "modified"]
         }
     }
     
@@ -95,7 +111,11 @@ class BankingDatasetValidator:
         "transaction_date": 1.2,
         "branch_code": 0.7,
         "account_type": 1.0,
-        "account_status": 1.0
+        "account_status": 1.0,
+        "phone": 0.5,
+        "pan": 0.5,
+        "created_at": 0.3,
+        "updated_at": 0.3
     }
     
     def __init__(self):
@@ -110,17 +130,45 @@ class BankingDatasetValidator:
         """
         Identify the role of a column based on name matching.
         Returns the matched column definition key or None.
+        
+        NOTE: KYC columns are explicitly ignored (KYC rules removed)
         """
         normalized = self.normalize_column_name(col_name)
+        
+        # CRITICAL: Skip KYC columns completely (KYC rules removed)
+        if "kyc" in normalized:
+            return None
+        
+        # Skip non-banking columns (currency, country, email, channel, etc.)
+        non_banking_keywords = ["currency", "country", "email", "channel", "source", "region", "city", "state_name"]
+        if any(kw in normalized for kw in non_banking_keywords):
+            return None
+        
+        # Check for PAN first (before generic date matching)
+        if any(kw in normalized for kw in ["pan", "pan_number", "pan_no", "pannumber", "panno", "permanent_account_number"]):
+            return "pan"
+        
+        # Check for created_at/updated_at (audit fields, not transaction dates)
+        if "created" in normalized and any(kw in normalized for kw in ["created_at", "created_date", "created", "date_created", "created_on"]):
+            return "created_at"
+        if ("updated" in normalized or "modified" in normalized) and any(kw in normalized for kw in ["updated_at", "updated_date", "updated", "date_updated", "updated_on", "modified_at", "modified"]):
+            return "updated_at"
         
         # Direct match
         if normalized in self.COLUMN_DEFINITIONS:
             return normalized
         
-        # Check variations
+        # Check variations - prioritize specific matches
         for key, definition in self.COLUMN_DEFINITIONS.items():
             for variation in definition["allowed_variations"]:
+                # Exact match or contains match
                 if normalized == variation.lower() or variation.lower() in normalized or normalized in variation.lower():
+                    # Additional check: don't match kyc_status as account_status
+                    if key == "account_status" and "kyc" in normalized:
+                        continue
+                    # Don't match transaction_date for created_at/updated_at (they're audit fields)
+                    if key == "transaction_date" and ("created" in normalized or "updated" in normalized or "modified" in normalized):
+                        continue  # Skip - these are handled above
                     return key
         
         return None
@@ -777,6 +825,137 @@ class BankingDatasetValidator:
             "confidence": confidence
         }
     
+    def validate_phone(self, series, col_name):
+        """Validate phone column according to business rules (warning only)."""
+        rules_passed = 0
+        rules_total = 2
+        failures = []
+        
+        non_null = series.dropna().astype(str)
+        total = len(series)
+        non_null_count = len(non_null)
+        
+        # Rule 1: NOT NULL (warning only)
+        not_null_ratio = non_null_count / total if total > 0 else 0
+        if not_null_ratio >= 0.9:
+            rules_passed += 1
+        else:
+            failures.append(f"Warning: Null ratio: {(1-not_null_ratio)*100:.1f}%")
+        
+        if non_null_count == 0:
+            return {
+                "rules_passed": 0,
+                "rules_total": rules_total,
+                "failures": ["Column is completely empty"],
+                "confidence": 0.0
+            }
+        
+        # Rule 2: Format check (warning only)
+        # Valid formats: 10 digits, may have +, -, spaces, ()
+        phone_pattern = re.compile(r'^[\+]?[\d\s\-\(\)]{10,15}$')
+        valid_format_ratio = non_null.str.match(phone_pattern).mean()
+        if valid_format_ratio >= 0.9:
+            rules_passed += 1
+        else:
+            failures.append(f"Warning: {((1-valid_format_ratio)*100):.1f}% phone numbers have format issues")
+        
+        confidence = (rules_passed / rules_total) * 100
+        
+        return {
+            "rules_passed": rules_passed,
+            "rules_total": rules_total,
+            "failures": failures,
+            "confidence": confidence
+        }
+    
+    def validate_pan(self, series, col_name):
+        """Validate PAN column according to business rules (warning only)."""
+        rules_passed = 0
+        rules_total = 2
+        failures = []
+        
+        non_null = series.dropna().astype(str).str.upper().str.strip()
+        total = len(series)
+        non_null_count = len(non_null)
+        
+        # Rule 1: NOT NULL (warning only)
+        not_null_ratio = non_null_count / total if total > 0 else 0
+        if not_null_ratio >= 0.9:
+            rules_passed += 1
+        else:
+            failures.append(f"Warning: Null ratio: {(1-not_null_ratio)*100:.1f}%")
+        
+        if non_null_count == 0:
+            return {
+                "rules_passed": 0,
+                "rules_total": rules_total,
+                "failures": ["Column is completely empty"],
+                "confidence": 0.0
+            }
+        
+        # Rule 2: PAN format check (warning only)
+        # PAN format: 10 characters - first 5 letters, next 4 digits, last 1 letter
+        # Pattern: [A-Z]{5}[0-9]{4}[A-Z]{1}
+        pan_pattern = re.compile(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$')
+        valid_format_ratio = non_null.str.match(pan_pattern).mean()
+        if valid_format_ratio >= 0.9:
+            rules_passed += 1
+        else:
+            failures.append(f"Warning: {((1-valid_format_ratio)*100):.1f}% PAN numbers have format issues (expected: ABCDE1234F)")
+        
+        confidence = (rules_passed / rules_total) * 100
+        
+        return {
+            "rules_passed": rules_passed,
+            "rules_total": rules_total,
+            "failures": failures,
+            "confidence": confidence
+        }
+    
+    def validate_pan(self, series, col_name):
+        """Validate PAN column according to business rules (warning only)."""
+        rules_passed = 0
+        rules_total = 2
+        failures = []
+        
+        non_null = series.dropna().astype(str).str.upper().str.strip()
+        total = len(series)
+        non_null_count = len(non_null)
+        
+        # Rule 1: NOT NULL (warning only)
+        not_null_ratio = non_null_count / total if total > 0 else 0
+        if not_null_ratio >= 0.9:
+            rules_passed += 1
+        else:
+            failures.append(f"Warning: Null ratio: {(1-not_null_ratio)*100:.1f}%")
+        
+        if non_null_count == 0:
+            return {
+                "rules_passed": 0,
+                "rules_total": rules_total,
+                "failures": ["Column is completely empty"],
+                "confidence": 0.0
+            }
+        
+        # Rule 2: PAN format check (warning only)
+        # PAN format: 10 characters - first 5 letters, next 4 digits, last 1 letter
+        # Pattern: [A-Z]{5}[0-9]{4}[A-Z]{1}
+        pan_pattern = re.compile(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$')
+        valid_format_ratio = non_null.str.match(pan_pattern).mean()
+        if valid_format_ratio >= 0.9:
+            rules_passed += 1
+        else:
+            failures.append(f"Warning: {((1-valid_format_ratio)*100):.1f}% PAN numbers have format issues (expected: ABCDE1234F)")
+        
+        confidence = (rules_passed / rules_total) * 100
+        
+        return {
+            "rules_passed": rules_passed,
+            "rules_total": rules_total,
+            "failures": failures,
+            "confidence": confidence
+        }
+    
     def validate_relationships(self, df, column_roles):
         """Validate relationships between columns."""
         relationships = []
@@ -969,18 +1148,20 @@ class BankingDatasetValidator:
             
             # Validate each column
             for col in df.columns:
+                # CRITICAL: Skip KYC columns completely - don't include in results
+                norm_col = self.normalize_column_name(col)
+                if "kyc" in norm_col:
+                    continue  # Skip KYC columns entirely
+                
+                # Skip non-banking columns (currency, country, email, channel, etc.) - don't include in results
+                non_banking_keywords = ["currency", "country", "email", "channel", "source", "region", "city", "state_name"]
+                if any(kw in norm_col for kw in non_banking_keywords):
+                    continue  # Skip non-banking columns entirely
+                
                 role = column_roles.get(col)
                 
                 if role is None:
-                    # Unknown column - skip validation
-                    column_results.append({
-                        "name": col,
-                        "confidence": 0.0,
-                        "rules_passed": 0,
-                        "rules_total": 0,
-                        "status": "UNKNOWN",
-                        "meaning": "Unknown column"
-                    })
+                    # Unknown column - skip validation and don't include in results
                     continue
                 
                 # Get validation method
@@ -997,7 +1178,11 @@ class BankingDatasetValidator:
                     "transaction_date": self.validate_transaction_date,
                     "branch_code": self.validate_branch_code,
                     "account_type": self.validate_account_type,
-                    "account_status": self.validate_account_status
+                    "account_status": self.validate_account_status,
+                    "phone": self.validate_phone,
+                    "pan": lambda s, c: self.validate_phone(s, c),  # PAN uses similar validation as phone (warning only)
+                    "created_at": self.validate_transaction_date,  # Created/updated dates use date validation
+                    "updated_at": self.validate_transaction_date
                 }
                 
                 if role in validation_methods:
@@ -1031,15 +1216,7 @@ class BankingDatasetValidator:
                         "meaning": self.COLUMN_DEFINITIONS[role]["meaning"],
                         "failures": result.get("failures", [])
                     })
-                else:
-                    column_results.append({
-                        "name": col,
-                        "confidence": 0.0,
-                        "rules_passed": 0,
-                        "rules_total": 0,
-                        "status": "UNKNOWN",
-                        "meaning": "Unknown column"
-                    })
+                # else: Skip unknown columns - don't include in results
             
             # Step 3: Validate relationships
             relationships, relationship_statuses = self.validate_relationships(df, column_roles)
@@ -1176,8 +1353,14 @@ class BankingDatasetValidator:
             for rel in relationships:
                 formatted_relationships.append(rel)
             
+            # Filter out KYC columns from results
+            filtered_column_results = [
+                col for col in column_results 
+                if "kyc" not in self.normalize_column_name(col.get("name", ""))
+            ]
+            
             return {
-                "columns": column_results,
+                "columns": filtered_column_results,
                 "relationships": formatted_relationships,
                 "dataset_confidence": round(dataset_confidence, 1),
                 "final_decision": final_decision,

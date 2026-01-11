@@ -33,40 +33,47 @@
         
         .header {
             text-align: center;
-            padding: 30px 20px;
+            padding: 40px 20px;
             margin: 0;
             color: white;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         
         .header h1 {
-            font-size: 2rem;
+            font-size: 2.25rem;
             font-weight: 700;
-            margin-bottom: 8px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 12px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            letter-spacing: -0.5px;
         }
         
         .header p {
-            font-size: 0.95rem;
-            opacity: 0.9;
+            font-size: 1rem;
+            opacity: 0.95;
+            font-weight: 400;
+            letter-spacing: 0.3px;
         }
         
         .card {
             background: white;
             border-radius: 0;
             box-shadow: none;
-            padding: 24px;
+            padding: 32px;
             margin: 0;
             width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
         }
         
         .status-banner {
             padding: 24px;
-            border-radius: 0;
-            margin: 0 0 24px 0;
+            border-radius: 12px;
+            margin: 0 0 32px 0;
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
         .status-banner.success {
@@ -90,14 +97,20 @@
         }
         
         .status-content h3 {
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             font-weight: 700;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
         }
         
         .status-content p {
-            font-size: 0.95rem;
+            font-size: 1rem;
             opacity: 0.95;
+            line-height: 1.6;
+        }
+        
+        .status-content strong {
+            font-weight: 600;
         }
         
         .info-grid {
@@ -109,14 +122,15 @@
         
         .info-card {
             background: #f7fafc;
-            padding: 18px;
-            border-radius: 0;
+            padding: 20px;
+            border-radius: 12px;
             transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid #e2e8f0;
         }
         
         .info-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
         }
         
         .info-card.success-bg {
@@ -151,8 +165,14 @@
         .info-item {
             display: flex;
             justify-content: space-between;
-            padding: 6px 0;
-            font-size: 0.9rem;
+            align-items: center;
+            padding: 10px 0;
+            font-size: 0.95rem;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
         }
         
         .info-label {
@@ -163,6 +183,7 @@
         .info-value {
             color: #2d3748;
             font-weight: 600;
+            text-align: right;
         }
         
         .badge {
@@ -227,8 +248,9 @@
         .risk-assessment {
             background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
             padding: 24px;
-            border-radius: 0;
-            margin: 0 0 20px 0;
+            border-radius: 12px;
+            margin: 0 0 24px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
         .risk-assessment.high {
@@ -243,9 +265,11 @@
         
         .action-box {
             background: #f7fafc;
-            padding: 18px;
-            border-radius: 0;
-            margin-top: 16px;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 24px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
         
         .action-box h4 {
@@ -255,17 +279,113 @@
             color: #2d3748;
         }
         
-        @media (max-width: 640px) {
+        .col-card {
+            margin-bottom: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .col-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .col-card h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #2d3748;
+            line-height: 1.4;
+        }
+
+        .col-card p {
+            margin: 10px 0;
+            font-size: 0.95rem;
+            color: #4a5568;
+            line-height: 1.7;
+        }
+
+        .col-card b {
+            color: #2d3748;
+            font-weight: 600;
+        }
+
+        .col-card ul {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+
+        .col-card li {
+            margin: 8px 0;
+            font-size: 0.95rem;
+            color: #4a5568;
+            line-height: 1.6;
+        }
+
+        .col-card code {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .card {
+                padding: 24px;
+            }
+            
             .info-grid {
                 grid-template-columns: 1fr;
+                gap: 16px;
             }
             
             .header h1 {
                 font-size: 1.5rem;
             }
             
+            .header {
+                padding: 24px 16px;
+            }
+            
+            .status-banner {
+                padding: 20px;
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .col-card {
+                padding: 16px;
+            }
+            
+            .col-card h3 {
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
             .card {
                 padding: 16px;
+            }
+            
+            .header h1 {
+                font-size: 1.3rem;
+            }
+            
+            .status-banner {
+                padding: 16px;
+            }
+            
+            .info-card {
+                padding: 16px;
+            }
+            
+            .col-card {
+                padding: 14px;
             }
         }
     </style>
@@ -502,31 +622,7 @@
                 `;
             }
             
-            // KYC Card
-            if (kycData) {
-                const cardClass = kycData.kyc_verified ? 'success-bg' : 'warning-bg';
-                const icon = kycData.kyc_verified ? '✅' : '⚠️';
-                infoGridHtml += `
-                    <div class="info-card ${cardClass}">
-                        <div class="info-card-header">
-                            <span class="info-card-icon">${icon}</span>
-                            <span class="info-card-title">KYC Status</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">User Name</span>
-                            <span class="info-value">${kycData.has_user_name ? 'Present' : 'Missing'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Completeness</span>
-                            <span class="info-value">${kycData.kyc_completeness}%</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Status</span>
-                            <span class="badge ${kycData.kyc_verified ? 'success' : 'warning'}">${kycData.kyc_verified ? 'Verified' : 'Pending'}</span>
-                        </div>
-                    </div>
-                `;
-            }
+            // KYC Card - REMOVED (KYC rules removed)
             
             // Customer ID Card
             if (customerIdData) {
@@ -667,126 +763,15 @@
                 }
             }
 
-            // Branch Code Detection (Apriori Algorithm)
+            // Branch Code Detection - REMOVED
             let branchCodeHtml = "";
-            if (branchCodeData) {
-                const canAnalyze = branchCodeData.can_analyze || false;
-                const userExists = branchCodeData.user_exists || false;
-                const columnFound = branchCodeData.column_found || false;
-                const columnName = branchCodeData.column_name || "N/A";
-                const isValid = branchCodeData.is_valid || false;
-                const decision = branchCodeData.decision || "unknown";
-                const totalMatches = branchCodeData.total_matches || 0;
-                const totalRows = branchCodeData.total_rows || 0;
-                const matchRatio = branchCodeData.match_ratio || 0;
-                const branchCodes = branchCodeData.branch_codes || [];
-                const frequentBranchCodes = branchCodeData.frequent_branch_codes || [];
-                const supportThreshold = branchCodeData.support_threshold || 0;
-                const pattern = branchCodeData.pattern || "[A-Z]{2,3}[0-9]{2,3}";
-                
-                if (!canAnalyze) {
-                    branchCodeHtml = `
-                        <div class="col-card" style="background:#fff3cd; border-left-color:#ffc107; margin-bottom:20px;">
-                            <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
-                            <p>⚠️ ${branchCodeData.reason || "Cannot analyze branch codes."}</p>
-                            <p style="margin-top:8px; font-size:0.9rem; color:#856404;">
-                                Branch code detection requires user name to exist (from KYC check).
-                            </p>
-                        </div>
-                    `;
-                } else if (!columnFound) {
-                    branchCodeHtml = `
-                        <div class="col-card" style="background:#fff3cd; border-left-color:#ffc107; margin-bottom:20px;">
-                            <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
-                            <p>✅ User exists: ${userExists ? 'Yes' : 'No'}</p>
-                            <p>⚠️ Branch code column not found in the dataset.</p>
-                            <p style="margin-top:8px; font-size:0.9rem; color:#856404;">
-                                Expected column names: branch_code, branchcode, branch, br_code, brcode, branch_id, branchid
-                            </p>
-                        </div>
-                    `;
-                } else {
-                    const bgColor = isValid ? '#d4edda' : (matchRatio >= 30 ? '#fff3cd' : '#f8d7da');
-                    const borderColor = isValid ? '#28a745' : (matchRatio >= 30 ? '#ffc107' : '#dc3545');
-                    const icon = isValid ? '✅' : (matchRatio >= 30 ? '⚠️' : '❌');
-                    const statusText = isValid ? 'VALID' : (matchRatio >= 30 ? 'PARTIAL' : 'INVALID');
-                    
-                    branchCodeHtml = `
-                        <div class="col-card" style="background:${bgColor}; border-left-color:${borderColor}; margin-bottom:20px;">
-                            <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
-                            <p><b>Column:</b> ${columnName}</p>
-                            <p><b>Status:</b> ${icon} ${statusText}</p>
-                            <p><b>Pattern:</b> <code style="background:white; padding:2px 6px; border-radius:3px; font-family:monospace;">${pattern}</code></p>
-                            <p><b>Total Rows:</b> ${totalRows}</p>
-                            <p><b>Total Matches:</b> <span style="font-size:1.1rem; font-weight:bold; color:${isValid ? '#28a745' : (matchRatio >= 30 ? '#856404' : '#dc3545')};">${totalMatches}</span></p>
-                            <p><b>Match Ratio:</b> <span style="font-size:1.2rem; font-weight:bold; color:${isValid ? '#28a745' : (matchRatio >= 30 ? '#856404' : '#dc3545')};">${matchRatio}%</span></p>
-                            
-                            ${frequentBranchCodes.length > 0 ? `
-                                <div style="margin-top:16px;">
-                                    <p style="font-weight:600; margin-bottom:8px;"><b>Frequent Branch Codes (Support ≥ ${supportThreshold}%):</b></p>
-                                    <div style="background:#f7fafc; padding:12px; border-radius:4px; max-height:300px; overflow-y:auto;">
-                                        <table style="width:100%; border-collapse:collapse;">
-                                            <thead>
-                                                <tr style="background:#e2e8f0;">
-                                                    <th style="padding:8px; text-align:left; border-bottom:2px solid #cbd5e0;">Branch Code</th>
-                                                    <th style="padding:8px; text-align:center; border-bottom:2px solid #cbd5e0;">Count</th>
-                                                    <th style="padding:8px; text-align:center; border-bottom:2px solid #cbd5e0;">Support</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${frequentBranchCodes.map(bc => `
-                                                    <tr>
-                                                        <td style="padding:8px; font-family:monospace; font-weight:600;">${bc.branch_code}</td>
-                                                        <td style="padding:8px; text-align:center;">${bc.count}</td>
-                                                        <td style="padding:8px; text-align:center; color:#28a745; font-weight:600;">${bc.support}%</td>
-                                                    </tr>
-                                                `).join("")}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            ${branchCodes.length > 0 ? `
-                                <div style="margin-top:16px;">
-                                    <p style="font-weight:600; margin-bottom:8px;"><b>All Detected Branch Codes (${branchCodes.length}${branchCodes.length >= 50 ? '+' : ''}):</b></p>
-                                    <div style="background:#f7fafc; padding:12px; border-radius:4px; max-height:300px; overflow-y:auto;">
-                                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; font-family:monospace; font-size:0.9rem;">
-                                            ${branchCodes.map(bc => `<div style="padding:4px; background:white; border:1px solid #d4edda; border-radius:3px; text-align:center; font-weight:600;">${bc}</div>`).join("")}
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            <div style="margin-top:16px; padding:12px; background:#e6f7ff; border-left:4px solid #1890ff; border-radius:4px;">
-                                <p style="font-weight:600; margin-bottom:8px; color:#0050b3;"><b>Branch Code Pattern Specification:</b></p>
-                                <ul style="margin:0; padding-left:20px; color:#0050b3; font-size:0.9rem;">
-                                    <li>Pattern: <code style="background:white; padding:2px 6px; border-radius:3px;">${pattern}</code></li>
-                                    <li>2-3 uppercase letters (A-Z) followed by 2-3 digits (0-9)</li>
-                                    <li>Examples: <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">AB12</code>, <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">XYZ123</code>, <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">ABC45</code> ✅</li>
-                                    <li>Uses Apriori algorithm to find frequent branch codes (support ≥ ${supportThreshold}%)</li>
-                                </ul>
-                            </div>
-                        </div>
-                    `;
-                }
-            } else {
-                branchCodeHtml = `
-                    <div class="col-card" style="background:#f7fafc; border-left-color:#6c757d; margin-bottom:20px;">
-                        <h3>🔹 Branch Code Detection (Apriori Algorithm)</h3>
-                        <p style="color:#6c757d;">Branch code detection data not available.</p>
-                    </div>
-                `;
-            }
 
-            // PAN Number Validation
+            // PAN Number Validation - Only show if PAN data exists and column is found
             let panHtml = "";
-            if (panData) {
-                const columnFound = panData.column_found || false;
+            if (panData && panData.column_found) {
                 const columnName = panData.column_name || "N/A";
                 const probability = panData.probability_percentage || 0;
                 const isValid = panData.is_valid || false;
-                const decision = panData.decision || "unknown";
                 const validPanCount = panData.valid_pan_count || 0;
                 const invalidPanCount = panData.invalid_pan_count || 0;
                 const totalPanFound = panData.total_pan_found || 0;
@@ -794,111 +779,69 @@
                 const panList = panData.pan_list || [];
                 const invalidPanList = panData.invalid_pan_list || [];
                 
-                if (columnFound) {
-                    const bgColor = isValid ? '#d4edda' : (probability >= 50 ? '#fff3cd' : '#f8d7da');
-                    const borderColor = isValid ? '#28a745' : (probability >= 50 ? '#ffc107' : '#dc3545');
-                    const icon = isValid ? '✅' : (probability >= 50 ? '⚠️' : '❌');
-                    const statusText = isValid ? 'VALID' : (probability >= 50 ? 'PARTIAL' : 'INVALID');
-                    
-                    panHtml = `
-                        <div class="col-card" style="background:${bgColor}; border-left-color:${borderColor}; margin-bottom:20px;">
-                            <h3>🔹 PAN Number Validation</h3>
-                            <p><b>Column:</b> ${columnName}</p>
-                            <p><b>Status:</b> ${icon} ${statusText}</p>
-                            <p><b>Probability:</b> <span style="font-size:1.2rem; font-weight:bold; color:${isValid ? '#28a745' : (probability >= 50 ? '#856404' : '#dc3545')};">${probability}%</span></p>
-                            <p><b>Total Rows:</b> ${totalRows}</p>
-                            <p><b>Valid PAN Count:</b> <span style="font-size:1.1rem; font-weight:bold; color:#28a745;">${validPanCount}</span></p>
-                            <p><b>Invalid PAN Count:</b> <span style="color:#dc3545;">${invalidPanCount}</span></p>
-                            <p><b>Total PAN Found:</b> <span style="font-size:1.1rem; font-weight:bold;">${totalPanFound}</span></p>
-                            
-                            ${panList.length > 0 ? `
-                                <div style="margin-top:16px;">
-                                    <p style="font-weight:600; margin-bottom:8px;"><b>Valid PAN Numbers Found (${panList.length}${panList.length >= 50 ? '+' : ''}):</b></p>
-                                    <div style="background:#f7fafc; padding:12px; border-radius:4px; max-height:300px; overflow-y:auto;">
-                                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; font-family:monospace; font-size:0.9rem;">
-                                            ${panList.map(pan => `<div style="padding:4px; background:white; border:1px solid #d4edda; border-radius:3px; text-align:center;">${pan}</div>`).join("")}
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            ${invalidPanList.length > 0 ? `
-                                <div style="margin-top:16px;">
-                                    <p style="font-weight:600; margin-bottom:8px; color:#721c24;"><b>Invalid PAN Numbers (Sample - ${invalidPanList.length}${invalidPanList.length >= 20 ? '+' : ''}):</b></p>
-                                    <div style="background:#fff5f5; padding:12px; border-radius:4px; max-height:200px; overflow-y:auto;">
-                                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; font-family:monospace; font-size:0.9rem;">
-                                            ${invalidPanList.map(pan => `<div style="padding:4px; background:white; border:1px solid #f8d7da; border-radius:3px; text-align:center; color:#721c24;">${pan}</div>`).join("")}
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            <div style="margin-top:16px; padding:12px; background:#e6f7ff; border-left:4px solid #1890ff; border-radius:4px;">
-                                <p style="font-weight:600; margin-bottom:8px; color:#0050b3;"><b>PAN Format Specification:</b></p>
-                                <ul style="margin:0; padding-left:20px; color:#0050b3; font-size:0.9rem;">
-                                    <li>Total 10 characters</li>
-                                    <li>First 5 = letters (A-Z)</li>
-                                    <li>Next 4 = digits (0-9)</li>
-                                    <li>Last 1 = letter (A-Z)</li>
-                                    <li>Pattern: <code style="background:white; padding:2px 6px; border-radius:3px;">[A-Z]{5}[0-9]{4}[A-Z]{1}</code></li>
-                                    <li>Example: <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">ABCDE1234F</code> ✅</li>
-                                </ul>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    panHtml = `
-                        <div class="col-card" style="background:#fff3cd; border-left-color:#ffc107; margin-bottom:20px;">
-                            <h3>🔹 PAN Number Validation</h3>
-                            <p>⚠️ PAN column not found in the dataset.</p>
-                            <p style="margin-top:8px; font-size:0.9rem; color:#856404;">
-                                Expected column names: pan, pan_number, pan_no, pannumber, panno, permanent_account_number
-                            </p>
-                            <div style="margin-top:12px; padding:12px; background:#fff7e6; border-left:4px solid #ffc107; border-radius:4px;">
-                                <p style="font-weight:600; margin-bottom:8px; color:#856404;"><b>PAN Format (if column exists):</b></p>
-                                <ul style="margin:0; padding-left:20px; color:#856404; font-size:0.9rem;">
-                                    <li>Total 10 characters: ABCDE1234F</li>
-                                    <li>Pattern: <code style="background:white; padding:2px 6px; border-radius:3px;">[A-Z]{5}[0-9]{4}[A-Z]{1}</code></li>
-                                </ul>
-                            </div>
-                        </div>
-                    `;
-                }
-            } else {
-                // If panData is null/undefined, show that PAN validation was not performed
+                const bgColor = isValid ? '#d4edda' : (probability >= 50 ? '#fff3cd' : '#f8d7da');
+                const borderColor = isValid ? '#28a745' : (probability >= 50 ? '#ffc107' : '#dc3545');
+                const icon = isValid ? '✅' : (probability >= 50 ? '⚠️' : '❌');
+                const statusText = isValid ? 'VALID' : (probability >= 50 ? 'PARTIAL' : 'INVALID');
+                
                 panHtml = `
-                    <div class="col-card" style="background:#f7fafc; border-left-color:#6c757d; margin-bottom:20px;">
+                    <div class="col-card" style="background:${bgColor}; border-left-color:${borderColor}; margin-bottom:20px;">
                         <h3>🔹 PAN Number Validation</h3>
-                        <p style="color:#6c757d;">PAN validation data not available.</p>
+                        <p><b>Column:</b> ${columnName}</p>
+                        <p><b>Status:</b> ${icon} ${statusText}</p>
+                        <p><b>Probability:</b> <span style="font-size:1.2rem; font-weight:bold; color:${isValid ? '#28a745' : (probability >= 50 ? '#856404' : '#dc3545')};">${probability}%</span></p>
+                        <p><b>Total Rows:</b> ${totalRows}</p>
+                        <p><b>Valid PAN Count:</b> <span style="font-size:1.1rem; font-weight:bold; color:#28a745;">${validPanCount}</span></p>
+                        <p><b>Invalid PAN Count:</b> <span style="color:#dc3545;">${invalidPanCount}</span></p>
+                        <p><b>Total PAN Found:</b> <span style="font-size:1.1rem; font-weight:bold;">${totalPanFound}</span></p>
+                        
+                        ${panList.length > 0 ? `
+                            <div style="margin-top:16px;">
+                                <p style="font-weight:600; margin-bottom:8px;"><b>Valid PAN Numbers Found (${panList.length}${panList.length >= 50 ? '+' : ''}):</b></p>
+                                <div style="background:#f7fafc; padding:12px; border-radius:4px; max-height:300px; overflow-y:auto;">
+                                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; font-family:monospace; font-size:0.9rem;">
+                                        ${panList.map(pan => `<div style="padding:4px; background:white; border:1px solid #d4edda; border-radius:3px; text-align:center;">${pan}</div>`).join("")}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${invalidPanList.length > 0 ? `
+                            <div style="margin-top:16px;">
+                                <p style="font-weight:600; margin-bottom:8px; color:#721c24;"><b>Invalid PAN Numbers (Sample - ${invalidPanList.length}${invalidPanList.length >= 20 ? '+' : ''}):</b></p>
+                                <div style="background:#fff5f5; padding:12px; border-radius:4px; max-height:200px; overflow-y:auto;">
+                                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:8px; font-family:monospace; font-size:0.9rem;">
+                                        ${invalidPanList.map(pan => `<div style="padding:4px; background:white; border:1px solid #f8d7da; border-radius:3px; text-align:center; color:#721c24;">${pan}</div>`).join("")}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <div style="margin-top:16px; padding:12px; background:#e6f7ff; border-left:4px solid #1890ff; border-radius:4px;">
+                            <p style="font-weight:600; margin-bottom:8px; color:#0050b3;"><b>PAN Format Specification:</b></p>
+                            <ul style="margin:0; padding-left:20px; color:#0050b3; font-size:0.9rem;">
+                                <li>Total 10 characters</li>
+                                <li>First 5 = letters (A-Z)</li>
+                                <li>Next 4 = digits (0-9)</li>
+                                <li>Last 1 = letter (A-Z)</li>
+                                <li>Pattern: <code style="background:white; padding:2px 6px; border-radius:3px;">[A-Z]{5}[0-9]{4}[A-Z]{1}</code></li>
+                                <li>Example: <code style="background:white; padding:2px 6px; border-radius:3px; font-weight:bold;">ABCDE1234F</code> ✅</li>
+                            </ul>
+                        </div>
                     </div>
                 `;
             }
 
             const riskHtml = ``;
 
-            // Final Decision (STEP-8)
-            // Only show final decision if we have high confidence in our analysis
-            const hasHighConfidence = (transactionData && transactionData.confidence_percentage >= 70) || 
-                                  (transactionTypeData && transactionTypeData.overall_confidence >= 70) ||
-                                  (data && data.summary?.best_match?.probability_account_number >= 70);
-            
-            const decisionClass = decisionText === 'APPROVE' ? 'success' : (decisionText === 'HOLD' ? 'warning' : 'error');
-            const decisionHtml = `
-                <div class="col-card" style="background:${decisionText === 'APPROVE' ? '#d4edda' : (decisionText === 'HOLD' ? '#fff3cd' : '#f8d7da')}; border-left-color:${decisionText === 'APPROVE' ? '#28a745' : (decisionText === 'HOLD' ? '#ffc107' : '#dc3545')}; margin-bottom:20px;">
-                    <h3>🔹 STEP-8: Final Decision</h3>
-                    <p><b>Decision:</b> <span class="badge ${decisionClass}">${decisionText}</span></p>
-                    <p style="margin-top: 8px;"><b>Reason:</b> ${reasonText}</p>
-                    ${!hasHighConfidence ? '<p style="margin-top: 8px; font-style: italic; color: #856404;">Note: This decision is based on low-confidence matches. Consider reviewing the data.</p>' : ''}
-                </div>
-            `;
+            // Final Decision - REMOVED
+            const decisionHtml = ``;
 
             // Next Action
             const missingMandatory = missingData?.missing_mandatory || [];
-            const kycBelowThreshold = kycData && (!kycData.meets_threshold && kycData.kyc_completeness < 60);
             const missingItems = [];
             if (missingMandatory.includes("account_status")) missingItems.push("Account Status");
             if (missingMandatory.includes("balance")) missingItems.push("Balance");
-            if (kycBelowThreshold) missingItems.push(`KYC (current: ${kycData.kyc_completeness}%, required: ≥60%)`);
             if (foreignKeyData?.fk_mismatch) missingItems.push("Fix Foreign Key Mismatch");
             
             const nextActionHtml = missingItems.length > 0 ? `
@@ -1087,8 +1030,9 @@
                 const parsedStatus = JSON.parse(sessionStorage.getItem("accountStatus") || "null");
                 const parsedMissing = JSON.parse(sessionStorage.getItem("missingColumns") || "null");
                 const parsedBalance = JSON.parse(sessionStorage.getItem("balanceAnalysis") || "null");
-                const parsedKyc = JSON.parse(sessionStorage.getItem("kycVerification") || "null");
-                const parsedBranchCode = JSON.parse(sessionStorage.getItem("branchCodeDetection") || "null");
+                // KYC and Branch Code removed - no longer used
+                const parsedKyc = null;
+                const parsedBranchCode = null;
                 const parsedCustomerId = JSON.parse(sessionStorage.getItem("customerIdValidation") || "null");
                 const parsedTransaction = JSON.parse(sessionStorage.getItem("transactionValidation") || "null");
                 const parsedTransactionType = JSON.parse(sessionStorage.getItem("transactionTypeValidation") || "null");
