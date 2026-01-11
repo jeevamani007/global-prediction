@@ -15,6 +15,7 @@ from health_care import HealthcareDomainDetector
 from retail import RetailDomainDetector
 from space import SpaceDomainDetector
 from human_resource import HRDomainDetector
+from file_converter import FileConverter
 
 
 app = FastAPI(title="Domain Detection API")
@@ -43,7 +44,7 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls"}
+ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".sql"}
 
 # Templates folder
 templates = Jinja2Templates(directory="templates")  # make a 'templates' folder and put index.html inside
@@ -69,6 +70,20 @@ async def upload_file(file: UploadFile = File(...)):
         file_path = os.path.join(UPLOAD_DIR, file.filename)
         with open(file_path, "wb") as f:
             f.write(content)
+
+        # Convert file to CSV format if needed (handles SQL, Excel, etc.)
+        file_converter = None
+        original_file_path = file_path
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        
+        if file_ext in ['.sql', '.xlsx', '.xls']:
+            try:
+                file_converter = FileConverter()
+                # Convert to CSV
+                file_path = file_converter.convert_to_csv(file_path)
+                print(f"File converted to CSV: {file_path}")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
         # Run domain detection – banking first, then others as needed
         try:
@@ -162,10 +177,18 @@ async def upload_file(file: UploadFile = File(...)):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error during analysis: {str(e)}")
 
+        # Clean up temporary CSV file if file was converted
+        if file_converter:
+            try:
+                file_converter.cleanup_temp_files()
+            except Exception as e:
+                print(f"Warning: Could not clean up temp files: {e}")
+
         return JSONResponse(
             content={
                 "message": "File analyzed successfully",
                 "filename": file.filename,
+                "file_type": "SQL" if file.filename.lower().endswith('.sql') else "CSV/Excel",
                 "banking": banking_result,
                 "banking_account_validation": banking_result.get("account_number_validation"),
                 "banking_account_check": banking_result.get("account_number_check"),
