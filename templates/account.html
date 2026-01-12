@@ -1325,19 +1325,47 @@
                             `;
                         }
                         
-                        // Relationships
+                        // Relationships & Workflow
                         if (multiFileRelationships && multiFileRelationships.length > 0) {
                             multiFileHtml += `
-                                <div style="background:white; padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0;">
-                                    <h4 style="margin:0 0 12px 0; color:#1976D2; font-size:1.1rem;">📋 Table Relationships</h4>
-                                    <div style="display:grid; gap:12px;">
-                                        ${multiFileRelationships.map(rel => `
-                                            <div style="padding:12px; background:#f0f8ff; border-radius:6px; border-left:4px solid #2196F3;">
-                                                <p style="margin:4px 0; font-weight:600; color:#1976D2;">${rel.relationship_type}</p>
-                                                <p style="margin:4px 0; font-family:monospace; font-size:0.9rem;">${rel.description}</p>
-                                                <p style="margin:4px 0; font-size:0.85rem; color:#666;">Overlap: ${(typeof rel.overlap_ratio === 'number' ? rel.overlap_ratio * 100 : parseFloat(rel.overlap_ratio || 0) * 100).toFixed(1)}%</p>
-                                            </div>
-                                        `).join('')}
+                                <div style="background:white; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0;">
+                                    <h4 style="margin:0 0 16px 0; color:#1976D2; font-size:1.2rem; display:flex; align-items:center; gap:8px;">
+                                        <span>🔄</span> Table Relationships & Data Flow
+                                    </h4>
+                                    <div style="display:grid; gap:16px;">
+                                        ${multiFileRelationships.map((rel, idx) => {
+                                            const overlapPercent = (typeof rel.overlap_ratio === 'number' ? rel.overlap_ratio * 100 : parseFloat(rel.overlap_ratio || 0) * 100).toFixed(1);
+                                            return `
+                                                <div style="padding:16px; background:linear-gradient(135deg, #f0f8ff 0%, #e3f2fd 100%); border-radius:8px; border-left:5px solid #2196F3; box-shadow:0 2px 8px rgba(33, 150, 243, 0.15);">
+                                                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                                                        <span style="background:#2196F3; color:white; padding:6px 12px; border-radius:20px; font-size:0.85rem; font-weight:600;">${rel.relationship_type}</span>
+                                                        <span style="background:white; color:#2196F3; padding:4px 10px; border-radius:15px; font-size:0.8rem; font-weight:600;">${overlapPercent}% Overlap</span>
+                                                    </div>
+                                                    <div style="font-family:monospace; font-size:0.95rem; color:#2d3748; margin:8px 0; padding:8px; background:white; border-radius:4px;">
+                                                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                                            <span style="font-weight:600; color:#1976D2;">${rel.parent_table}</span>
+                                                            <span style="color:#666;">.</span>
+                                                            <span style="color:#2196F3; font-weight:600;">${rel.parent_column}</span>
+                                                            <span style="color:#666; margin:0 8px;">→</span>
+                                                            <span style="font-weight:600; color:#1976D2;">${rel.child_table}</span>
+                                                            <span style="color:#666;">.</span>
+                                                            <span style="color:#2196F3; font-weight:600;">${rel.child_column}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div style="font-size:0.85rem; color:#666; margin-top:8px; padding-top:8px; border-top:1px solid rgba(33, 150, 243, 0.2);">
+                                                        <strong>Description:</strong> ${rel.description || 'No description available'}
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                    <div style="margin-top:16px; padding:12px; background:#e8f5e9; border-radius:6px; border-left:4px solid #4caf50;">
+                                        <div style="font-weight:600; color:#2e7d32; margin-bottom:4px; font-size:0.9rem;">💡 How It Works:</div>
+                                        <div style="font-size:0.85rem; color:#388e3c; line-height:1.6;">
+                                            The system analyzes all tables to detect connections through primary keys (PK) and foreign keys (FK). 
+                                            Relationships are identified by matching column names and value overlaps between tables. 
+                                            This creates a data flow map showing how tables are connected in your banking system.
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -1672,8 +1700,119 @@
                 
                 // Populate each tab with specific content based on validator data
                 
-                // Business Rules Tab
-                if (validatorData && !validatorData.error) {
+                // Business Rules Tab - Support Multi-Table
+                const isMultiFileModeForTabs = sessionStorage.getItem("multiFileMode") === "true";
+                const multiFileTableResultsForTabs = isMultiFileModeForTabs ? JSON.parse(sessionStorage.getItem("multiFileTableResults") || "[]") : [];
+                
+                if (isMultiFileModeForTabs && multiFileTableResultsForTabs.length > 0) {
+                    // Multi-table mode: Show business rules for each table
+                    let businessRulesHtml = `
+                    <div class="section-header">
+                        <h2 class="section-title">💼 Business Rules - Multi-Table Analysis</h2>
+                    </div>
+                    <div class="content-section">
+                        <div style="margin-bottom:20px; padding:14px; background:#e8f5e9; border-radius:8px; border-left:4px solid #4caf50;">
+                            <div style="font-weight:600; color:#2e7d32; margin-bottom:6px; font-size:0.95rem;">💡 Multi-Table Business Rules:</div>
+                            <div style="font-size:0.9rem; color:#388e3c; line-height:1.7;">
+                                Banking business rules are applied to each table independently. Each table's columns are validated against banking standards. 
+                                Rules check data format, ranges, relationships, and business logic specific to banking operations.
+                            </div>
+                        </div>
+                    `;
+                    
+                    multiFileTableResultsForTabs.forEach((table, idx) => {
+                        const tableValidator = table.banking_validator;
+                        if (!tableValidator || tableValidator.error) {
+                            businessRulesHtml += `
+                                <div style="margin-bottom:20px; padding:20px; background:#f8f9fa; border-radius:8px; border-left:4px solid #95a5a6;">
+                                    <h3 style="margin:0 0 12px 0; color:#2d3748; font-size:1.2rem;">📋 ${table.table_name}</h3>
+                                    <p style="margin:0; color:#666;">No banking validation data available for this table.</p>
+                                </div>
+                            `;
+                            return;
+                        }
+                        
+                        const columns = tableValidator.columns || [];
+                        const finalDecision = tableValidator.final_decision || 'UNKNOWN';
+                        const confidence = tableValidator.dataset_confidence || 0;
+                        const decisionColor = finalDecision === 'PASS' ? '#28a745' : finalDecision === 'PASS WITH WARNINGS' ? '#ffc107' : '#dc3545';
+                        const totalCols = columns.length;
+                        const passedCols = columns.filter(c => c.status === 'MATCH').length;
+                        const failedCols = columns.filter(c => c.status === 'FAIL').length;
+                        const warningCols = columns.filter(c => c.status === 'WARNING').length;
+                        
+                        businessRulesHtml += `
+                            <div style="margin-bottom:24px; padding:20px; background:white; border-radius:8px; border-left:5px solid ${decisionColor}; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+                                    <h3 style="margin:0; color:#2d3748; font-size:1.3rem; font-weight:600;">📋 ${table.table_name}</h3>
+                                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                        <span style="background:${decisionColor}; color:white; padding:6px 14px; border-radius:20px; font-size:0.9rem; font-weight:600;">${finalDecision}</span>
+                                        <span style="background:#2196F3; color:white; padding:6px 14px; border-radius:20px; font-size:0.9rem;">${confidence}%</span>
+                                    </div>
+                                </div>
+                                
+                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:20px;">
+                                    <div style="padding:12px; background:#f0f8ff; border-radius:6px; text-align:center;">
+                                        <div style="font-size:1.5rem; font-weight:bold; color:#2196F3;">${totalCols}</div>
+                                        <div style="font-size:0.85rem; color:#666;">Total Columns</div>
+                                    </div>
+                                    <div style="padding:12px; background:#f0fdf4; border-radius:6px; text-align:center;">
+                                        <div style="font-size:1.5rem; font-weight:bold; color:#28a745;">${passedCols}</div>
+                                        <div style="font-size:0.85rem; color:#666;">Passed</div>
+                                    </div>
+                                    <div style="padding:12px; background:#fffbe6; border-radius:6px; text-align:center;">
+                                        <div style="font-size:1.5rem; font-weight:bold; color:#ffc107;">${warningCols}</div>
+                                        <div style="font-size:0.85rem; color:#666;">Warnings</div>
+                                    </div>
+                                    <div style="padding:12px; background:#fef2f2; border-radius:6px; text-align:center;">
+                                        <div style="font-size:1.5rem; font-weight:bold; color:#dc3545;">${failedCols}</div>
+                                        <div style="font-size:0.85rem; color:#666;">Failed</div>
+                                    </div>
+                                </div>
+                                
+                                ${columns.length > 0 ? `
+                                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:12px;">
+                                        ${columns.map(col => {
+                                            const status = col.status || 'UNKNOWN';
+                                            const colColor = status === 'MATCH' ? '#28a745' : status === 'WARNING' ? '#ffc107' : '#dc3545';
+                                            const colBg = status === 'MATCH' ? '#f0fdf4' : status === 'WARNING' ? '#fffbeb' : '#fef2f2';
+                                            
+                                            return `
+                                                <div style="padding:12px; background:${colBg}; border-left:3px solid ${colColor}; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.08);">
+                                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                                        <span style="font-weight:600; color:#2d3748; font-size:0.95rem;">${col.name || 'Unknown'}</span>
+                                                        <span style="background:${colColor}; color:white; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:600;">${status}</span>
+                                                    </div>
+                                                    <div style="font-size:0.85rem; color:#666; margin-top:6px; padding-top:6px; border-top:1px solid rgba(0,0,0,0.1);">
+                                                        <div style="margin-bottom:4px;"><b>Meaning:</b> ${col.meaning || 'N/A'}</div>
+                                                        <div style="margin-bottom:4px;"><b>Confidence:</b> ${col.confidence || 0}%</div>
+                                                        ${col.rules_passed !== undefined ? `<div style="margin-bottom:4px;"><b>Rules:</b> ${col.rules_passed}/${col.rules_total || 1} passed</div>` : ''}
+                                                    </div>
+                                                    ${col.applied_rules && col.applied_rules.length > 0 ? `
+                                                        <div style="margin-top:8px; padding:6px; background:rgba(33, 150, 243, 0.1); border-radius:4px; border-left:2px solid #2196F3;">
+                                                            <div style="font-weight:600; color:#1976D2; font-size:0.8rem; margin-bottom:3px;">Applied Rules:</div>
+                                                            <div style="font-size:0.75rem; color:#1976D2;">${col.applied_rules.slice(0, 2).join(', ')}${col.applied_rules.length > 2 ? '...' : ''}</div>
+                                                        </div>
+                                                    ` : ''}
+                                                    ${col.failures && col.failures.length > 0 ? `
+                                                        <div style="margin-top:6px; padding:6px; background:rgba(220, 53, 69, 0.1); border-radius:4px; border-left:2px solid #dc3545;">
+                                                            <div style="font-weight:600; color:#dc3545; font-size:0.8rem; margin-bottom:3px;">Issues:</div>
+                                                            <div style="font-size:0.75rem; color:#dc3545;">${col.failures.slice(0, 2).join('; ')}${col.failures.length > 2 ? '...' : ''}</div>
+                                                        </div>
+                                                    ` : ''}
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                ` : '<p style="color:#666;">No columns validated</p>'}
+                            </div>
+                        `;
+                    });
+                    
+                    businessRulesHtml += `</div>`;
+                    businessRulesContent.innerHTML = businessRulesHtml;
+                } else if (validatorData && !validatorData.error) {
+                    // Single table mode
                     const businessRulesHtml = `
                     <div class="section-header">
                         <h2 class="section-title">💼 Business Rules</h2>
@@ -1782,8 +1921,107 @@
                     columnAnalysisContent.innerHTML = `<div class="section-header"><h2 class="section-title">🔍 Column Analysis</h2></div><p>No column analysis data available.</p>`;
                 }
                 
-                // Validation Details Tab
-                if (validatorData && !validatorData.error) {
+                // Validation Details Tab - Support Multi-Table
+                if (isMultiFileModeForTabs && multiFileTableResultsForTabs.length > 0) {
+                    let validationDetailsHtml = `
+                    <div class="section-header">
+                        <h2 class="section-title">📋 Validation Details - Multi-Table</h2>
+                    </div>
+                    <div class="content-section">
+                        <div style="margin-bottom:20px; padding:14px; background:#fff3cd; border-radius:8px; border-left:4px solid #ffc107;">
+                            <div style="font-weight:600; color:#856404; margin-bottom:6px; font-size:0.95rem;">💡 Validation Details Explained:</div>
+                            <div style="font-size:0.9rem; color:#856404; line-height:1.7;">
+                                Each table is validated independently. The validation process checks data quality, business rule compliance, and identifies issues. 
+                                Review the details for each table to understand validation results and recommendations.
+                            </div>
+                        </div>
+                    `;
+                    
+                    multiFileTableResultsForTabs.forEach((table, idx) => {
+                        const tableValidator = table.banking_validator;
+                        if (!tableValidator || tableValidator.error) {
+                            validationDetailsHtml += `
+                                <div style="margin-bottom:20px; padding:20px; background:#f8f9fa; border-radius:8px; border-left:4px solid #95a5a6;">
+                                    <h3 style="margin:0 0 12px 0; color:#2d3748; font-size:1.2rem;">📋 ${table.table_name}</h3>
+                                    <p style="margin:0; color:#666;">No validation data available for this table.</p>
+                                </div>
+                            `;
+                            return;
+                        }
+                        
+                        const finalDecision = tableValidator.final_decision || 'UNKNOWN';
+                        const confidence = tableValidator.dataset_confidence || 0;
+                        const decisionColor = finalDecision === 'PASS' ? '#28a745' : finalDecision === 'PASS WITH WARNINGS' ? '#ffc107' : '#dc3545';
+                        const decisionBg = finalDecision === 'PASS' ? '#d4edda' : finalDecision === 'PASS WITH WARNINGS' ? '#fff3cd' : '#f8d7da';
+                        const columns = tableValidator.columns || [];
+                        
+                        validationDetailsHtml += `
+                            <div style="margin-bottom:24px; padding:20px; background:white; border-radius:8px; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                                <h3 style="margin:0 0 16px 0; color:#2d3748; font-size:1.3rem; font-weight:600; padding-bottom:12px; border-bottom:2px solid #e2e8f0;">📋 ${table.table_name}</h3>
+                                
+                                <div style="padding:16px; background:${decisionBg}; border-radius:8px; border-left:4px solid ${decisionColor}; margin-bottom:16px;">
+                                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+                                        <div>
+                                            <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">Final Decision</div>
+                                            <div style="font-size:1.1rem; font-weight:600; color:${decisionColor};">${finalDecision}</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">Dataset Confidence</div>
+                                            <div style="font-size:1.1rem; font-weight:600; color:#2196F3;">${confidence}%</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">Total Records</div>
+                                            <div style="font-size:1.1rem; font-weight:600; color:#2d3748;">${table.total_rows || tableValidator.total_records || 0}</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">Columns Validated</div>
+                                            <div style="font-size:1.1rem; font-weight:600; color:#2d3748;">${columns.length}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="padding:16px; background:#f8f9fa; border-radius:8px; margin-bottom:16px;">
+                                    <div style="font-weight:600; color:#2d3748; margin-bottom:8px; font-size:1rem;">Explanation:</div>
+                                    <div style="color:#666; line-height:1.6; font-size:0.95rem;">${tableValidator.explanation || 'No explanation available.'}</div>
+                                </div>
+                                
+                                ${columns.length > 0 ? `
+                                    <div>
+                                        <h4 style="margin:0 0 16px 0; color:#2d3748; font-size:1.1rem; font-weight:600;">Column-wise Validation Details</h4>
+                                        ${columns.map(col => {
+                                            const statusColor = col.status === 'MATCH' ? '#28a745' : col.status === 'WARNING' ? '#ffc107' : '#dc3545';
+                                            const statusBg = col.status === 'MATCH' ? '#f0fdf4' : col.status === 'WARNING' ? '#fffbeb' : '#fef2f2';
+                                            return `
+                                                <div style="padding:16px; background:${statusBg}; border-left:3px solid ${statusColor}; border-radius:6px; margin-bottom:12px;">
+                                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                                        <h5 style="margin:0; color:#2d3748; font-size:1rem; font-weight:600;">${col.name || 'Unknown Column'} (${col.meaning || 'N/A'})</h5>
+                                                        <span style="background:${statusBg}; color:${statusColor}; padding:4px 12px; border-radius:12px; font-size:0.85rem; font-weight:600; border:1px solid ${statusColor};">${col.status}</span>
+                                                    </div>
+                                                    <div style="color:#666; font-size:0.9rem; line-height:1.6;">
+                                                        <p style="margin:4px 0;"><strong>Confidence:</strong> ${col.confidence || 0}%</p>
+                                                        <p style="margin:4px 0;"><strong>Rules Applied:</strong> ${col.applied_rules && col.applied_rules.length > 0 ? col.applied_rules.join(', ') : 'General Rule'}</p>
+                                                        ${col.failures && col.failures.length > 0 ? `
+                                                            <div style="margin-top:8px; padding:8px; background:#fff2f0; border-radius:4px;">
+                                                                <strong style="color:#dc3545;">Issues Found:</strong>
+                                                                <ul style="margin:8px 0 0 20px; color:#dc3545;">
+                                                                    ${col.failures.map(issue => `<li>${issue}</li>`).join('')}
+                                                                </ul>
+                                                            </div>
+                                                        ` : ''}
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    validationDetailsHtml += `</div>`;
+                    validationDetailsContent.innerHTML = validationDetailsHtml;
+                } else if (validatorData && !validatorData.error) {
+                    // Single table mode
                     const validationDetailsHtml = `
                     <div class="section-header">
                         <h2 class="section-title">📋 Validation Details</h2>

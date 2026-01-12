@@ -1,31 +1,11 @@
-customer_id,customer_name,phone,email,branch_name,account_status,account_type
-CUST001,John Doe,9876543210,john.doe@example.com,Main Branch,Active,Savings
-CUST002,Jane Smith,9876543211,jane.smith@example.com,Main Branch,Active,Current
-CUST003,Robert Brown,9876543212,robert.brown@example.com,East Branch,Active,Savings
-CUST004,Linda Green,9876543213,linda.green@example.com,West Branch,Inactive,Current
-CUST005,Michael White,9876543214,michael.white@example.com,North Branch,Active,Savings
-CUST006,Patricia Black,9876543215,patricia.black@example.com,South Branch,Active,Current
-CUST007,William King,9876543216,william.king@example.com,Main Branch,Active,Savings
-CUST008,Elizabeth Lee,9876543217,elizabeth.lee@example.com,East Branch,Inactive,Current
-CUST009,David Scott,9876543218,david.scott@example.com,West Branch,Active,Savings
-CUST010,Mary Adams,9876543219,mary.adams@example.com,North Branch,Active,Current
-CUST011,James Clark,9876543220,james.clark@example.com,Main Branch,Active,Savings
-CUST012,Jennifer Hall,9876543221,jennifer.hall@example.com,East Branch,Inactive,Current
-CUST013,Richard Allen,9876543222,richard.allen@example.com,West Branch,Active,Savings
-CUST014,Susan Young,9876543223,susan.young@example.com,North Branch,Active,Current
-CUST015,Joseph Wright,9876543224,joseph.wright@example.com,Main Branch,Active,Savings
-CUST016,Karen Hill,9876543225,karen.hill@example.com,East Branch,Active,Current
-CUST017,Thomas Baker,9876543226,thomas.baker@example.com,West Branch,Inactive,Savings
-CUST018,Nancy Rivera,9876543227,nancy.rivera@example.com,North Branch,Active,Current
-CUST019,Charles Cooper,9876543228,charles.cooper@example.com,Main Branch,Active,Savings
-CUST020,Dorothy Cox,9876543229,dorothy.cox@example.com,East Branch,Active,Current
-CUST021,Daniel Ward,9876543230,daniel.ward@example.com,West Branch,Active,Savings
-CUST022,Betty Torres,9876543231,betty.torres@example.com,North Branch,Inactive,Current
-CUST023,Matthew Peterson,9876543232,matthew.peterson@example.com,Main Branch,Active,Savings
-CUST024,Helen Gray,9876543233,helen.gray@example.com,East Branch,Active,Current
-CUST025,Anthony Ramirez,9876543234,anthony.ramirez@example.com,West Branch,Active,Savings
-CUST026,Lisa James,9876543235,lisa.james@example.com,North Branch,Active,Current
-CUST027,Mark Watson,9876543236,mark.watson@example.com,Main Branch,Active,Savings
-CUST028,Laura Brooks,9876543237,laura.brooks@example.com,East Branch,Inactive,Current
-CUST029,Steven Kelly,9876543238,steven.kelly@example.com,West Branch,Active,Savings
-CUST030,Karen Sanders,9876543239,karen.sanders@example.com,North Branch,Active,Current
+customer_id,customer_name,phone,email,city
+CUST001,Ravi Kumar,9876543210,ravi@gmail.com,Chennai
+CUST002,Anitha Rao,9876543211,anitha@gmail.com,Bangalore
+CUST003,John Paul,9876543212,john@gmail.com,Coimbatore
+CUST004,Priya Sharma,9876543213,priya@gmail.com,Delhi
+CUST005,Arun Mehta,9876543214,arun@gmail.com,Mumbai
+CUST006,Kavya Iyer,9876543215,kavya@gmail.com,Chennai
+CUST007,Manoj Singh,9876543216,manoj@gmail.com,Patna
+CUST008,Divya Nair,9876543217,divya@gmail.com,Kochi
+CUST009,Suresh Babu,9876543218,suresh@gmail.com,Madurai
+CUST010,Neha Gupta,9876543219,neha@gmail.com,Jaipur
