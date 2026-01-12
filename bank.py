@@ -196,7 +196,7 @@ class BankingDomainDetector:
             non_null = series.dropna().astype(str).str.lower().str.strip()
             if len(non_null) == 0:
                 return False
-            valid_types = ["savings", "current", "checking", "loan", "credit", "fixed", "fd", "rd", "deposit"]
+            valid_types = ["savings", "current", "salary", "student", "pension", "checking", "loan", "credit", "fixed", "fd", "rd", "deposit"]
             match_ratio = non_null.str.contains('|'.join(valid_types), case=False, na=False).mean()
             return match_ratio >= 0.5
         except:
@@ -224,7 +224,7 @@ class BankingDomainDetector:
             "customer_id": "CUSTOMER_ID: Internal customer identifier - Usually alphanumeric like CUST1001, Each customer has unique ID, Same ID appears across multiple accounts for same customer, Required field, Not used in balance calculations",
             "customer_name": "CUSTOMER_NAME: Customer's full name - Contains letters and spaces, Same name may appear for multiple accounts of same person, Must be at least 3 characters, Not numeric data, Connected to customer ID",
             "account_number": "ACCOUNT_NUMBER: Unique bank account number - Numbers only, Between 6 to 18 digits long, Same account number appears in multiple transaction rows, Required field, Used to connect transactions to accounts",
-            "account_type": "ACCOUNT_TYPE: Type of account like Savings or Current - Text values only, Limited options like Savings, Current, Salary, Same type repeats for same account, Connected to account number",
+            "account_type": "ACCOUNT_TYPE: Type of account like Savings, Current, Salary, Student, or Pension - Text values only, Limited options like Savings, Current, Salary, Student, Pension, Same type repeats for same account, Connected to account number",
             "account_status": "ACCOUNT_STATUS: Is account active - Options like ACTIVE, INACTIVE, CLOSED, One status per account, Required field, Changes rarely, Not numeric data",
             "transaction_id": "TRANSACTION_ID: Unique ID for each transaction - Different for most transactions, Mix of letters and numbers, Appears once per transaction row, Not used in math, Connected to account number",
             "transaction_date": "TRANSACTION_DATE: When transaction happened - Format like YYYY-MM-DD, May repeat for same day, Not money amounts, Connected to debit/credit, Helps order transactions",

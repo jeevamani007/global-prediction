@@ -60,7 +60,7 @@ class DynamicBusinessRulesValidator:
     }
     
     # Allowed values for enumerated columns
-    ALLOWED_ACCOUNT_TYPES = ["Savings", "Current"]
+    ALLOWED_ACCOUNT_TYPES = ["Savings", "Current", "Salary", "Student", "Pension"]
     ALLOWED_ACCOUNT_STATUSES = ["Active", "Deactive"]
     ALLOWED_TRANSACTION_TYPES = ["Debit", "Credit"]
     
@@ -343,7 +343,7 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_account_type(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: Account type must be from allowed values (Savings or Current only)."""
+        """Business Rule: Account type must be from allowed values (Savings, Current, Salary, Student, or Pension)."""
         violations = []
         non_null = series.dropna().astype(str).str.strip()
         
@@ -356,7 +356,7 @@ class DynamicBusinessRulesValidator:
         valid_ratio = normalized.isin(self.ALLOWED_ACCOUNT_TYPES).mean()
         if valid_ratio < 0.95:
             invalid_values = non_null[~normalized.isin(self.ALLOWED_ACCOUNT_TYPES)].unique().tolist()[:5]
-            violations.append(f"Invalid account types: {invalid_values}. Only 'Savings' or 'Current' are allowed.")
+            violations.append(f"Invalid account types: {invalid_values}. Allowed types: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'.")
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",

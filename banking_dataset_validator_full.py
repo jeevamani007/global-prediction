@@ -30,7 +30,7 @@ class BankingDatasetValidator:
                 "required": False
             },
             "account_type": {
-                "description": "Only Savings, Current, Salary",
+                "description": "Savings, Current, Salary, Student, or Pension",
                 "validation_func": self.validate_account_type,
                 "required": False
             },
@@ -255,20 +255,22 @@ class BankingDatasetValidator:
         return status, confidence, issues
     
     def validate_account_type(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate account type: only Savings, Current, Salary"""
+        """Validate account type: Savings, Current, Salary, Student, or Pension"""
         issues = []
-        non_null = series.dropna().str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        allowed_types = {'SAVINGS', 'CURRENT', 'SALARY'}
-        valid_mask = non_null.isin(allowed_types)
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
+        allowed_types = {'Savings', 'Current', 'Salary', 'Student', 'Pension'}
+        valid_mask = normalized.isin(allowed_types)
         valid_ratio = valid_mask.mean()
         
         if valid_ratio < 0.95:
             invalid_values = non_null[~valid_mask].unique().tolist()[:5]
-            issues.append(f"Invalid account types: {invalid_values}")
+            issues.append(f"Invalid account types: {invalid_values}. Allowed types: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'.")
         
         confidence = valid_ratio
         status = "FAIL" if issues else "MATCH"

@@ -135,7 +135,7 @@ def explain_features():
         "account_number: Numeric, 6-18 digits, unique",
         "customer_id: Alphanumeric, unique per customer", 
         "customer_name: Letters & spaces only, minimum 3 chars",
-        "account_type: Only 'Savings' or 'Current'",
+        "account_type: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'",
         "account_status: Only 'Active' or 'Deactive'",
         "branch: Alphanumeric",
         "ifsc_code: Alphanumeric, 8-11 characters",

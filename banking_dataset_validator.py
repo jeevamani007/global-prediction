@@ -95,7 +95,7 @@ class BankingDatasetValidator:
     # Allowed values for enumerated columns - Only Debit or Credit allowed
     ALLOWED_TXN_TYPES = ["debit", "credit"]
     # Canonical account types are stored in uppercase for case-insensitive checks.
-    ALLOWED_ACCOUNT_TYPES = ["SAVINGS", "CURRENT"]  # Only Savings or Current allowed
+    ALLOWED_ACCOUNT_TYPES = ["SAVINGS", "CURRENT", "SALARY", "STUDENT", "PENSION"]  # Savings, Current, Salary, Student, or Pension
     # Common synonyms mapped to canonical values (all uppercase for consistency).
     ACCOUNT_TYPE_SYNONYMS = {
         "SAVING": "SAVINGS",
@@ -808,8 +808,8 @@ class BankingDatasetValidator:
                 "confidence": 0.0
             }
         
-        # Rule 2: Allowed values only (case-insensitive) - Only Savings or Current
-        allowed_types_upper = [t.upper() for t in ["Savings", "Current"]]
+        # Rule 2: Allowed values only (case-insensitive) - Savings, Current, Salary, Student, or Pension
+        allowed_types_upper = [t.upper() for t in ["Savings", "Current", "Salary", "Student", "Pension"]]
         normalized_upper = normalized.str.upper()
         valid_mask = normalized_upper.isin(allowed_types_upper)
         valid_ratio = valid_mask.mean()
@@ -817,7 +817,7 @@ class BankingDatasetValidator:
             rules_passed += 1
         else:
             invalid_values = non_null[~valid_mask].unique().tolist()[:5]
-            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%). Only 'Savings' or 'Current' are allowed.")
+            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%). Allowed types: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'.")
         
         # Rule 3: Repeats for same account (soft check - always pass)
         rules_passed += 1

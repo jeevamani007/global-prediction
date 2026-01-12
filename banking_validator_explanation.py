@@ -61,8 +61,9 @@ Here are the detailed explanations of each banking column and its purpose:
 
 4. account_type:
    - Purpose: Type of bank account
-   - Business Rule: Only 'Savings' or 'Current'
+   - Business Rule: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'
    - Used for: Determining account features and restrictions
+   - Types: Savings (individuals), Current (business/traders), Salary (company employees), Student (college students), Pension (retirees)
 
 5. account_status:
    - Purpose: Current status of the account

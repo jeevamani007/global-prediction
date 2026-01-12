@@ -29,7 +29,7 @@ class CompleteBankingValidator:
                 "required": False
             },
             "account_type": {
-                "description": "Account type: Only 'Savings' or 'Current'",
+                "description": "Account type: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'",
                 "validation_func": self.validate_account_type,
                 "required": False
             },
@@ -250,8 +250,8 @@ class CompleteBankingValidator:
                         normalized_sample = sample_data.str.title().str.strip()
                         if normalized_sample.isin(['Debit', 'Credit']).mean() >= 0.8:
                             detected_columns[col] = "transaction_type"
-                        # Check if it looks like account types (Savings/Current)
-                        elif normalized_sample.isin(['Savings', 'Current']).mean() >= 0.8:
+                        # Check if it looks like account types (Savings/Current/Salary/Student/Pension)
+                        elif normalized_sample.isin(['Savings', 'Current', 'Salary', 'Student', 'Pension']).mean() >= 0.8:
                             detected_columns[col] = "account_type"
                         # Check if it looks like account status (Active/Deactive)
                         elif normalized_sample.isin(['Active', 'Deactive']).mean() >= 0.8 or \
@@ -283,9 +283,9 @@ class CompleteBankingValidator:
             non_null_str = non_null.astype(str).str.strip()
             
             if standard_col == "account_type":
-                # Should contain Savings or Current
+                # Should contain Savings, Current, Salary, Student, or Pension
                 normalized = non_null_str.str.title()
-                valid_ratio = normalized.isin(['Savings', 'Current']).mean()
+                valid_ratio = normalized.isin(['Savings', 'Current', 'Salary', 'Student', 'Pension']).mean()
                 return valid_ratio >= 0.8
             
             elif standard_col == "account_status":
@@ -434,7 +434,7 @@ class CompleteBankingValidator:
         return status, confidence, issues
     
     def validate_account_type(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate account type: Only 'Savings' or 'Current'"""
+        """Validate account type: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'"""
         issues = []
         non_null = series.dropna().astype(str).str.strip()
         
@@ -443,13 +443,13 @@ class CompleteBankingValidator:
         
         # Normalize to title case for comparison (case-insensitive)
         normalized = non_null.str.title()
-        allowed_types = {'Savings', 'Current'}
+        allowed_types = {'Savings', 'Current', 'Salary', 'Student', 'Pension'}
         valid_mask = normalized.isin(allowed_types)
         valid_ratio = valid_mask.mean()
         
         if valid_ratio < 0.95:
             invalid_values = non_null[~valid_mask].unique().tolist()[:5]
-            issues.append(f"Invalid account types: {invalid_values}. Only 'Savings' or 'Current' are allowed.")
+            issues.append(f"Invalid account types: {invalid_values}. Allowed types: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'.")
         
         confidence = valid_ratio
         status = "FAIL" if issues else "MATCH"

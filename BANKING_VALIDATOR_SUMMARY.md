@@ -51,7 +51,7 @@ A comprehensive banking data validation system that analyzes CSV or SQL data acc
 - **account_number**: Numeric, 6-18 digits, unique per account
 - **customer_id**: Alphanumeric, unique per customer
 - **customer_name**: Letters & spaces only, minimum 3 characters
-- **account_type**: Only 'Savings' or 'Current'
+- **account_type**: 'Savings', 'Current', 'Salary', 'Student', or 'Pension'
 - **account_status**: Only 'Active' or 'Deactive'
 - **branch**: Alphanumeric
 - **ifsc_code**: Alphanumeric, 8-11 characters
