@@ -308,31 +308,42 @@ class DataValidationEngine:
             meaning = info["inferred_meaning"]
             
             # Apply specific rules based on column meaning
+            rule_name = f"validate_{meaning.replace(' ', '_').replace('-', '_')}"
             if meaning == "account_number":
                 result = self.validate_account_number(df[col_name])
+                result["applied_rule_names"] = ["Account Number Validation: digits only, 6-18 chars"]
             elif meaning == "customer_id":
                 result = self.validate_customer_id(df[col_name])
+                result["applied_rule_names"] = ["Customer ID Validation: alphanumeric, unique"]
             elif meaning == "customer_name":
                 result = self.validate_customer_name(df[col_name])
+                result["applied_rule_names"] = ["Customer Name Validation: text format"]
             elif meaning == "transaction_date":
                 result = self.validate_transaction_date(df[col_name])
+                result["applied_rule_names"] = ["Transaction Date Validation: valid date format"]
             elif meaning == "transaction_type":
                 result = self.validate_transaction_type(df[col_name])
+                result["applied_rule_names"] = ["Transaction Type Validation: allowed values"]
             elif meaning == "debit":
                 # If both debit and credit exist, check mutual exclusivity
                 credit_col = credit_cols[0] if credit_cols else None
                 result = self.validate_debit(df[col_name], df[credit_col] if credit_col else None)
+                result["applied_rule_names"] = ["Debit Validation: numeric, non-negative", "Mutual Exclusivity with Credit"]
             elif meaning == "credit":
                 # If both debit and credit exist, check mutual exclusivity
                 debit_col = debit_cols[0] if debit_cols else None
                 result = self.validate_credit(df[col_name], df[debit_col] if debit_col else None)
+                result["applied_rule_names"] = ["Credit Validation: numeric, non-negative", "Mutual Exclusivity with Debit"]
             elif meaning == "amount":
                 result = self.validate_amount(df[col_name])
+                result["applied_rule_names"] = ["Amount Validation: numeric format"]
             elif meaning == "transaction_id":
                 result = self.validate_transaction_id(df[col_name])
+                result["applied_rule_names"] = ["Transaction ID Validation: unique identifier"]
             else:
                 # Generic validation for other columns
                 result = self.generic_validation(df[col_name], meaning)
+                result["applied_rule_names"] = [f"Generic Validation for {meaning}"]
             
             # Calculate confidence based on data quality
             confidence_score = self.calculate_confidence(info)
@@ -686,7 +697,8 @@ class DataValidationEngine:
                     "violations": [f"Rows with both debit and credit > 0: {both_positive_rows[:10]}"],  # Limit to first 10
                     "affected_rows": both_positive_rows,
                     "match_status": "FAIL",
-                    "rules_applied": 1
+                    "rules_applied": 1,
+                    "applied_rule_names": ["Cross-Column Validation: Debit/Credit Mutual Exclusivity"]
                 })
         
         return cross_validations
@@ -766,6 +778,9 @@ class DataValidationEngine:
                 if "confidence_score" not in analysis:
                     analysis["confidence_score"] = self.calculate_confidence(analysis)
                 
+                # Get applied business rule names
+                applied_rules = val_result.get("applied_rule_names", [])
+                
                 formatted_results.append({
                     "column_name": col_name,
                     "inferred_meaning": analysis["inferred_meaning"],
@@ -774,7 +789,8 @@ class DataValidationEngine:
                     "confidence_score": f"{analysis['confidence_score']:.1f}%",
                     "sample_values": analysis["sample_values"],
                     "data_type": analysis["data_type"],
-                    "violations": val_result.get("violations", [])
+                    "violations": val_result.get("violations", []),
+                    "applied_rules": applied_rules
                 })
             
             return {

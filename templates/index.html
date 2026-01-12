@@ -216,6 +216,14 @@
             animation: highlightGlow 2s infinite alternate;
         }
         
+        .business-rules-summary {
+            background: linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            border-left: 4px solid #2196F3;
+        }
+        
         @keyframes highlightGlow {
             from { box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3); }
             to { box-shadow: 0 6px 24px rgba(33, 150, 243, 0.5); }
@@ -725,24 +733,35 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 
                 <div class="info-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin:16px 0;">
                     <div style="background:white; padding:12px; border-radius:8px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:bold; color:#2196F3;">${bankingResult.decision || "N/A"}</div>
-                        <div style="font-size:0.85rem; color:#666;">Final Decision</div>
+                        <div style="font-size:1.8rem; font-weight:bold; color:${bankingConfidence >= 70 ? '#4CAF50' : bankingConfidence >= 50 ? '#FF9800' : '#f44336'};">${bankingConfidence}%</div>
+                        <div style="font-size:0.9rem; color:#666; font-weight:600;">BANKING DOMAIN CONFIDENCE</div>
                     </div>
                     <div style="background:white; padding:12px; border-radius:8px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:bold; color:${bankingConfidence >= 70 ? '#4CAF50' : bankingConfidence >= 50 ? '#FF9800' : '#f44336'};">${bankingConfidence}%</div>
-                        <div style="font-size:0.85rem; color:#666;">Confidence Level</div>
+                        <div style="font-size:1.8rem; font-weight:bold; color:#2196F3;">${bankingResult.decision || "N/A"}</div>
+                        <div style="font-size:0.9rem; color:#666; font-weight:600;">FINAL DECISION</div>
                     </div>
                     <div style="background:white; padding:12px; border-radius:8px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:bold; color:#673AB7;">${bankingResult.total_columns || 0}</div>
-                        <div style="font-size:0.85rem; color:#666;">Total Columns</div>
+                        <div style="font-size:1.8rem; font-weight:bold; color:#673AB7;">${bankingResult.total_columns || 0}</div>
+                        <div style="font-size:0.9rem; color:#666; font-weight:600;">TOTAL COLUMNS</div>
                     </div>
                 </div>
                 
-                <div style="background:#f8f9ff; padding:16px; border-radius:8px; margin:16px 0;">
-                    <p><b>Domain:</b> ${bankingResult.domain || "Unknown"}</p>
-                    <p><b>Strength:</b> ${bankingResult.qualitative || "N/A"}</p>
-                    <p><b>Confidence Rating:</b> ${bankingResult.confidence_out_of_10 || 0}/10</p>
-                    <p><b>Empty Columns:</b> ${(bankingResult.empty_columns || []).join(", ") || "None"}</p>
+                <div class="business-rules-summary" style="margin:16px 0;">
+                    <div style="display:flex; justify-content:space-around; text-align:center; flex-wrap:wrap; gap:16px;">
+                        <div style="min-width:120px;">
+                            <div style="font-size:1.4rem; font-weight:bold; color:#2196F3;">${bankingResult.domain || "Unknown"}</div>
+                            <div style="font-size:0.85rem; color:#666;">Domain Detected</div>
+                        </div>
+                        <div style="min-width:120px;">
+                            <div style="font-size:1.4rem; font-weight:bold; color:#673AB7;">${bankingResult.qualitative || "N/A"}</div>
+                            <div style="font-size:0.85rem; color:#666;">Strength</div>
+                        </div>
+                        <div style="min-width:120px;">
+                            <div style="font-size:1.4rem; font-weight:bold; color:#FF9800;">${bankingResult.confidence_out_of_10 || 0}/10</div>
+                            <div style="font-size:0.85rem; color:#666;">Rating</div>
+                        </div>
+                    </div>
+                    <p style="text-align:center; margin:12px 0 0 0; font-size:0.9rem; color:#666;"><b>Empty Columns:</b> ${(bankingResult.empty_columns || []).join(", ") || "None"}</p>
                 </div>
                 
                 ${bankingResult.matched_keywords && bankingResult.matched_keywords.length > 0 ? `

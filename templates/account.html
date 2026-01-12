@@ -342,6 +342,15 @@
             font-size: 0.9em;
             border: 1px solid rgba(0,0,0,0.1);
         }
+        
+        .business-rule-item {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .business-rule-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+        }
 
         @media (max-width: 768px) {
             .card {
@@ -978,84 +987,140 @@
                 probabilityExplanationsHtml += `</div></div>`;
             }
             
-            // Banking Dataset Validator Results - Enhanced for Banking Domain Priority
+            // Banking Dataset Validator Results - Show Only Relevant Business Rules
             let validatorHtml = "";
             if (validatorData && !validatorData.error) {
                 const decisionColor = validatorData.final_decision === 'PASS' ? '#28a745' : validatorData.final_decision === 'PASS WITH WARNINGS' ? '#ffc107' : '#dc3545';
                 const decisionBg = validatorData.final_decision === 'PASS' ? '#d4edda' : validatorData.final_decision === 'PASS WITH WARNINGS' ? '#fff3cd' : '#f8d7da';
-                
+                            
+                // Count different types of issues
+                const totalColumns = validatorData.columns ? validatorData.columns.length : 0;
+                const matchedColumns = validatorData.columns ? validatorData.columns.filter(col => col.status === 'MATCH').length : 0;
+                const warningColumns = validatorData.columns ? validatorData.columns.filter(col => col.status === 'WARNING').length : 0;
+                const failedColumns = validatorData.columns ? validatorData.columns.filter(col => col.status === 'FAIL').length : 0;
+                            
                 validatorHtml = `
-                    <div class="col-card" style="background:${decisionBg}; border-left:5px solid ${decisionColor}; margin-bottom:24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-                            <h3 style="margin:0; font-size:1.4rem; color:${decisionColor};">
-                                <span style="margin-right:10px;">🏦</span> Banking Domain Validation Results
-                            </h3>
-                            <span class="badge ${validatorData.final_decision === 'PASS' ? 'success' : validatorData.final_decision === 'PASS WITH WARNINGS' ? 'warning' : 'error'}" 
-                                  style="padding:8px 16px; font-size:1rem;">
-                                ${validatorData.final_decision}
-                            </span>
-                        </div>
-                        
-                        <div class="info-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin:16px 0;">
-                            <div style="background:white; padding:12px; border-radius:8px; text-align:center;">
-                                <div style="font-size:1.8rem; font-weight:bold; color:${decisionColor};">${validatorData.dataset_confidence}%</div>
-                                <div style="font-size:0.85rem; color:#666;">Dataset Confidence</div>
+                    <div class="business-rules-card" style="background:${decisionBg}; border-left:5px solid ${decisionColor}; margin-bottom:24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+                            <div>
+                                <h3 style="margin:0 0 4px 0; font-size:1.4rem; color:${decisionColor}; display:flex; align-items:center; gap:10px;">
+                                    <span>💼</span> Banking Business Rules Validation
+                                </h3>
+                                <p style="margin:0; color:#555; font-size:0.95rem;">Showing only rules that apply to your data</p>
                             </div>
-                            <div style="background:white; padding:12px; border-radius:8px; text-align:center;">
-                                <div style="font-size:1.8rem; font-weight:bold; color:#1890ff;">${validatorData.columns ? validatorData.columns.length : 0}</div>
-                                <div style="font-size:0.85rem; color:#666;">Columns Validated</div>
-                            </div>
-                            <div style="background:white; padding:12px; border-radius:8px; text-align:center;">
-                                <div style="font-size:1.8rem; font-weight:bold; color:#52c41a;">${validatorData.relationships ? validatorData.relationships.length : 0}</div>
-                                <div style="font-size:0.85rem; color:#666;">Relationships Checked</div>
+                            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                                <span class="badge ${validatorData.final_decision === 'PASS' ? 'success' : validatorData.final_decision === 'PASS WITH WARNINGS' ? 'warning' : 'error'}" 
+                                      style="padding:8px 16px; font-size:1rem; font-weight:600;">
+                                    ${validatorData.final_decision}
+                                </span>
+                                <span style="background:#1890ff; color:white; padding:8px 16px; border-radius:20px; font-size:1rem; font-weight:600;">
+                                    ${validatorData.dataset_confidence}% Confidence
+                                </span>
                             </div>
                         </div>
-                        
-                        <div style="background:white; padding:16px; border-radius:8px; margin:16px 0;">
-                            <p style="margin:0; font-weight:600; color:#333; margin-bottom:8px;">Validation Summary:</p>
-                            <p style="margin:8px 0 0 0; line-height: 1.6;">${validatorData.explanation || 'N/A'}</p>
+                                    
+                        <div class="info-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin:16px 0;">
+                            <div style="background:white; padding:12px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                                <div style="font-size:1.5rem; font-weight:bold; color:#1890ff;">${totalColumns}</div>
+                                <div style="font-size:0.8rem; color:#666;">Total Columns</div>
+                            </div>
+                            <div style="background:white; padding:12px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                                <div style="font-size:1.5rem; font-weight:bold; color:#52c41a;">${matchedColumns}</div>
+                                <div style="font-size:0.8rem; color:#666;">Passed</div>
+                            </div>
+                            <div style="background:white; padding:12px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                                <div style="font-size:1.5rem; font-weight:bold; color:#faad14;">${warningColumns}</div>
+                                <div style="font-size:0.8rem; color:#666;">With Warnings</div>
+                            </div>
+                            <div style="background:white; padding:12px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                                <div style="font-size:1.5rem; font-weight:bold; color:#ff4d4f;">${failedColumns}</div>
+                                <div style="font-size:0.8rem; color:#666;">Failed</div>
+                            </div>
                         </div>
-                        
+                                    
+                        <div style="background:white; padding:16px; border-radius:8px; margin:16px 0; border:1px solid #e2e8f0;">
+                            <p style="margin:0; font-weight:600; color:#333; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                                <span>📋</span> Validation Summary
+                            </p>
+                            <p style="margin:8px 0 0 0; line-height: 1.6; color:#555;">${validatorData.explanation || 'N/A'}</p>
+                        </div>
+                                    
                         ${validatorData.columns && validatorData.columns.length > 0 ? `
-                            <div style="margin:20px 0;">
-                                <h4 style="color:#2d3748; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #e2e8f0;">
-                                    📋 Column-Level Business Rules Validation
+                            <div style="margin:24px 0;">
+                                <h4 style="color:#2d3748; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; gap:10px;">
+                                    <span>🔍</span> Applied Business Rules for Your Data (${validatorData.columns.length} columns analyzed)
                                 </h4>
-                                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">
                                     ${validatorData.columns.map(col => {
                                         const colStatusColor = col.status === 'MATCH' ? '#52c41a' : col.status === 'WARNING' ? '#faad14' : '#ff4d4f';
                                         const colBgColor = col.status === 'MATCH' ? '#f6ffed' : col.status === 'WARNING' ? '#fffbe6' : '#fff2f0';
                                         const colBorderColor = col.status === 'MATCH' ? '#b7eb8f' : col.status === 'WARNING' ? '#ffe58f' : '#ffccc7';
-                                        
+                                                    
                                         return `
-                                            <div style="background:${colBgColor}; border:1px solid ${colBorderColor}; border-radius:8px; padding:16px;">
-                                                <div style="display:flex; justify-content:space-between; align-items-start; margin-bottom:8px;">
-                                                    <div>
-                                                        <h5 style="margin:0 0 4px 0; font-size:1rem; color:#2d3748;">
-                                                            <strong>${col.name}</strong>
+                                            <div class="business-rule-item" style="background:${colBgColor}; border:1px solid ${colBorderColor}; border-radius:10px; padding:18px; transition: transform 0.2s ease;">
+                                                <div style="display:flex; justify-content:space-between; align-items-start; margin-bottom:12px;">
+                                                    <div style="flex:1;">
+                                                        <h5 style="margin:0 0 4px 0; font-size:1.1rem; color:#2d3748; font-weight:600;">
+                                                            <span style="display:inline-block; width:24px; height:24px; line-height:24px; text-align:center; background:${colStatusColor}; color:white; border-radius:50%; font-size:0.8rem; margin-right:8px;">
+                                                                ${col.name.substring(0,1).toUpperCase()}
+                                                            </span>
+                                                            ${col.name}
                                                         </h5>
-                                                        <div style="font-size:0.85rem; color:#666;">${col.meaning || 'N/A'}</div>
+                                                        <div style="font-size:0.9rem; color:#666; margin-bottom:8px;">${col.meaning || 'N/A'}</div>
                                                     </div>
-                                                    <span style="background:${colStatusColor}; color:white; padding:4px 10px; border-radius:12px; font-size:0.8rem; font-weight:600;">
+                                                    <span style="min-width:70px; text-align:center; background:${colStatusColor}; color:white; padding:6px 12px; border-radius:20px; font-size:0.85rem; font-weight:600;">
                                                         ${col.status}
                                                     </span>
                                                 </div>
-                                                
-                                                <div style="display:flex; justify-content:space-between; margin:10px 0; font-size:0.9rem;">
-                                                    <span style="color:#666;">Confidence:</span>
-                                                    <span style="font-weight:600; color:${colStatusColor};">${col.confidence}%</span>
+                                                            
+                                                <div style="display:flex; justify-content:space-between; margin:10px 0; padding:8px 0; border-top:1px dashed #ddd; border-bottom:1px dashed #ddd;">
+                                                    <div style="text-align:center;">
+                                                        <div style="font-size:1.2rem; font-weight:bold; color:${colStatusColor};">${col.confidence}%</div>
+                                                        <div style="font-size:0.8rem; color:#777;">Confidence</div>
+                                                    </div>
+                                                    <div style="text-align:center;">
+                                                        <div style="font-size:1.2rem; font-weight:bold; color:#1890ff;">${col.rules_passed}/${col.rules_total}</div>
+                                                        <div style="font-size:0.8rem; color:#777;">Rules Applied</div>
+                                                    </div>
                                                 </div>
+                                                                                                
+                                                <!-- Show the specific business rules that were applied -->
+                                                ${col.applied_rules && col.applied_rules.length > 0 ? `
+                                                    <div style="margin-top:12px; padding:10px; background:rgba(25, 118, 210, 0.08); border-radius:6px; border-left:3px solid #2196F3;">
+                                                        <div style="font-weight:600; color:#1976D2; margin-bottom:6px; font-size:0.9rem; display:flex; align-items:center; gap:6px;">
+                                                            <span>📋</span> Applied Business Rules:
+                                                        </div>
+                                                        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                                            ${col.applied_rules.slice(0, 3).map(rule => `
+                                                                <span style="background:#e3f2fd; color:#1976D2; padding:4px 8px; border-radius:12px; font-size:0.8rem; font-weight:500;">
+                                                                    ${rule}
+                                                                </span>
+                                                            `).join('')}
+                                                            ${col.applied_rules.length > 3 ? `<span style="background:#bbdefb; color:#1565c0; padding:4px 8px; border-radius:12px; font-size:0.8rem;">+${col.applied_rules.length - 3} more</span>` : ''}
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
                                                 
-                                                <div style="display:flex; justify-content:space-between; margin:4px 0; font-size:0.9rem;">
-                                                    <span style="color:#666;">Rules:</span>
-                                                    <span style="font-weight:600;">${col.rules_passed}/${col.rules_total}</span>
-                                                </div>
-                                                
+                                                <!-- Show the validation reasons -->
+                                                ${col.reasons && col.reasons.length > 0 ? `
+                                                    <div style="margin-top:10px; padding:10px; background:rgba(25, 118, 210, 0.05); border-radius:6px; border-left:3px solid #42A5F5;">
+                                                        <div style="font-weight:600; color:#1E88E5; margin-bottom:6px; font-size:0.9rem; display:flex; align-items:center; gap:6px;">
+                                                            <span>💡</span> Validation Reasons:
+                                                        </div>
+                                                        <ul style="margin:0; padding-left:18px; font-size:0.85rem; color:#1565C0; line-height: 1.4;">
+                                                            ${col.reasons.slice(0, 3).map(reason => `<li style="margin:3px 0; word-break:break-word;">${reason}</li>`).join('')}
+                                                        </ul>
+                                                    </div>
+                                                ` : ''}
+                                                                                                
                                                 ${col.failures && col.failures.length > 0 ? `
-                                                    <div style="margin-top:12px; padding:10px; background:#ffccc7; border-radius:4px; border-left:3px solid #ff4d4f;">
-                                                        <div style="font-weight:600; color:#ff4d4f; margin-bottom:4px; font-size:0.9rem;">Issues Found:</div>
-                                                        <ul style="margin:0; padding-left:16px; font-size:0.85rem; color:#a61d24;">
-                                                            ${col.failures.slice(0, 3).map(f => `<li style="margin:3px 0;">${f}</li>`).join('')}
+                                                    <div style="margin-top:14px; padding:12px; background:rgba(255, 56, 96, 0.1); border-radius:6px; border-left:4px solid #ff4d4f;">
+                                                        <div style="font-weight:600; color:#ff4d4f; margin-bottom:6px; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                                                            <span>⚠️</span> Issues Found:
+                                                        </div>
+                                                        <ul style="margin:0; padding-left:18px; font-size:0.85rem; color:#a61d24; line-height: 1.5;">
+                                                            ${col.failures.slice(0, 3).map(f => `<li style="margin:4px 0; word-break:break-word;">${f}</li>`).join('')}
+                                                            ${col.failures.length > 3 ? `<li style="margin:4px 0; color:#777; font-style:italic;">+ ${col.failures.length - 3} more issues</li>` : ''}
                                                         </ul>
                                                     </div>
                                                 ` : ''}
@@ -1065,13 +1130,13 @@
                                 </div>
                             </div>
                         ` : ''}
-                        
+                                    
                         ${validatorData.relationships && validatorData.relationships.length > 0 ? `
-                            <div style="margin:20px 0;">
-                                <h4 style="color:#2d3748; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #e2e8f0;">
-                                    🔗 Cross-Column Relationship Validation
+                            <div style="margin:24px 0;">
+                                <h4 style="color:#2d3748; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; gap:10px;">
+                                    <span>🔗</span> Cross-Column Relationship Checks (${validatorData.relationships.length} relationships)
                                 </h4>
-                                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;">
+                                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;">
                                     ${validatorData.relationships.map(rel => {
                                         const relKey = Object.keys(rel)[0];
                                         const relValue = rel[relKey];
@@ -1079,13 +1144,16 @@
                                         const relBgColor = relValue === 'PASS' ? '#f6ffed' : relValue === 'FAIL' ? '#fff2f0' : '#fffbe6';
                                         const relBorderColor = relValue === 'PASS' ? '#b7eb8f' : relValue === 'FAIL' ? '#ffccc7' : '#ffe58f';
                                         const relIcon = relValue === 'PASS' ? '✅' : relValue === 'FAIL' ? '❌' : '⚠️';
-                                        
+                                                    
                                         return `
-                                            <div style="background:${relBgColor}; border:1px solid ${relBorderColor}; border-radius:8px; padding:12px;">
-                                                <div style="display:flex; justify-content:space-between; align-items-center;">
-                                                    <span style="font-weight:600; color:#2d3748;">${relKey}</span>
-                                                    <span style="display:inline-flex; align-items:center; gap:6px; font-weight:600; color:${relStatusColor};">
-                                                        ${relIcon} ${relValue}
+                                            <div style="background:${relBgColor}; border:1px solid ${relBorderColor}; border-radius:10px; padding:16px;">
+                                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                                    <span style="font-weight:600; color:#2d3748; font-size:1rem;">
+                                                        ${relKey}
+                                                    </span>
+                                                    <span style="display:inline-flex; align-items:center; gap:8px; font-weight:600; color:${relStatusColor}; font-size:0.95rem;">
+                                                        <span>${relIcon}</span>
+                                                        <span>${relValue}</span>
                                                     </span>
                                                 </div>
                                             </div>
@@ -1094,6 +1162,16 @@
                                 </div>
                             </div>
                         ` : ''}
+                                    
+                        <div style="margin-top:24px; padding:16px; background:#f8f9fa; border-radius:8px; border:1px solid #e9ecef;">
+                            <h5 style="margin:0 0 10px 0; color:#495057; display:flex; align-items:center; gap:8px;">
+                                <span>💡</span> Business Rules Applied
+                            </h5>
+                            <p style="margin:0; color:#6c757d; font-size:0.9rem; line-height: 1.6;">
+                                The system automatically detects which business rules apply to your data based on column names and data types.
+                                Only relevant rules are applied - no unnecessary checks are performed.
+                            </p>
+                        </div>
                     </div>
                 `;
             }
