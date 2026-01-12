@@ -409,10 +409,10 @@
 
     <div class="upload-area" id="uploadArea">
         <p>Click or Drag & Drop</p>
-        <small>.sql, .csv, .xlsx, .xls</small>
+        <small>.sql, .csv, .xlsx, .xls (Multiple files supported)</small>
     </div>
 
-    <input type="file" id="fileInput" accept=".sql,.csv,.xlsx,.xls">
+    <input type="file" id="fileInput" accept=".sql,.csv,.xlsx,.xls" multiple>
 
     <div class="file-info" id="fileInfo">
         <p id="fileName"></p>
@@ -445,13 +445,13 @@ const response = document.getElementById("response");
 const resultBox = document.getElementById("resultBox");
 const accountBtn = document.getElementById("accountBtn");
 
-let selectedFile = null;
+let selectedFiles = [];
 
 /* ---------------- Upload Handling ---------------- */
 
 uploadArea.onclick = () => fileInput.click();
 
-fileInput.onchange = e => handleFile(e.target.files[0]);
+fileInput.onchange = e => handleFiles(e.target.files);
 
 uploadArea.ondragover = e => {
     e.preventDefault();
@@ -463,15 +463,23 @@ uploadArea.ondragleave = () => uploadArea.classList.remove("dragover");
 uploadArea.ondrop = e => {
     e.preventDefault();
     uploadArea.classList.remove("dragover");
-    handleFile(e.dataTransfer.files[0]);
+    handleFiles(e.dataTransfer.files);
 };
 
-function handleFile(file) {
-    if (!file) return;
+function handleFiles(files) {
+    if (!files || files.length === 0) return;
 
-    selectedFile = file;
-    fileName.textContent = "📄 " + file.name;
-    fileSize.textContent = "Size: " + formatFileSize(file.size);
+    selectedFiles = Array.from(files);
+    
+    if (selectedFiles.length === 1) {
+        fileName.textContent = "📄 " + selectedFiles[0].name;
+        fileSize.textContent = "Size: " + formatFileSize(selectedFiles[0].size);
+    } else {
+        fileName.textContent = `📄 ${selectedFiles.length} files selected`;
+        const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+        fileSize.innerHTML = "Total Size: " + formatFileSize(totalSize) + "<br>" +
+            selectedFiles.map(f => `  • ${f.name} (${formatFileSize(f.size)})`).join('<br>');
+    }
 
     fileInfo.classList.add("show");
     uploadBtn.classList.add("show");
@@ -487,7 +495,20 @@ function formatFileSize(bytes) {
 
 uploadBtn.onclick = async () => {
     const formData = new FormData();
-    formData.append("file", selectedFile);
+    
+    // Use multi-file endpoint if multiple files, otherwise single-file endpoint
+    const isMultiFile = selectedFiles.length > 1;
+    const endpoint = isMultiFile ? "http://localhost:8000/upload-multiple" : "http://localhost:8000/upload";
+    
+    if (isMultiFile) {
+        // Multi-file mode
+        selectedFiles.forEach(file => {
+            formData.append("files", file);
+        });
+    } else {
+        // Single file mode (backward compatible)
+        formData.append("file", selectedFiles[0]);
+    }
 
     uploadBtn.disabled = true;
     loading.classList.add("show");
@@ -495,9 +516,9 @@ uploadBtn.onclick = async () => {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for multi-file
 
-        const res = await fetch("http://localhost:8000/upload", {
+        const res = await fetch(endpoint, {
             method: "POST",
             body: formData,
             signal: controller.signal
@@ -584,6 +605,28 @@ uploadBtn.onclick = async () => {
         }
         if (data.core_banking_validator) {
             sessionStorage.setItem("coreBankingValidator", JSON.stringify(data.core_banking_validator));
+        }
+        
+        // Store multi-file metadata if available
+        if (data.multi_file_mode) {
+            sessionStorage.setItem("multiFileMode", "true");
+            if (data.relationships) {
+                sessionStorage.setItem("multiFileRelationships", JSON.stringify(data.relationships));
+            }
+            if (data.primary_keys) {
+                sessionStorage.setItem("multiFilePrimaryKeys", JSON.stringify(data.primary_keys));
+            }
+            if (data.foreign_keys) {
+                sessionStorage.setItem("multiFileForeignKeys", JSON.stringify(data.foreign_keys));
+            }
+            if (data.domain_detection) {
+                sessionStorage.setItem("multiFileDomainDetection", JSON.stringify(data.domain_detection));
+            }
+            if (data.table_results) {
+                sessionStorage.setItem("multiFileTableResults", JSON.stringify(data.table_results));
+            }
+        } else {
+            sessionStorage.setItem("multiFileMode", "false");
         }
 
         // Display domain results on index.html page

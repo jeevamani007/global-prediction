@@ -1,31 +1,31 @@
-account_number,customer_id,customer_name,account_type,account_status,transaction_id,transaction_date,transaction_type,debit,credit
-1000000001,CUST001,Ravi Kumar,SAVINGS,ACTIVE,TXN001,2023-01-05,CREDIT,0,5000
-1000000002,CUST002,Anitha Rao,CURRENT,ACTIVE,TXN002,2023-01-10,DEBIT,2000,0
-1000000003,CUST003,Suresh Mani,SAVINGS,ACTIVE,TXN003,2023-02-01,CREDIT,0,3000
-1000000004,CUST004,Divya Priya,SALARY,ACTIVE,TXN004,2023-02-15,DEBIT,1500,0
-1000000005,CUST005,Karthik Raj,SAVINGS,ACTIVE,TXN005,2023-03-01,CREDIT,0,8000
-1000000006,CUST006,Priya Sharma,CURRENT,ACTIVE,TXN006,2023-03-10,DEBIT,2500,0
-1000000007,CUST007,Arun Kumar,SAVINGS,ACTIVE,TXN007,2023-03-20,CREDIT,0,4000
-1000000008,CUST008,Meena Devi,SALARY,ACTIVE,TXN008,2023-04-01,DEBIT,1000,0
-1000000009,CUST009,Santhosh R,SAVINGS,ACTIVE,TXN009,2023-04-12,CREDIT,0,6000
-1000000010,CUST010,Lavanya S,CURRENT,ACTIVE,TXN010,2023-04-25,DEBIT,3000,0
-1000000011,CUST011,Naveen Kumar,SAVINGS,ACTIVE,TXN011,2023-05-02,CREDIT,0,7000
-1000000012,CUST012,Rekha Iyer,SALARY,ACTIVE,TXN012,2023-05-15,DEBIT,1200,0
-1000000013,CUST013,Mohan Das,SAVINGS,ACTIVE,TXN013,2023-05-28,CREDIT,0,4500
-1000000014,CUST014,Pooja Nair,CURRENT,ACTIVE,TXN014,2023-06-05,DEBIT,2200,0
-1000000015,CUST015,Ramesh Babu,SAVINGS,ACTIVE,TXN015,2023-06-18,CREDIT,0,5200
-1000000016,CUST016,Sneha Patel,SALARY,ACTIVE,TXN016,2023-07-01,DEBIT,1800,0
-1000000017,CUST017,Vijay Anand,SAVINGS,ACTIVE,TXN017,2023-07-10,CREDIT,0,6500
-1000000018,CUST018,Neethu Roy,CURRENT,ACTIVE,TXN018,2023-07-22,DEBIT,2600,0
-1000000019,CUST019,Bala Murugan,SAVINGS,ACTIVE,TXN019,2023-08-03,CREDIT,0,7200
-1000000020,CUST020,Aishwarya K,SALARY,ACTIVE,TXN020,2023-08-15,DEBIT,1400,0
-1000000021,CUST021,Rahul Mehta,SAVINGS,ACTIVE,TXN021,2023-09-01,CREDIT,0,9000
-1000000022,CUST022,Swetha R,CURRENT,ACTIVE,TXN022,2023-09-12,DEBIT,3200,0
-1000000023,CUST023,Deepak Jain,SAVINGS,ACTIVE,TXN023,2023-09-25,CREDIT,0,4800
-1000000024,CUST024,Keerthana S,SALARY,ACTIVE,TXN024,2023-10-05,DEBIT,1600,0
-1000000025,CUST025,Manoj Kumar,SAVINGS,ACTIVE,TXN025,2023-10-18,CREDIT,0,5600
-1000000026,CUST026,Pallavi G,CURRENT,ACTIVE,TXN026,2023-11-01,DEBIT,2100,0
-1000000027,CUST027,Ajith R,SAVINGS,ACTIVE,TXN027,2023-11-15,CREDIT,0,6100
-1000000028,CUST028,Shalini P,SALARY,ACTIVE,TXN028,2023-12-01,DEBIT,1300,0
-1000000029,CUST029,Saravanan M,SAVINGS,ACTIVE,TXN029,2023-12-15,CREDIT,0,7500
-1000000030,CUST030,Nithya V,CURRENT,ACTIVE,TXN030,2023-12-28,DEBIT,2800,0
+customer_id,customer_name,phone,email,branch_name,account_status,account_type
+CUST001,John Doe,9876543210,john.doe@example.com,Main Branch,Active,Savings
+CUST002,Jane Smith,9876543211,jane.smith@example.com,Main Branch,Active,Current
+CUST003,Robert Brown,9876543212,robert.brown@example.com,East Branch,Active,Savings
+CUST004,Linda Green,9876543213,linda.green@example.com,West Branch,Inactive,Current
+CUST005,Michael White,9876543214,michael.white@example.com,North Branch,Active,Savings
+CUST006,Patricia Black,9876543215,patricia.black@example.com,South Branch,Active,Current
+CUST007,William King,9876543216,william.king@example.com,Main Branch,Active,Savings
+CUST008,Elizabeth Lee,9876543217,elizabeth.lee@example.com,East Branch,Inactive,Current
+CUST009,David Scott,9876543218,david.scott@example.com,West Branch,Active,Savings
+CUST010,Mary Adams,9876543219,mary.adams@example.com,North Branch,Active,Current
+CUST011,James Clark,9876543220,james.clark@example.com,Main Branch,Active,Savings
+CUST012,Jennifer Hall,9876543221,jennifer.hall@example.com,East Branch,Inactive,Current
+CUST013,Richard Allen,9876543222,richard.allen@example.com,West Branch,Active,Savings
+CUST014,Susan Young,9876543223,susan.young@example.com,North Branch,Active,Current
+CUST015,Joseph Wright,9876543224,joseph.wright@example.com,Main Branch,Active,Savings
+CUST016,Karen Hill,9876543225,karen.hill@example.com,East Branch,Active,Current
+CUST017,Thomas Baker,9876543226,thomas.baker@example.com,West Branch,Inactive,Savings
+CUST018,Nancy Rivera,9876543227,nancy.rivera@example.com,North Branch,Active,Current
+CUST019,Charles Cooper,9876543228,charles.cooper@example.com,Main Branch,Active,Savings
+CUST020,Dorothy Cox,9876543229,dorothy.cox@example.com,East Branch,Active,Current
+CUST021,Daniel Ward,9876543230,daniel.ward@example.com,West Branch,Active,Savings
+CUST022,Betty Torres,9876543231,betty.torres@example.com,North Branch,Inactive,Current
+CUST023,Matthew Peterson,9876543232,matthew.peterson@example.com,Main Branch,Active,Savings
+CUST024,Helen Gray,9876543233,helen.gray@example.com,East Branch,Active,Current
+CUST025,Anthony Ramirez,9876543234,anthony.ramirez@example.com,West Branch,Active,Savings
+CUST026,Lisa James,9876543235,lisa.james@example.com,North Branch,Active,Current
+CUST027,Mark Watson,9876543236,mark.watson@example.com,Main Branch,Active,Savings
+CUST028,Laura Brooks,9876543237,laura.brooks@example.com,East Branch,Inactive,Current
+CUST029,Steven Kelly,9876543238,steven.kelly@example.com,West Branch,Active,Savings
+CUST030,Karen Sanders,9876543239,karen.sanders@example.com,North Branch,Active,Current

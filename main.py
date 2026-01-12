@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -19,6 +20,7 @@ from human_resource import HRDomainDetector
 from file_converter import FileConverter
 from data_validation_engine import DataValidationEngine
 from complete_banking_validator import CompleteBankingValidator
+from multi_file_processor import MultiFileProcessor
 
 
 app = FastAPI(title="Domain Detection API")
@@ -292,6 +294,114 @@ async def upload_file(file: UploadFile = File(...)):
                 "human_resource":human_resource_result
             }
         )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+@app.post("/upload-multiple")
+async def upload_multiple_files(files: List[UploadFile] = File(...)):
+    """Multi-file upload endpoint"""
+    try:
+        if not files or len(files) == 0:
+            raise HTTPException(status_code=400, detail="No files uploaded")
+        
+        # Validate all files
+        file_paths = []
+        file_converters = []
+        
+        for file in files:
+            if not file.filename:
+                continue
+            
+            if not is_allowed_file(file.filename):
+                raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}")
+            
+            content = await file.read()
+            if len(content) == 0:
+                continue
+            
+            # Save the uploaded file
+            file_path = os.path.join(UPLOAD_DIR, file.filename)
+            with open(file_path, "wb") as f:
+                f.write(content)
+            
+            # Convert file to CSV format if needed
+            file_ext = os.path.splitext(file.filename)[1].lower()
+            file_converter = None
+            
+            if file_ext in ['.sql', '.xlsx', '.xls']:
+                try:
+                    file_converter = FileConverter()
+                    file_path = file_converter.convert_to_csv(file_path)
+                    file_converters.append(file_converter)
+                    print(f"File converted to CSV: {file_path}")
+                except Exception as e:
+                    raise HTTPException(status_code=400, detail=f"Error processing file {file.filename}: {str(e)}")
+            
+            file_paths.append(file_path)
+        
+        if not file_paths:
+            raise HTTPException(status_code=400, detail="No valid files to process")
+        
+        # Process multiple files using multi-file processor
+        try:
+            multi_file_processor = MultiFileProcessor()
+            result = multi_file_processor.process_files(file_paths)
+            
+            # Clean up temporary files
+            for converter in file_converters:
+                try:
+                    converter.cleanup_temp_files()
+                except Exception as e:
+                    print(f"Warning: Could not clean up temp files: {e}")
+            
+            # Format response to match single-file format (for UI compatibility)
+            if result.get("multi_file_mode"):
+                # Extract primary banking result for backward compatibility
+                banking_result = result.get("banking", {})
+                banking_validator_result = result.get("banking_dataset_validator")
+                core_banking_validator_result = result.get("core_banking_validator")
+                
+                # Build response maintaining same structure as single-file
+                response = {
+                    "message": "Files analyzed successfully",
+                    "multi_file_mode": True,
+                    "total_files": result.get("total_files", len(file_paths)),
+                    "banking": banking_result,
+                    "banking_dataset_validator": banking_validator_result,
+                    "core_banking_validator": core_banking_validator_result,
+                    "domain_detection": result.get("domain_detection"),
+                    "primary_keys": result.get("primary_keys"),
+                    "foreign_keys": result.get("foreign_keys"),
+                    "relationships": result.get("relationships"),
+                    "overall_verdict": result.get("overall_verdict"),
+                    "overall_confidence": result.get("overall_confidence"),
+                    "business_explanation": result.get("business_explanation"),
+                    "table_results": result.get("table_results", [])
+                }
+                
+                # Add all domain results from first table (for UI compatibility)
+                if result.get("table_results") and len(result["table_results"]) > 0:
+                    first_table = result["table_results"][0]
+                    if first_table.get("status") == "SUCCESS":
+                        # Set default domain results (they'll be empty for multi-file)
+                        response["financial"] = None
+                        response["insurance"] = None
+                        response["government"] = None
+                        response["healthcare"] = None
+                        response["retail"] = None
+                        response["space"] = None
+                        response["human_resource"] = None
+                
+                return JSONResponse(content=response)
+            else:
+                return JSONResponse(content=result)
+                
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error during multi-file analysis: {str(e)}")
+    
     except HTTPException:
         raise
     except Exception as e:
