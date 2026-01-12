@@ -92,10 +92,10 @@ class BankingDatasetValidator:
         }
     }
     
-    # Allowed values for enumerated columns
-    ALLOWED_TXN_TYPES = ["deposit", "withdraw", "withdrawal", "transfer", "credit", "debit"]
+    # Allowed values for enumerated columns - Only Debit or Credit allowed
+    ALLOWED_TXN_TYPES = ["debit", "credit"]
     # Canonical account types are stored in uppercase for case-insensitive checks.
-    ALLOWED_ACCOUNT_TYPES = ["SAVINGS", "CURRENT", "LOAN", "FD", "RD"]
+    ALLOWED_ACCOUNT_TYPES = ["SAVINGS", "CURRENT"]  # Only Savings or Current allowed
     # Common synonyms mapped to canonical values (all uppercase for consistency).
     ACCOUNT_TYPE_SYNONYMS = {
         "SAVING": "SAVINGS",
@@ -453,12 +453,15 @@ class BankingDatasetValidator:
             }
         
         # Rule 2: Allowed values only (case-insensitive)
-        valid_ratio = non_null.isin([v.lower() for v in self.ALLOWED_TXN_TYPES]).mean()
+        # Normalize to title case for comparison (case-insensitive) - Only Debit or Credit
+        normalized = non_null.str.title()
+        allowed_types = ["Debit", "Credit"]
+        valid_ratio = normalized.isin(allowed_types).mean()
         if valid_ratio >= 0.95:
             rules_passed += 1
         else:
-            invalid_values = non_null[~non_null.isin([v.lower() for v in self.ALLOWED_TXN_TYPES])].unique().tolist()[:5]
-            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%)")
+            invalid_values = non_null[~normalized.isin(allowed_types)].unique().tolist()[:5]
+            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%). Only 'Debit' or 'Credit' are allowed.")
         
         confidence = (rules_passed / rules_total) * 100
         
@@ -785,7 +788,8 @@ class BankingDatasetValidator:
         failures = []
         
         non_null = series.dropna().astype(str).str.strip()
-        normalized = non_null.str.upper().replace(self.ACCOUNT_TYPE_SYNONYMS)
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
         total = len(series)
         non_null_count = len(non_null)
         
@@ -804,14 +808,16 @@ class BankingDatasetValidator:
                 "confidence": 0.0
             }
         
-        # Rule 2: Allowed values only (case-insensitive with synonyms)
-        valid_mask = normalized.isin(self.ALLOWED_ACCOUNT_TYPES)
+        # Rule 2: Allowed values only (case-insensitive) - Only Savings or Current
+        allowed_types_upper = [t.upper() for t in ["Savings", "Current"]]
+        normalized_upper = normalized.str.upper()
+        valid_mask = normalized_upper.isin(allowed_types_upper)
         valid_ratio = valid_mask.mean()
         if valid_ratio >= 0.95:
             rules_passed += 1
         else:
             invalid_values = non_null[~valid_mask].unique().tolist()[:5]
-            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%)")
+            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%). Only 'Savings' or 'Current' are allowed.")
         
         # Rule 3: Repeats for same account (soft check - always pass)
         rules_passed += 1
@@ -831,7 +837,12 @@ class BankingDatasetValidator:
         rules_total = 3
         failures = []
         
-        non_null = series.dropna().astype(str).str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
+        # Normalize to title case and handle variations
+        normalized = non_null.str.title()
+        normalized = normalized.replace('Inactive', 'Deactive')
+        normalized = normalized.replace('De-Active', 'Deactive')
+        normalized = normalized.replace('De Active', 'Deactive')
         total = len(series)
         non_null_count = len(non_null)
         
@@ -850,13 +861,15 @@ class BankingDatasetValidator:
                 "confidence": 0.0
             }
         
-        # Rule 2: Allowed values only
-        valid_ratio = non_null.isin(self.ALLOWED_ACCOUNT_STATUSES).mean()
+        # Rule 2: Allowed values only - Only Active or Deactive
+        allowed_statuses_upper = [s.upper() for s in ["Active", "Deactive"]]
+        normalized_upper = normalized.str.upper()
+        valid_ratio = normalized_upper.isin(allowed_statuses_upper).mean()
         if valid_ratio >= 0.95:
             rules_passed += 1
         else:
-            invalid_values = non_null[~non_null.isin(self.ALLOWED_ACCOUNT_STATUSES)].unique().tolist()[:5]
-            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%)")
+            invalid_values = non_null[~normalized_upper.isin(allowed_statuses_upper)].unique().tolist()[:5]
+            failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%). Only 'Active' or 'Deactive' are allowed.")
         
         # Rule 3: One status per account (soft check - always pass)
         rules_passed += 1

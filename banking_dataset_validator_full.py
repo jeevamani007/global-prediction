@@ -296,19 +296,19 @@ class BankingDatasetValidator:
         return status, confidence, issues
     
     def validate_ifsc_code(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate IFSC code: exactly 11 characters, alphanumeric"""
+        """Validate IFSC code: alphanumeric, 3-15 characters (flexible format)"""
         issues = []
         non_null = series.dropna().astype(str)
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        # Check if exactly 11 characters
-        length_mask = non_null.str.len() == 11
+        # Check if length is between 3-15 characters (flexible format)
+        length_mask = non_null.str.len().between(3, 15)
         length_ratio = length_mask.mean()
         
         if length_ratio < 0.95:
-            issues.append(f"Values not exactly 11 characters: {(1 - length_ratio) * 100:.1f}%")
+            issues.append(f"Values not between 3-15 characters: {(1 - length_ratio) * 100:.1f}%")
         
         # Check if alphanumeric
         alphanum_mask = non_null.str.match(r'^[A-Za-z0-9]+$')

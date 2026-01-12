@@ -65,10 +65,10 @@ print(f"Rules failed: {results['summary']['rules_failed']}")
 - Minimum 3 characters
 
 ### Account Type
-- Must be from allowed values: SAVINGS, CURRENT, LOAN, FD, RD
+- Must be from allowed values: Savings or Current only
 
 ### Account Status
-- Must be from allowed values: ACTIVE, INACTIVE, CLOSED, SUSPENDED
+- Must be from allowed values: Active or Deactive only
 
 ### Branch Code
 - Must be alphanumeric (spaces allowed for branch names)
@@ -85,7 +85,7 @@ print(f"Rules failed: {results['summary']['rules_failed']}")
 - Must be valid date format (parseable by pandas)
 
 ### Transaction Type
-- Must be from allowed values: DEBIT, CREDIT, DEPOSIT, WITHDRAW, WITHDRAWAL, TRANSFER
+- Must be from allowed values: Debit or Credit only
 
 ### Debit
 - Must be numeric and >= 0

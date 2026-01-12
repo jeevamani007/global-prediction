@@ -60,9 +60,9 @@ class DynamicBusinessRulesValidator:
     }
     
     # Allowed values for enumerated columns
-    ALLOWED_ACCOUNT_TYPES = ["SAVINGS", "CURRENT", "LOAN", "FD", "RD", "SAVING", "CURRENT ACCOUNT", "SAVINGS ACCOUNT"]
-    ALLOWED_ACCOUNT_STATUSES = ["ACTIVE", "INACTIVE", "CLOSED", "SUSPENDED"]
-    ALLOWED_TRANSACTION_TYPES = ["DEBIT", "CREDIT", "DEPOSIT", "WITHDRAW", "WITHDRAWAL", "TRANSFER"]
+    ALLOWED_ACCOUNT_TYPES = ["Savings", "Current"]
+    ALLOWED_ACCOUNT_STATUSES = ["Active", "Deactive"]
+    ALLOWED_TRANSACTION_TYPES = ["Debit", "Credit"]
     
     def __init__(self):
         """Initialize the validator."""
@@ -165,12 +165,15 @@ class DynamicBusinessRulesValidator:
             
             elif role == "account_type":
                 # Must be from allowed account types
-                valid_ratio = non_null_str.str.upper().str.strip().isin([v.upper() for v in self.ALLOWED_ACCOUNT_TYPES]).mean()
+                normalized = non_null_str.str.title().str.strip()
+                valid_ratio = normalized.isin(self.ALLOWED_ACCOUNT_TYPES).mean()
                 return valid_ratio >= 0.8
             
             elif role == "account_status":
                 # Must be from allowed statuses
-                valid_ratio = non_null_str.str.upper().str.strip().isin([v.upper() for v in self.ALLOWED_ACCOUNT_STATUSES]).mean()
+                normalized = non_null_str.str.title().str.strip()
+                normalized = normalized.replace('Inactive', 'Deactive')
+                valid_ratio = normalized.isin(self.ALLOWED_ACCOUNT_STATUSES).mean()
                 return valid_ratio >= 0.8
             
             elif role == "branch_code":
@@ -203,7 +206,8 @@ class DynamicBusinessRulesValidator:
             
             elif role == "transaction_type":
                 # Must be from allowed transaction types
-                valid_ratio = non_null_str.str.upper().str.strip().isin([v.upper() for v in self.ALLOWED_TRANSACTION_TYPES]).mean()
+                normalized = non_null_str.str.title().str.strip()
+                valid_ratio = normalized.isin(self.ALLOWED_TRANSACTION_TYPES).mean()
                 return valid_ratio >= 0.8
             
             elif role == "debit":
@@ -339,18 +343,20 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_account_type(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: Account type must be from allowed values."""
+        """Business Rule: Account type must be from allowed values (Savings or Current only)."""
         violations = []
-        non_null = series.dropna().astype(str).str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
         
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
         # Rule: Must be from allowed types
-        valid_ratio = non_null.isin([v.upper() for v in self.ALLOWED_ACCOUNT_TYPES]).mean()
+        valid_ratio = normalized.isin(self.ALLOWED_ACCOUNT_TYPES).mean()
         if valid_ratio < 0.95:
-            invalid_values = non_null[~non_null.isin([v.upper() for v in self.ALLOWED_ACCOUNT_TYPES])].unique().tolist()[:5]
-            violations.append(f"Invalid account types: {invalid_values}")
+            invalid_values = non_null[~normalized.isin(self.ALLOWED_ACCOUNT_TYPES)].unique().tolist()[:5]
+            violations.append(f"Invalid account types: {invalid_values}. Only 'Savings' or 'Current' are allowed.")
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",
@@ -359,18 +365,25 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_account_status(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: Account status must be from allowed values."""
+        """Business Rule: Account status must be from allowed values (Active or Deactive only)."""
         violations = []
-        non_null = series.dropna().astype(str).str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
         
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
+        # Map common variations to correct values
+        normalized = normalized.replace('Inactive', 'Deactive')
+        normalized = normalized.replace('De-Active', 'Deactive')
+        normalized = normalized.replace('De Active', 'Deactive')
+        
         # Rule: Must be from allowed statuses
-        valid_ratio = non_null.isin([v.upper() for v in self.ALLOWED_ACCOUNT_STATUSES]).mean()
+        valid_ratio = normalized.isin(self.ALLOWED_ACCOUNT_STATUSES).mean()
         if valid_ratio < 0.95:
-            invalid_values = non_null[~non_null.isin([v.upper() for v in self.ALLOWED_ACCOUNT_STATUSES])].unique().tolist()[:5]
-            violations.append(f"Invalid account statuses: {invalid_values}")
+            invalid_values = non_null[~normalized.isin(self.ALLOWED_ACCOUNT_STATUSES)].unique().tolist()[:5]
+            violations.append(f"Invalid account statuses: {invalid_values}. Only 'Active' or 'Deactive' are allowed.")
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",
@@ -398,25 +411,25 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_ifsc_code(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: IFSC code must be alphanumeric (flexible format)."""
+        """Business Rule: IFSC code must be alphanumeric, 3-15 characters (flexible format)."""
         violations = []
-        non_null = series.dropna().astype(str).str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
         
-        # Rule 1: Alphanumeric only
-        alphanumeric_ratio = non_null.str.fullmatch(r"[A-Z0-9]+").mean()
+        # Rule 1: Alphanumeric only (case-insensitive)
+        alphanumeric_ratio = non_null.str.fullmatch(r"[A-Za-z0-9]+").mean()
         if alphanumeric_ratio < 0.95:
             violations.append(f"Non-alphanumeric values: {(1-alphanumeric_ratio)*100:.1f}%")
         
-        # Rule 2: Reasonable length (3-15 characters)
+        # Rule 2: Reasonable length (3-15 characters) - flexible format
         length_ok_ratio = non_null.str.len().between(3, 15).mean()
         if length_ok_ratio < 0.95:
             violations.append(f"Invalid length: {(1-length_ok_ratio)*100:.1f}% (Expected: 3-15 characters)")
         
         # Note: We don't enforce strict IFSC format (4 letters + 0 + 6 digits) 
-        # because users may have their own format codes
+        # because users may have their own format codes (e.g., IFSC0001, IFSC0000001, etc.)
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",
@@ -469,18 +482,20 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_transaction_type(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: Transaction type must be from allowed values."""
+        """Business Rule: Transaction type must be from allowed values (Debit or Credit only)."""
         violations = []
-        non_null = series.dropna().astype(str).str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
         
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
         # Rule: Must be from allowed types
-        valid_ratio = non_null.isin([v.upper() for v in self.ALLOWED_TRANSACTION_TYPES]).mean()
+        valid_ratio = normalized.isin(self.ALLOWED_TRANSACTION_TYPES).mean()
         if valid_ratio < 0.95:
-            invalid_values = non_null[~non_null.isin([v.upper() for v in self.ALLOWED_TRANSACTION_TYPES])].unique().tolist()[:5]
-            violations.append(f"Invalid transaction types: {invalid_values}")
+            invalid_values = non_null[~normalized.isin(self.ALLOWED_TRANSACTION_TYPES)].unique().tolist()[:5]
+            violations.append(f"Invalid transaction types: {invalid_values}. Only 'Debit' or 'Credit' are allowed.")
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",

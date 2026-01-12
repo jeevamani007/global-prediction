@@ -29,12 +29,12 @@ class CompleteBankingValidator:
                 "required": False
             },
             "account_type": {
-                "description": "Account type: Only 'Savings', 'Current', 'Salary'",
+                "description": "Account type: Only 'Savings' or 'Current'",
                 "validation_func": self.validate_account_type,
                 "required": False
             },
             "account_status": {
-                "description": "Account status: Only 'ACTIVE', 'INACTIVE'",
+                "description": "Account status: Only 'Active' or 'Deactive'",
                 "validation_func": self.validate_account_status,
                 "required": False
             },
@@ -44,7 +44,7 @@ class CompleteBankingValidator:
                 "required": False
             },
             "ifsc_code": {
-                "description": "IFSC code: Exactly 11 characters, alphanumeric",
+                "description": "IFSC code: Alphanumeric, 3-15 characters",
                 "validation_func": self.validate_ifsc_code,
                 "required": False
             },
@@ -59,7 +59,7 @@ class CompleteBankingValidator:
                 "required": False
             },
             "transaction_type": {
-                "description": "Transaction type: Only 'DEBIT' or 'CREDIT'",
+                "description": "Transaction type: Only 'Debit' or 'Credit'",
                 "validation_func": self.validate_transaction_type,
                 "required": False
             },
@@ -148,19 +148,75 @@ class CompleteBankingValidator:
     def detect_and_map_columns(self, df: pd.DataFrame) -> Dict[str, str]:
         """
         Detect columns in the dataset and map them to standard banking columns.
+        Uses both column name matching and data pattern validation.
         """
         detected_columns = {}
         
+        # CRITICAL: Define priority order - most specific columns first
+        priority_columns = [
+            "account_type", "account_status", "transaction_type", "transaction_date",
+            "opening_balance", "closing_balance", "customer_name", "customer_id",
+            "account_number", "transaction_id", "ifsc_code", "branch",
+            "debit", "credit", "phone", "kyc_status", "txn_date"
+        ]
+        
         for col in df.columns:
             col_lower = col.lower().strip()
+            col_normalized = col_lower.replace("_", "").replace("-", "").replace(" ", "")
             
-            # Try to match column name variations
             matched = False
-            for standard_col, variations in self.column_variations.items():
-                if any(variation.lower() in col_lower for variation in variations):
-                    detected_columns[col] = standard_col
-                    matched = True
-                    break
+            
+            # First pass: Check priority columns in order (most specific first)
+            for standard_col in priority_columns:
+                if standard_col not in self.column_variations:
+                    continue
+                    
+                variations = self.column_variations[standard_col]
+                norm_variations = [v.lower().replace("_", "").replace("-", "").replace(" ", "") for v in variations]
+                
+                # Check for exact match
+                if col_normalized in norm_variations or col_lower in [v.lower() for v in variations]:
+                    # Validate with data pattern before confirming
+                    if self._validate_column_mapping(df[col], standard_col):
+                        detected_columns[col] = standard_col
+                        matched = True
+                        break
+                
+                # Check for specific pattern matches for critical columns
+                if standard_col == "account_type":
+                    if ("account" in col_normalized and "type" in col_normalized) or \
+                       any(v in col_lower for v in ["account_type", "acct_type", "accounttype"]):
+                        if self._validate_column_mapping(df[col], standard_col):
+                            detected_columns[col] = standard_col
+                            matched = True
+                            break
+                
+                elif standard_col == "account_status":
+                    if ("account" in col_normalized and "status" in col_normalized) or \
+                       any(v in col_lower for v in ["account_status", "acc_status", "accountstate"]):
+                        if self._validate_column_mapping(df[col], standard_col):
+                            detected_columns[col] = standard_col
+                            matched = True
+                            break
+                
+                elif standard_col == "transaction_type":
+                    if ("transaction" in col_normalized and "type" in col_normalized) or \
+                       any(v in col_lower for v in ["transaction_type", "txn_type", "transtype"]):
+                        if self._validate_column_mapping(df[col], standard_col):
+                            detected_columns[col] = standard_col
+                            matched = True
+                            break
+                
+                # For other columns, check if variation is in column name
+                else:
+                    for variation in variations:
+                        if variation.lower() in col_lower or col_lower in variation.lower():
+                            if self._validate_column_mapping(df[col], standard_col):
+                                detected_columns[col] = standard_col
+                                matched = True
+                                break
+                    if matched:
+                        break
             
             # If no direct match, try to infer from data characteristics
             if not matched:
@@ -190,12 +246,17 @@ class CompleteBankingValidator:
                         pd.to_datetime(sample_data)
                         detected_columns[col] = "txn_date"
                     except:
-                        # Check if it looks like transaction types
-                        if sample_data.str.upper().isin(['DEBIT', 'CREDIT']).all():
+                        # Check if it looks like transaction types (Debit/Credit)
+                        normalized_sample = sample_data.str.title().str.strip()
+                        if normalized_sample.isin(['Debit', 'Credit']).mean() >= 0.8:
                             detected_columns[col] = "transaction_type"
-                        # Check if it looks like account types
-                        elif sample_data.str.upper().isin(['SAVINGS', 'CURRENT', 'SALARY', 'SAVING', 'CHECKING']).all():
+                        # Check if it looks like account types (Savings/Current)
+                        elif normalized_sample.isin(['Savings', 'Current']).mean() >= 0.8:
                             detected_columns[col] = "account_type"
+                        # Check if it looks like account status (Active/Deactive)
+                        elif normalized_sample.isin(['Active', 'Deactive']).mean() >= 0.8 or \
+                             normalized_sample.replace('Inactive', 'Deactive').isin(['Active', 'Deactive']).mean() >= 0.8:
+                            detected_columns[col] = "account_status"
                         # Check if it looks like names
                         elif sample_data.str.contains(r'^[A-Za-z\s]+$', regex=True).all():
                             detected_columns[col] = "customer_name"
@@ -208,6 +269,72 @@ class CompleteBankingValidator:
                     detected_columns[col] = "unknown"
         
         return detected_columns
+    
+    def _validate_column_mapping(self, series: pd.Series, standard_col: str) -> bool:
+        """
+        Validate that a column's data pattern matches the expected standard column type.
+        This prevents misclassification (e.g., account_type column being mapped to account_number).
+        """
+        try:
+            non_null = series.dropna()
+            if len(non_null) == 0:
+                return False  # Can't validate empty columns
+            
+            non_null_str = non_null.astype(str).str.strip()
+            
+            if standard_col == "account_type":
+                # Should contain Savings or Current
+                normalized = non_null_str.str.title()
+                valid_ratio = normalized.isin(['Savings', 'Current']).mean()
+                return valid_ratio >= 0.8
+            
+            elif standard_col == "account_status":
+                # Should contain Active or Deactive
+                normalized = non_null_str.str.title()
+                normalized = normalized.replace('Inactive', 'Deactive')
+                valid_ratio = normalized.isin(['Active', 'Deactive']).mean()
+                return valid_ratio >= 0.8
+            
+            elif standard_col == "transaction_type":
+                # Should contain Debit or Credit
+                normalized = non_null_str.str.title()
+                valid_ratio = normalized.isin(['Debit', 'Credit']).mean()
+                return valid_ratio >= 0.8
+            
+            elif standard_col == "account_number":
+                # Should be numeric, 6-18 digits
+                numeric_ratio = non_null_str.str.match(r'^\d+$').mean()
+                length_ok = non_null_str.str.len().between(6, 18).mean()
+                return numeric_ratio >= 0.8 and length_ok >= 0.8
+            
+            elif standard_col == "customer_id":
+                # Should be alphanumeric
+                alphanum_ratio = non_null_str.str.match(r'^[A-Za-z0-9]+$').mean()
+                return alphanum_ratio >= 0.8
+            
+            elif standard_col == "transaction_id":
+                # Should be alphanumeric
+                alphanum_ratio = non_null_str.str.match(r'^[A-Za-z0-9]+$').mean()
+                return alphanum_ratio >= 0.8
+            
+            elif standard_col in ["debit", "credit", "opening_balance", "closing_balance"]:
+                # Should be numeric
+                numeric_series = pd.to_numeric(non_null_str, errors="coerce")
+                numeric_ratio = numeric_series.notna().mean()
+                return numeric_ratio >= 0.8
+            
+            elif standard_col == "txn_date" or standard_col == "transaction_date":
+                # Should be parseable as date
+                date_parsed = pd.to_datetime(non_null_str, errors="coerce")
+                valid_ratio = date_parsed.notna().mean()
+                return valid_ratio >= 0.8
+            
+            # For other columns, accept the mapping (less strict validation)
+            return True
+            
+        except Exception:
+            # If validation fails, don't block the mapping (fallback)
+            return True
     
     def validate_account_number(self, series: pd.Series) -> Tuple[str, float, List[str]]:
         """Validate account number: numeric, 6-18 digits, unique per account"""
@@ -301,20 +428,22 @@ class CompleteBankingValidator:
         return status, confidence, issues
     
     def validate_account_type(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate account type: Only 'Savings', 'Current', 'Salary'"""
+        """Validate account type: Only 'Savings' or 'Current'"""
         issues = []
-        non_null = series.dropna().str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        allowed_types = {'SAVINGS', 'CURRENT', 'SALARY', 'SAVING', 'CHECKING'}
-        valid_mask = non_null.isin(allowed_types)
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
+        allowed_types = {'Savings', 'Current'}
+        valid_mask = normalized.isin(allowed_types)
         valid_ratio = valid_mask.mean()
         
         if valid_ratio < 0.95:
             invalid_values = non_null[~valid_mask].unique().tolist()[:5]
-            issues.append(f"Invalid account types: {invalid_values}")
+            issues.append(f"Invalid account types: {invalid_values}. Only 'Savings' or 'Current' are allowed.")
         
         confidence = valid_ratio
         status = "FAIL" if issues else "MATCH"
@@ -322,20 +451,28 @@ class CompleteBankingValidator:
         return status, confidence, issues
     
     def validate_account_status(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate account status: Only 'ACTIVE', 'INACTIVE'"""
+        """Validate account status: Only 'Active' or 'Deactive'"""
         issues = []
-        non_null = series.dropna().str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        allowed_statuses = {'ACTIVE', 'INACTIVE', 'OPEN', 'CLOSED'}
-        valid_mask = non_null.isin(allowed_statuses)
+        # Normalize to title case for comparison (case-insensitive)
+        # Also handle common variations
+        normalized = non_null.str.title()
+        # Map common variations to correct values
+        normalized = normalized.replace('Inactive', 'Deactive')
+        normalized = normalized.replace('De-Active', 'Deactive')
+        normalized = normalized.replace('De Active', 'Deactive')
+        
+        allowed_statuses = {'Active', 'Deactive'}
+        valid_mask = normalized.isin(allowed_statuses)
         valid_ratio = valid_mask.mean()
         
         if valid_ratio < 0.95:
             invalid_values = non_null[~valid_mask].unique().tolist()[:5]
-            issues.append(f"Invalid account statuses: {invalid_values}")
+            issues.append(f"Invalid account statuses: {invalid_values}. Only 'Active' or 'Deactive' are allowed.")
         
         confidence = valid_ratio
         status = "FAIL" if issues else "MATCH"
@@ -364,22 +501,22 @@ class CompleteBankingValidator:
         return status, confidence, issues
     
     def validate_ifsc_code(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate IFSC code: Exactly 11 characters, alphanumeric"""
+        """Validate IFSC code: Alphanumeric, 3-15 characters (flexible format)"""
         issues = []
-        non_null = series.dropna().astype(str)
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        # Check if exactly 11 characters
-        length_mask = non_null.str.len() == 11
+        # Check if length is between 3-15 characters (flexible range)
+        length_mask = non_null.str.len().between(3, 15)
         length_ratio = length_mask.mean()
         
         if length_ratio < 0.95:
             invalid_values = non_null[~length_mask].head(3).tolist()
-            issues.append(f"Values not exactly 11 characters: {((1-length_ratio)*100):.1f}% - Sample: {invalid_values}")
+            issues.append(f"Values not between 3-15 characters: {((1-length_ratio)*100):.1f}% - Sample: {invalid_values}")
         
-        # Check if alphanumeric
+        # Check if alphanumeric (case-insensitive, allow uppercase)
         alphanum_mask = non_null.str.match(r'^[A-Za-z0-9]+$')
         alphanum_ratio = alphanum_mask.mean()
         
@@ -461,20 +598,22 @@ class CompleteBankingValidator:
         return status, confidence, issues
     
     def validate_transaction_type(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate transaction type: Only 'DEBIT' or 'CREDIT'"""
+        """Validate transaction type: Only 'Debit' or 'Credit'"""
         issues = []
-        non_null = series.dropna().str.upper().str.strip()
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        allowed_types = {'DEBIT', 'CREDIT'}
-        valid_mask = non_null.isin(allowed_types)
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
+        allowed_types = {'Debit', 'Credit'}
+        valid_mask = normalized.isin(allowed_types)
         valid_ratio = valid_mask.mean()
         
         if valid_ratio < 0.95:
             invalid_values = non_null[~valid_mask].unique().tolist()[:5]
-            issues.append(f"Invalid transaction types: {invalid_values}")
+            issues.append(f"Invalid transaction types: {invalid_values}. Only 'Debit' or 'Credit' are allowed.")
         
         confidence = valid_ratio
         status = "FAIL" if issues else "MATCH"

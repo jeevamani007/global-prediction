@@ -272,14 +272,15 @@ class CoreBankingEngine:
             return False
     
     def _matches_transaction_type_pattern(self, series):
-        """Check if series contains transaction type values - ONLY DEBIT/CREDIT categorical values"""
+        """Check if series contains transaction type values - ONLY Debit/Credit categorical values"""
         try:
-            non_null = series.dropna().astype(str).str.upper().str.strip()
+            non_null = series.dropna().astype(str).str.strip()
             if len(non_null) == 0:
                 return False
-            # CRITICAL: Only match DEBIT and CREDIT (case-insensitive)
-            valid_types = ["DEBIT", "CREDIT"]
-            match_ratio = non_null.isin(valid_types).mean()
+            # CRITICAL: Only match Debit and Credit (case-insensitive, normalized to title case)
+            normalized = non_null.str.title()
+            valid_types = ["Debit", "Credit"]
+            match_ratio = normalized.isin(valid_types).mean()
             # Require at least 80% match for transaction_type (strict requirement)
             return match_ratio >= 0.8
         except:
@@ -301,11 +302,14 @@ class CoreBankingEngine:
     def _matches_status_pattern(self, series):
         """Check if series matches account status pattern"""
         try:
-            non_null = series.dropna().astype(str).str.upper().str.strip()
+            non_null = series.dropna().astype(str).str.strip()
             if len(non_null) == 0:
                 return False
-            valid_statuses = ["ACTIVE", "INACTIVE", "CLOSED", "FROZEN", "1", "0", "TRUE", "FALSE", "YES", "NO"]
-            match_ratio = non_null.isin(valid_statuses).mean()
+            # Normalize to title case and handle variations
+            normalized = non_null.str.title()
+            normalized = normalized.replace('Inactive', 'Deactive')
+            valid_statuses = ["Active", "Deactive"]
+            match_ratio = normalized.isin(valid_statuses).mean()
             return match_ratio >= 0.5
         except:
             return False
@@ -506,25 +510,26 @@ class CoreBankingEngine:
         return {"rules_applied": rules_applied, "rules_passed": rules_passed, "rules_failed": rules_failed}
     
     def _validate_transaction_type(self, series):
-        """Validate TRANSACTION_TYPE rules - ONLY DEBIT/CREDIT categorical values"""
+        """Validate TRANSACTION_TYPE rules - ONLY Debit/Credit categorical values"""
         rules_applied = []
         rules_passed = []
         rules_failed = []
         
-        non_null = series.dropna().astype(str).str.upper().str.strip()
-        # CRITICAL: Only validate DEBIT and CREDIT (case-insensitive)
-        valid_types = ["DEBIT", "CREDIT"]
+        non_null = series.dropna().astype(str).str.strip()
+        # CRITICAL: Only validate Debit and Credit (case-insensitive, normalized to title case)
+        normalized = non_null.str.title()
+        valid_types = ["Debit", "Credit"]
         non_null_count = int(len(non_null))  # Convert to Python int
-        valid_ratio = float(non_null.isin(valid_types).mean()) if non_null_count > 0 else 0.0
+        valid_ratio = float(normalized.isin(valid_types).mean()) if non_null_count > 0 else 0.0
         
         rules_applied.append("ALLOWED_VALUES_ONLY")
         if valid_ratio >= 0.9:
             rules_passed.append("ALLOWED_VALUES_ONLY")
         else:
-            invalid_values = non_null[~non_null.isin(valid_types)].unique().tolist()[:5]
+            invalid_values = non_null[~normalized.isin(valid_types)].unique().tolist()[:5]
             rules_failed.append({
                 "rule": "ALLOWED_VALUES_ONLY",
-                "reason": f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio:.2%}). Only DEBIT and CREDIT are allowed."
+                "reason": f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio:.2%}). Only 'Debit' or 'Credit' are allowed."
             })
         
         return {"rules_applied": rules_applied, "rules_passed": rules_passed, "rules_failed": rules_failed}
@@ -560,30 +565,32 @@ class CoreBankingEngine:
         return {"rules_applied": rules_applied, "rules_passed": rules_passed, "rules_failed": rules_failed}
     
     def _validate_account_status(self, series):
-        """Validate ACCOUNT_STATUS rules"""
+        """Validate ACCOUNT_STATUS rules - Only Active or Deactive"""
         rules_applied = []
         rules_passed = []
         rules_failed = []
         
-        non_null = series.dropna().astype(str).str.upper().str.strip()
-        valid_statuses = ["ACTIVE", "INACTIVE", "CLOSED", "FROZEN"]
+        non_null = series.dropna().astype(str).str.strip()
+        # Normalize to title case and handle variations
+        normalized = non_null.str.title()
+        normalized = normalized.replace('Inactive', 'Deactive')
+        normalized = normalized.replace('De-Active', 'Deactive')
+        normalized = normalized.replace('De Active', 'Deactive')
+        
+        valid_statuses = ["Active", "Deactive"]
         
         # Check if values match valid statuses
         non_null_count = int(len(non_null))  # Convert to Python int
-        valid_ratio = float(non_null.isin(valid_statuses).mean()) if non_null_count > 0 else 0.0
+        valid_ratio = float(normalized.isin(valid_statuses).mean()) if non_null_count > 0 else 0.0
         rules_applied.append("VALID_STATUS_VALUES")
         
-        # Also accept boolean-like values
-        boolean_statuses = ["1", "0", "TRUE", "FALSE", "YES", "NO"]
-        boolean_ratio = float(non_null.isin(boolean_statuses).mean()) if non_null_count > 0 else 0.0
-        
-        if valid_ratio >= 0.8 or boolean_ratio >= 0.8:
+        if valid_ratio >= 0.8:
             rules_passed.append("VALID_STATUS_VALUES")
         else:
-            invalid_values = non_null[~non_null.isin(valid_statuses + boolean_statuses)].unique().tolist()[:5]
+            invalid_values = non_null[~normalized.isin(valid_statuses)].unique().tolist()[:5]
             rules_failed.append({
                 "rule": "VALID_STATUS_VALUES",
-                "reason": f"Invalid status values found: {invalid_values}"
+                "reason": f"Invalid status values found: {invalid_values}. Only 'Active' or 'Deactive' are allowed."
             })
         
         return {"rules_applied": rules_applied, "rules_passed": rules_passed, "rules_failed": rules_failed}

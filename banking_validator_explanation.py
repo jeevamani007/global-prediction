@@ -61,12 +61,12 @@ Here are the detailed explanations of each banking column and its purpose:
 
 4. account_type:
    - Purpose: Type of bank account
-   - Business Rule: Only 'Savings', 'Current', 'Salary'
+   - Business Rule: Only 'Savings' or 'Current'
    - Used for: Determining account features and restrictions
 
 5. account_status:
    - Purpose: Current status of the account
-   - Business Rule: Only 'ACTIVE', 'INACTIVE'
+   - Business Rule: Only 'Active' or 'Deactive'
    - Used for: Determining if transactions are allowed
 
 6. branch:
@@ -91,7 +91,7 @@ Here are the detailed explanations of each banking column and its purpose:
 
 10. transaction_type:
     - Purpose: Direction of money flow
-    - Business Rule: Only 'DEBIT' or 'CREDIT'
+    - Business Rule: Only 'Debit' or 'Credit'
     - Used for: Determining if money left or entered the account
 
 11. debit:
