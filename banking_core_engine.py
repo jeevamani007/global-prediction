@@ -149,13 +149,19 @@ class CoreBankingEngine:
                 if self._matches_transaction_id_pattern(column_series):
                     role_scores["TRANSACTION_ID"] = role_scores.get("TRANSACTION_ID", 0) + 60
                 
-                # TRANSACTION_DATE pattern check
-                if self._matches_date_pattern(column_series):
-                    role_scores["TRANSACTION_DATE"] = role_scores.get("TRANSACTION_DATE", 0) + 60
-                
-                # TRANSACTION_TYPE pattern check
+                # CRITICAL PRIORITY RULE: Check transaction_type (DEBIT/CREDIT) BEFORE date
+                # Transaction type should only match DEBIT/CREDIT categorical values
                 if self._matches_transaction_type_pattern(column_series):
                     role_scores["TRANSACTION_TYPE"] = role_scores.get("TRANSACTION_TYPE", 0) + 60
+                    # CRITICAL: If column matches transaction_type pattern, exclude it from date
+                    if "TRANSACTION_DATE" in role_scores:
+                        del role_scores["TRANSACTION_DATE"]
+                # TRANSACTION_DATE pattern check (ONLY if not transaction_type)
+                elif self._matches_date_pattern(column_series):
+                    role_scores["TRANSACTION_DATE"] = role_scores.get("TRANSACTION_DATE", 0) + 60
+                    # CRITICAL: If column matches date pattern, exclude it from transaction_type
+                    if "TRANSACTION_TYPE" in role_scores:
+                        del role_scores["TRANSACTION_TYPE"]
                 
                 # Numeric balance/debit/credit checks
                 if self._matches_numeric_balance_pattern(column_series):
@@ -226,27 +232,56 @@ class CoreBankingEngine:
             return False
     
     def _matches_date_pattern(self, series):
-        """Check if series matches date pattern"""
+        """Check if series matches date pattern strictly using YYYY-MM-DD format and calendar validation"""
         try:
-            non_null = series.dropna()
+            non_null = series.dropna().astype(str).str.strip()
             if len(non_null) == 0:
                 return False
-            # Try to parse as date
+            
+            # CRITICAL: Require strict YYYY-MM-DD format (or parseable variants with separators)
+            # Check for date format with separators (YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, etc.)
+            date_format_pattern = r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}|^\d{1,2}[-/]\d{1,2}[-/]\d{4}'
+            has_date_format = non_null.str.contains(date_format_pattern, na=False, regex=True).mean()
+            
+            if has_date_format < 0.7:  # At least 70% must have date format
+                return False
+            
+            # Try to parse as date with calendar validation
             date_parsed = pd.to_datetime(non_null, errors="coerce")
             valid_date_ratio = date_parsed.notna().mean()
-            return valid_date_ratio >= 0.7
+            
+            # Calendar validation: check if parsed dates are valid calendar dates
+            if valid_date_ratio >= 0.7:
+                # Additional validation: dates should be reasonable (not all same date, not future dates)
+                valid_dates = date_parsed.dropna()
+                if len(valid_dates) > 0:
+                    # Check if dates are reasonable (not too far in future, not ancient)
+                    now = pd.Timestamp.now()
+                    future_dates = (valid_dates > now).sum()
+                    ancient_dates = (valid_dates < pd.Timestamp('1900-01-01')).sum()
+                    total_valid = len(valid_dates)
+                    
+                    # If too many future or ancient dates, might not be transaction dates
+                    if future_dates / total_valid > 0.5 or ancient_dates / total_valid > 0.5:
+                        return False
+                    
+                    return valid_date_ratio >= 0.9  # Require 90% valid dates for transaction_date
+            
+            return False
         except:
             return False
     
     def _matches_transaction_type_pattern(self, series):
-        """Check if series contains transaction type values"""
+        """Check if series contains transaction type values - ONLY DEBIT/CREDIT categorical values"""
         try:
-            non_null = series.dropna().astype(str).str.lower().str.strip()
+            non_null = series.dropna().astype(str).str.upper().str.strip()
             if len(non_null) == 0:
                 return False
-            valid_types = ["deposit", "withdraw", "withdrawal", "transfer"]
+            # CRITICAL: Only match DEBIT and CREDIT (case-insensitive)
+            valid_types = ["DEBIT", "CREDIT"]
             match_ratio = non_null.isin(valid_types).mean()
-            return match_ratio >= 0.5
+            # Require at least 80% match for transaction_type (strict requirement)
+            return match_ratio >= 0.8
         except:
             return False
     
@@ -318,12 +353,24 @@ class CoreBankingEngine:
                 rules_failed.extend(result["rules_failed"])
             
             elif role == "TRANSACTION_DATE":
+                # CRITICAL: Validate that it's actually a date and NOT transaction_type
+                if self._matches_transaction_type_pattern(column_series):
+                    rules_failed.append({
+                        "rule": "NOT_TRANSACTION_TYPE",
+                        "reason": "Column matches TRANSACTION_TYPE pattern (DEBIT/CREDIT) - cross-mapping detected"
+                    })
                 result = self._validate_transaction_date(column_series)
                 rules_applied.extend(result["rules_applied"])
                 rules_passed.extend(result["rules_passed"])
                 rules_failed.extend(result["rules_failed"])
             
             elif role == "TRANSACTION_TYPE":
+                # CRITICAL: Validate that it's actually transaction_type and NOT a date
+                if self._matches_date_pattern(column_series):
+                    rules_failed.append({
+                        "rule": "NOT_DATE",
+                        "reason": "Column matches TRANSACTION_DATE pattern - cross-mapping detected"
+                    })
                 result = self._validate_transaction_type(column_series)
                 rules_applied.extend(result["rules_applied"])
                 rules_passed.extend(result["rules_passed"])
@@ -459,13 +506,14 @@ class CoreBankingEngine:
         return {"rules_applied": rules_applied, "rules_passed": rules_passed, "rules_failed": rules_failed}
     
     def _validate_transaction_type(self, series):
-        """Validate TRANSACTION_TYPE rules"""
+        """Validate TRANSACTION_TYPE rules - ONLY DEBIT/CREDIT categorical values"""
         rules_applied = []
         rules_passed = []
         rules_failed = []
         
-        non_null = series.dropna().astype(str).str.lower().str.strip()
-        valid_types = ["deposit", "withdraw", "withdrawal", "transfer"]
+        non_null = series.dropna().astype(str).str.upper().str.strip()
+        # CRITICAL: Only validate DEBIT and CREDIT (case-insensitive)
+        valid_types = ["DEBIT", "CREDIT"]
         non_null_count = int(len(non_null))  # Convert to Python int
         valid_ratio = float(non_null.isin(valid_types).mean()) if non_null_count > 0 else 0.0
         
@@ -476,7 +524,7 @@ class CoreBankingEngine:
             invalid_values = non_null[~non_null.isin(valid_types)].unique().tolist()[:5]
             rules_failed.append({
                 "rule": "ALLOWED_VALUES_ONLY",
-                "reason": f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio:.2%})"
+                "reason": f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio:.2%}). Only DEBIT and CREDIT are allowed."
             })
         
         return {"rules_applied": rules_applied, "rules_passed": rules_passed, "rules_failed": rules_failed}

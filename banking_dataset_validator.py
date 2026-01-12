@@ -94,7 +94,22 @@ class BankingDatasetValidator:
     
     # Allowed values for enumerated columns
     ALLOWED_TXN_TYPES = ["deposit", "withdraw", "withdrawal", "transfer", "credit", "debit"]
-    ALLOWED_ACCOUNT_TYPES = ["Savings", "Current", "Salary", "Loan"]
+    # Canonical account types are stored in uppercase for case-insensitive checks.
+    ALLOWED_ACCOUNT_TYPES = ["SAVINGS", "CURRENT", "LOAN", "FD", "RD"]
+    # Common synonyms mapped to canonical values (all uppercase for consistency).
+    ACCOUNT_TYPE_SYNONYMS = {
+        "SAVING": "SAVINGS",
+        "SAVINGS ACCOUNT": "SAVINGS",
+        "CURRENT ACCOUNT": "CURRENT",
+        "CHEQUING": "CURRENT",
+        "CHEQUING ACCOUNT": "CURRENT",
+        "LOAN ACCOUNT": "LOAN",
+        "FIXED DEPOSIT": "FD",
+        "FD ACCOUNT": "FD",
+        "TERM DEPOSIT": "FD",
+        "RECURRING DEPOSIT": "RD",
+        "RD ACCOUNT": "RD",
+    }
     ALLOWED_ACCOUNT_STATUSES = ["ACTIVE", "INACTIVE", "CLOSED"]
     
     # Column weights for confidence calculation (core columns have higher weights)
@@ -154,6 +169,27 @@ class BankingDatasetValidator:
         if ("updated" in normalized or "modified" in normalized) and any(kw in normalized for kw in ["updated_at", "updated_date", "updated", "date_updated", "updated_on", "modified_at", "modified"]):
             return "updated_at"
         
+        # CRITICAL PRIORITY: Check transaction_type BEFORE transaction_date to prevent cross-mapping
+        # If column name contains both "transaction" and "type", it's transaction_type, not transaction_date
+        if "transaction" in normalized and "type" in normalized:
+            # Check if it matches transaction_type variations
+            txn_type_variations = ["txn_type", "transaction_type", "trans_type", "transactiontype", "type"]
+            for variation in txn_type_variations:
+                if normalized == variation.lower() or variation.lower() in normalized or normalized in variation.lower():
+                    return "txn_type"
+        
+        # CRITICAL PRIORITY: Check transaction_date AFTER transaction_type check
+        # If column name contains both "transaction" and "date", it's transaction_date
+        if "transaction" in normalized and "date" in normalized:
+            # Check if it matches transaction_date variations
+            txn_date_variations = ["transaction_date", "txn_date", "trans_date", "transactiondate", "date"]
+            for variation in txn_date_variations:
+                if normalized == variation.lower() or variation.lower() in normalized or normalized in variation.lower():
+                    # Don't match transaction_date for created_at/updated_at (they're audit fields)
+                    if "created" in normalized or "updated" in normalized or "modified" in normalized:
+                        continue  # Skip - these are handled above
+                    return "transaction_date"
+        
         # Direct match
         if normalized in self.COLUMN_DEFINITIONS:
             return normalized
@@ -169,6 +205,12 @@ class BankingDatasetValidator:
                     # Don't match transaction_date for created_at/updated_at (they're audit fields)
                     if key == "transaction_date" and ("created" in normalized or "updated" in normalized or "modified" in normalized):
                         continue  # Skip - these are handled above
+                    # CRITICAL: Don't match transaction_date if column name suggests transaction_type
+                    if key == "transaction_date" and "type" in normalized:
+                        continue  # Skip - transaction_type takes priority
+                    # CRITICAL: Don't match transaction_type if column name suggests transaction_date
+                    if key == "txn_type" and "date" in normalized and "type" not in normalized:
+                        continue  # Skip - transaction_date takes priority when date is present but type is not
                     return key
         
         return None
@@ -705,12 +747,13 @@ class BankingDatasetValidator:
         rules_total = 2
         failures = []
         
-        non_null = series.dropna().astype(str)
+        non_null = series.dropna().astype(str).str.strip()
         non_null_count = len(non_null)
         total = len(series)
         
-        # Rule 1: Alphanumeric
-        alphanumeric_ratio = non_null.str.fullmatch(r"[A-Za-z0-9]+").mean() if non_null_count > 0 else 0
+        # Rule 1: Alphanumeric with spaces and hyphens allowed (for branch names like "Main Branch", "West Branch")
+        # Pattern allows: letters, numbers, spaces, hyphens
+        alphanumeric_ratio = non_null.str.fullmatch(r"[A-Za-z0-9\s-]+").mean() if non_null_count > 0 else 0
         if alphanumeric_ratio >= 0.95:
             rules_passed += 1
         else:
@@ -719,7 +762,7 @@ class BankingDatasetValidator:
         # Rule 2: Short code (reasonable length)
         if non_null_count > 0:
             avg_length = non_null.str.len().mean()
-            if avg_length <= 20:  # Reasonable length
+            if avg_length <= 30:  # Increased to 30 to accommodate branch names with spaces
                 rules_passed += 1
             else:
                 failures.append(f"Average length too long: {avg_length:.1f}")
@@ -742,6 +785,7 @@ class BankingDatasetValidator:
         failures = []
         
         non_null = series.dropna().astype(str).str.strip()
+        normalized = non_null.str.upper().replace(self.ACCOUNT_TYPE_SYNONYMS)
         total = len(series)
         non_null_count = len(non_null)
         
@@ -760,12 +804,13 @@ class BankingDatasetValidator:
                 "confidence": 0.0
             }
         
-        # Rule 2: Allowed values only
-        valid_ratio = non_null.isin(self.ALLOWED_ACCOUNT_TYPES).mean()
+        # Rule 2: Allowed values only (case-insensitive with synonyms)
+        valid_mask = normalized.isin(self.ALLOWED_ACCOUNT_TYPES)
+        valid_ratio = valid_mask.mean()
         if valid_ratio >= 0.95:
             rules_passed += 1
         else:
-            invalid_values = non_null[~non_null.isin(self.ALLOWED_ACCOUNT_TYPES)].unique().tolist()[:5]
+            invalid_values = non_null[~valid_mask].unique().tolist()[:5]
             failures.append(f"Invalid values found: {invalid_values} (valid ratio: {valid_ratio*100:.1f}%)")
         
         # Rule 3: Repeats for same account (soft check - always pass)

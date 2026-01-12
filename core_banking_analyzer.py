@@ -121,27 +121,56 @@ class CoreBankingDataAnalyzer:
             return False
     
     def _matches_date_pattern(self, series):
-        """Check if series matches date pattern."""
+        """Check if series matches date pattern strictly using YYYY-MM-DD format and calendar validation."""
         try:
-            non_null = series.dropna()
+            non_null = series.dropna().astype(str).str.strip()
             if len(non_null) == 0:
                 return False
-            # Try to parse as date
+            
+            # CRITICAL: Require strict YYYY-MM-DD format (or parseable variants with separators)
+            # Check for date format with separators (YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, etc.)
+            date_format_pattern = r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}|^\d{1,2}[-/]\d{1,2}[-/]\d{4}'
+            has_date_format = non_null.str.contains(date_format_pattern, na=False, regex=True).mean()
+            
+            if has_date_format < 0.7:  # At least 70% must have date format
+                return False
+            
+            # Try to parse as date with calendar validation
             date_parsed = pd.to_datetime(non_null, errors="coerce")
             valid_date_ratio = date_parsed.notna().mean()
-            return valid_date_ratio >= 0.7
+            
+            # Calendar validation: check if parsed dates are valid calendar dates
+            if valid_date_ratio >= 0.7:
+                # Additional validation: dates should be reasonable (not all same date, not future dates)
+                valid_dates = date_parsed.dropna()
+                if len(valid_dates) > 0:
+                    # Check if dates are reasonable (not too far in future, not ancient)
+                    now = pd.Timestamp.now()
+                    future_dates = (valid_dates > now).sum()
+                    ancient_dates = (valid_dates < pd.Timestamp('1900-01-01')).sum()
+                    total_valid = len(valid_dates)
+                    
+                    # If too many future or ancient dates, might not be transaction dates
+                    if future_dates / total_valid > 0.5 or ancient_dates / total_valid > 0.5:
+                        return False
+                    
+                    return valid_date_ratio >= 0.9  # Require 90% valid dates for transaction_date
+            
+            return False
         except:
             return False
     
     def _matches_transaction_type_pattern(self, series):
-        """Check if series contains transaction type values."""
+        """Check if series contains transaction type values - ONLY DEBIT/CREDIT categorical values."""
         try:
-            non_null = series.dropna().astype(str).str.lower().str.strip()
+            non_null = series.dropna().astype(str).str.upper().str.strip()
             if len(non_null) == 0:
                 return False
-            valid_types = ["deposit", "withdraw", "withdrawal", "transfer", "credit", "debit", "payment", "purchase", "sale"]
+            # CRITICAL: Only match DEBIT and CREDIT (case-insensitive)
+            valid_types = ["DEBIT", "CREDIT"]
             match_ratio = non_null.isin(valid_types).mean()
-            return match_ratio >= 0.5
+            # Require at least 80% match for transaction_type (strict requirement)
+            return match_ratio >= 0.8
         except:
             return False
     
@@ -279,13 +308,22 @@ class CoreBankingDataAnalyzer:
                 if self._matches_customer_id_pattern(column_series):
                     role_scores["CUSTOMER_ID"] = role_scores.get("CUSTOMER_ID", 0) + 50
                 
-                # TRANSACTION_DATE pattern check
+                # TRANSACTION_DATE pattern check (PRIORITY: Check date first)
                 if self._matches_date_pattern(column_series):
                     role_scores["TRANSACTION_DATE"] = role_scores.get("TRANSACTION_DATE", 0) + 50
+                    # CRITICAL: If column matches date pattern, exclude it from transaction_type
+                    # Remove transaction_type score to prevent cross-mapping
+                    if "TRANSACTION_TYPE" in role_scores:
+                        del role_scores["TRANSACTION_TYPE"]
                 
-                # TRANSACTION_TYPE pattern check
-                if self._matches_transaction_type_pattern(column_series):
+                # TRANSACTION_TYPE pattern check (ONLY if not already identified as date)
+                # Only check if date pattern didn't match
+                elif self._matches_transaction_type_pattern(column_series):
                     role_scores["TRANSACTION_TYPE"] = role_scores.get("TRANSACTION_TYPE", 0) + 50
+                    # CRITICAL: If column matches transaction_type pattern, ensure it's NOT a date
+                    # Remove transaction_date score to prevent cross-mapping
+                    if "TRANSACTION_DATE" in role_scores:
+                        del role_scores["TRANSACTION_DATE"]
                 
                 # Numeric balance/debit/credit checks
                 if self._matches_numeric_balance_pattern(column_series):
@@ -336,9 +374,19 @@ class CoreBankingDataAnalyzer:
                 if not self._matches_transaction_id_pattern(column_series):
                     validation_passed = False
             elif best_role_name == "TRANSACTION_TYPE":
-                # Validate that it's actually a transaction type
+                # Validate that it's actually a transaction type (DEBIT/CREDIT only)
                 if not self._matches_transaction_type_pattern(column_series):
                     validation_passed = False
+                # CRITICAL: Also ensure it's NOT a date to prevent cross-mapping
+                if self._matches_date_pattern(column_series):
+                    validation_passed = False  # Reject if it's actually a date
+            elif best_role_name == "TRANSACTION_DATE":
+                # Validate that it's actually a date
+                if not self._matches_date_pattern(column_series):
+                    validation_passed = False
+                # CRITICAL: Also ensure it's NOT a transaction type to prevent cross-mapping
+                if self._matches_transaction_type_pattern(column_series):
+                    validation_passed = False  # Reject if it matches transaction_type pattern
             elif best_role_name == "ACCOUNT_NUMBER":
                 # Validate that it's actually an account number
                 if not self._matches_account_number_pattern(column_series):

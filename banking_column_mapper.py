@@ -400,12 +400,12 @@ class BankingColumnMapper:
     def check_transaction_date_pattern(self, series):
         """
         Check if series matches TRANSACTION_DATE pattern:
-        - Date format
-        - Chronological sequence (optional check)
+        - STRICT YYYY-MM-DD format (or parseable variants with separators)
+        - Calendar validation (valid dates, not future/ancient)
         - NOT purely numeric (dates should have separators or be string-like)
         """
         try:
-            non_null = series.dropna().astype(str)
+            non_null = series.dropna().astype(str).str.strip()
             if len(non_null) == 0:
                 return False, 0.0
             
@@ -415,34 +415,42 @@ class BankingColumnMapper:
                 # Purely numeric values are unlikely to be dates in banking context
                 return False, 0.0
             
-            # Check if contains date separators (/, -, or spaces) or looks like date format
-            has_separators = non_null.str.contains(r'[/-]|^\d{4}-\d{2}-\d{2}', na=False, regex=True).mean()
+            # CRITICAL: Require strict date format with separators (YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, etc.)
+            date_format_pattern = r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}|^\d{1,2}[-/]\d{1,2}[-/]\d{4}'
+            has_date_format = non_null.str.contains(date_format_pattern, na=False, regex=True).mean()
             
-            # Try to parse as date
+            if has_date_format < 0.7:  # At least 70% must have date format
+                return False, 0.0
+            
+            # Try to parse as date with calendar validation
             date_parsed = pd.to_datetime(non_null, errors="coerce")
             valid_date_ratio = date_parsed.notna().mean()
             
             confidence = 0.0
-            # Require both valid date parsing AND separators/format
-            if valid_date_ratio >= 0.95 and has_separators >= 0.7:
+            # Require both valid date parsing AND date format separators
+            if valid_date_ratio >= 0.95 and has_date_format >= 0.9:
                 confidence = 95.0
-            elif valid_date_ratio >= 0.9 and has_separators >= 0.6:
+            elif valid_date_ratio >= 0.9 and has_date_format >= 0.8:
                 confidence = 85.0
-            elif valid_date_ratio >= 0.8 and has_separators >= 0.5:
+            elif valid_date_ratio >= 0.8 and has_date_format >= 0.7:
                 confidence = 75.0
-            elif valid_date_ratio >= 0.7 and has_separators >= 0.4:
-                confidence = 60.0
             
-            # Bonus if chronological (dates are in order)
-            if valid_date_ratio >= 0.7 and confidence > 0:
+            # Calendar validation: check if parsed dates are reasonable
+            if confidence > 0:
                 try:
-                    date_parsed_clean = date_parsed.dropna()
-                    if len(date_parsed_clean) > 1:
-                        sorted_indices = date_parsed_clean.sort_values().index
-                        original_indices = date_parsed_clean.index
-                        # Check if mostly in order
-                        if len(sorted_indices) > 0:
-                            confidence = min(confidence + 5.0, 100.0)
+                    valid_dates = date_parsed.dropna()
+                    if len(valid_dates) > 0:
+                        # Check if dates are reasonable (not too far in future, not ancient)
+                        now = pd.Timestamp.now()
+                        future_dates = (valid_dates > now).sum()
+                        ancient_dates = (valid_dates < pd.Timestamp('1900-01-01')).sum()
+                        total_valid = len(valid_dates)
+                        
+                        # Penalize if too many future or ancient dates
+                        if future_dates / total_valid > 0.3:
+                            confidence *= 0.7  # Reduce confidence if many future dates
+                        if ancient_dates / total_valid > 0.3:
+                            confidence *= 0.7  # Reduce confidence if many ancient dates
                 except Exception:
                     pass
             
@@ -514,10 +522,26 @@ class BankingColumnMapper:
                 }
                 
                 # Check each purpose pattern (order matters - check most specific first)
-                # TRANSACTION_DATE (check before numeric patterns)
-                matches, conf = self.check_transaction_date_pattern(series)
-                if matches and conf > 0:
-                    column_analyses[col]["scores"]["TRANSACTION_DATE"] = conf
+                # CRITICAL PRIORITY RULE: Check transaction_type (DEBIT/CREDIT) BEFORE date
+                # Transaction type should only match DEBIT/CREDIT categorical values
+                non_null = series.dropna().astype(str).str.upper().str.strip()
+                if len(non_null) > 0:
+                    valid_types = ["DEBIT", "CREDIT"]
+                    match_ratio = non_null.isin(valid_types).mean()
+                    if match_ratio >= 0.8:  # At least 80% must be DEBIT/CREDIT
+                        # This is transaction_type, NOT date
+                        column_analyses[col]["scores"]["TRANSACTION_TYPE"] = min(match_ratio * 100, 100.0)
+                        # Skip date check for this column
+                    else:
+                        # TRANSACTION_DATE (check only if not transaction_type)
+                        matches, conf = self.check_transaction_date_pattern(series)
+                        if matches and conf > 0:
+                            column_analyses[col]["scores"]["TRANSACTION_DATE"] = conf
+                else:
+                    # TRANSACTION_DATE (check if column is empty - unlikely but handle it)
+                    matches, conf = self.check_transaction_date_pattern(series)
+                    if matches and conf > 0:
+                        column_analyses[col]["scores"]["TRANSACTION_DATE"] = conf
                 
                 # TRANSACTION_ID (check before account_number to avoid confusion)
                 matches, conf = self.check_transaction_id_pattern(series)
@@ -639,14 +663,32 @@ class BankingColumnMapper:
                     if "amount" in norm_col and "TRANSACTION_ID" in analysis["scores"]:
                         del analysis["scores"]["TRANSACTION_ID"]
                     
-                    # CRITICAL RULE: Remove TRANSACTION_DATE if column is clearly numeric
-                    # (dates should not match purely numeric columns)
+                    # CRITICAL RULE: Prevent cross-mapping between TRANSACTION_DATE and TRANSACTION_TYPE
+                    # If column matches TRANSACTION_TYPE (DEBIT/CREDIT), remove TRANSACTION_DATE
+                    if "TRANSACTION_TYPE" in analysis["scores"]:
+                        if "TRANSACTION_DATE" in analysis["scores"]:
+                            del analysis["scores"]["TRANSACTION_DATE"]
+                    
+                    # CRITICAL RULE: If column matches TRANSACTION_DATE, ensure it's NOT transaction_type
                     if "TRANSACTION_DATE" in analysis["scores"]:
+                        # Check if values match DEBIT/CREDIT pattern
+                        non_null = df[col].dropna().astype(str).str.upper().str.strip()
+                        if len(non_null) > 0:
+                            valid_types = ["DEBIT", "CREDIT"]
+                            match_ratio = non_null.isin(valid_types).mean()
+                            if match_ratio >= 0.8:  # If 80%+ match DEBIT/CREDIT, it's transaction_type not date
+                                del analysis["scores"]["TRANSACTION_DATE"]
+                                # Add transaction_type score if not already present
+                                if "TRANSACTION_TYPE" not in analysis["scores"]:
+                                    analysis["scores"]["TRANSACTION_TYPE"] = min(match_ratio * 100, 100.0)
+                        
+                        # Also remove TRANSACTION_DATE if column is clearly numeric without date format
                         numeric_series = pd.to_numeric(df[col], errors="coerce")
                         if numeric_series.notna().mean() > 0.9:
                             # Check if it's actually a date by looking at string format
                             non_null_str = df[col].dropna().astype(str)
-                            has_date_format = non_null_str.str.contains(r'[/-]|^\d{4}-\d{2}-\d{2}', na=False, regex=True).mean()
+                            date_format_pattern = r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}|^\d{1,2}[-/]\d{1,2}[-/]\d{4}'
+                            has_date_format = non_null_str.str.contains(date_format_pattern, na=False, regex=True).mean()
                             if has_date_format < 0.5:  # Doesn't look like date format
                                 del analysis["scores"]["TRANSACTION_DATE"]
                     
