@@ -18,7 +18,7 @@ from space import SpaceDomainDetector
 from human_resource import HRDomainDetector
 from file_converter import FileConverter
 from data_validation_engine import DataValidationEngine
-from banking_dataset_validator_full import BankingDatasetValidator
+from complete_banking_validator import CompleteBankingValidator
 
 
 app = FastAPI(title="Domain Detection API")
@@ -102,47 +102,40 @@ async def upload_file(file: UploadFile = File(...)):
             banking_validator_result = None
             if banking_result and isinstance(banking_result, dict) and banking_result.get("decision") not in (None, "UNKNOWN"):
                 try:
-                    # Use our new comprehensive banking validator
-                    comprehensive_validator = BankingDatasetValidator()
-                    banking_validator_result = comprehensive_validator.validate_dataset(file_path)
+                    # Use our new complete banking validator
+                    complete_validator = CompleteBankingValidator()
+                    banking_validator_result = complete_validator.validate_dataset(file_path)
                     
                     # Map the results to match the expected format for UI
                     if "error" not in banking_validator_result:
                         # Extract column-level validation results
-                        validation_report = banking_validator_result.get("validation_report", {})
-                        columns_data = validation_report.get("columns", [])
+                        column_validation_results = banking_validator_result.get("column_wise_validation", [])
                         
                         columns_result = []
-                        for col in columns_data:
-                            status = col.get("status", "UNKNOWN").upper()
-                            if status == "FAIL":
-                                status = "FAIL"
-                            elif status == "PARTIAL":
-                                status = "WARNING"  # Map PARTIAL to WARNING for UI
-                            else:
-                                status = "MATCH"  # Map everything else to MATCH
-                                
+                        for col in column_validation_results:
+                            status = col.get("validation_result", "FAIL").upper()
+                            
                             columns_result.append({
                                 "name": col.get("column_name", "Unknown"),
-                                "meaning": col.get("column_purpose", "Unknown"),
+                                "meaning": col.get("standard_name", "Unknown"),
                                 "status": status,
-                                "confidence": round(col.get("confidence", 0) * 100, 1),  # Convert to percentage
+                                "confidence": col.get("confidence_percentage", 0),  # Already in percentage
                                 "rules_passed": 1,  # Placeholder - would need actual count
                                 "rules_total": 1,   # Placeholder - would need actual count
-                                "failures": col.get("issues", []),
-                                "applied_rules": [col.get("business_rules_applied", "General Rule")],
-                                "reasons": col.get("reasons", [])
+                                "failures": col.get("detected_issue", []),
+                                "applied_rules": [col.get("business_rule", "General Rule")],
+                                "reasons": col.get("detected_issue", [])
                             })
                         
                         # Calculate overall dataset confidence
-                        summary = validation_report.get("summary", {})
-                        avg_confidence = summary.get("overall_compliance_percentage", 0)
+                        summary = banking_validator_result.get("summary", {})
+                        avg_confidence = summary.get("overall_confidence", 0)
                         
-                        # Determine final decision based on overall compliance
-                        overall_compliance = summary.get("overall_compliance_percentage", 0)
-                        if overall_compliance >= 95:
+                        # Determine final decision based on overall confidence
+                        overall_confidence = summary.get("overall_confidence", 0)
+                        if overall_confidence >= 95:
                             final_decision = "PASS"
-                        elif overall_compliance >= 80:
+                        elif overall_confidence >= 80:
                             final_decision = "PASS WITH WARNINGS"
                         else:
                             final_decision = "FAIL"
@@ -150,13 +143,13 @@ async def upload_file(file: UploadFile = File(...)):
                         banking_validator_result = {
                             "final_decision": final_decision,
                             "dataset_confidence": round(avg_confidence, 1),
-                            "explanation": f"Banking validation completed. {summary.get('total_columns', 0)} columns analyzed, {summary.get('matched_columns', 0)} matched, {summary.get('failed_columns', 0)} failed.",
+                            "explanation": f"Banking validation completed. {summary.get('total_columns_analyzed', 0)} columns analyzed, {summary.get('total_passed', 0)} passed, {summary.get('total_failed', 0)} failed.",
                             "columns": columns_result,
-                            "relationships": validation_report.get("cross_validations", []),
+                            "relationships": banking_validator_result.get("cross_column_validations", []),
                             "total_records": summary.get("total_records", 0)
                         }
                 except Exception as e:
-                    print(f"Warning: Comprehensive banking validator error: {str(e)}")
+                    print(f"Warning: Complete banking validator error: {str(e)}")
                     # Fall back to original validator
                     try:
                         validator = BankingDatasetValidator()
