@@ -1991,8 +1991,143 @@
                     businessRulesContent.innerHTML = `<div class="section-header"><h2 class="section-title">💼 Business Rules</h2></div><p>No business rules data available.</p>`;
                 }
                 
-                // Column Analysis Tab
-                if (validatorData && !validatorData.error) {
+                // Column Analysis Tab - Support Multi-Table with Detailed Analysis
+                if (isMultiFileModeForTabs && multiFileTableResultsForTabs.length > 0) {
+                    let columnAnalysisHtml = `
+                    <div class="section-header">
+                        <h2 class="section-title">🔍 Code Analysis - Detailed Column Analysis</h2>
+                    </div>
+                    <div class="content-section">
+                        <div style="margin-bottom:20px; padding:14px; background:#e3f2fd; border-radius:8px; border-left:4px solid #2196F3;">
+                            <div style="font-weight:600; color:#1976D2; margin-bottom:6px; font-size:0.95rem;">💡 Code Analysis Explained:</div>
+                            <div style="font-size:0.9rem; color:#1565C0; line-height:1.7;">
+                                This section shows comprehensive analysis for each table including: <strong>Data Types</strong> (int64, object, float64), 
+                                <strong>Null Percentage</strong> (data completeness), <strong>Uniqueness Percentage</strong> (duplicate detection), 
+                                <strong>Pattern Detection</strong> (id, number, date, amount, text), and <strong>Sample Values</strong> (actual data examples). 
+                                This helps understand the structure and quality of each column in your tables.
+                            </div>
+                        </div>
+                    `;
+                    
+                    multiFileTableResultsForTabs.forEach((table, idx) => {
+                        const columnAnalysis = table.column_analysis || [];
+                        const tableName = table.table_name || `Table ${idx + 1}`;
+                        const totalRows = table.total_rows || 0;
+                        const totalColumns = table.total_columns || 0;
+                        
+                        columnAnalysisHtml += `
+                            <div style="margin-bottom:32px; padding:20px; background:white; border-radius:8px; border:2px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                                <div style="margin-bottom:20px; padding-bottom:16px; border-bottom:2px solid #e2e8f0;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                                        <h3 style="margin:0; color:#2d3748; font-size:1.4rem; font-weight:600; display:flex; align-items:center; gap:10px;">
+                                            <span>📋</span> ${tableName}
+                                        </h3>
+                                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                                            <span style="background:#2196F3; color:white; padding:6px 14px; border-radius:20px; font-size:0.9rem; font-weight:600;">
+                                                ${totalRows} rows
+                                            </span>
+                                            <span style="background:#4caf50; color:white; padding:6px 14px; border-radius:20px; font-size:0.9rem; font-weight:600;">
+                                                ${totalColumns} columns
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${columnAnalysis.length > 0 ? `
+                                    <div style="overflow-x:auto;">
+                                        <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                                            <thead>
+                                                <tr style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
+                                                    <th style="padding:12px; text-align:left; font-weight:600; color:#495057; font-size:0.9rem;">Column Name</th>
+                                                    <th style="padding:12px; text-align:left; font-weight:600; color:#495057; font-size:0.9rem;">Data Type</th>
+                                                    <th style="padding:12px; text-align:center; font-weight:600; color:#495057; font-size:0.9rem;">Null %</th>
+                                                    <th style="padding:12px; text-align:center; font-weight:600; color:#495057; font-size:0.9rem;">Uniqueness %</th>
+                                                    <th style="padding:12px; text-align:left; font-weight:600; color:#495057; font-size:0.9rem;">Pattern</th>
+                                                    <th style="padding:12px; text-align:left; font-weight:600; color:#495057; font-size:0.9rem;">Sample Values</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${columnAnalysis.map((col, colIdx) => {
+                                                    const nullPercent = col.null_percentage !== undefined ? col.null_percentage.toFixed(2) : '0.00';
+                                                    const uniquePercent = col.uniqueness_percentage !== undefined ? col.uniqueness_percentage.toFixed(2) : '0.00';
+                                                    const pattern = col.pattern || 'unknown';
+                                                    const sampleValues = col.sample_values || [];
+                                                    const dataType = col.data_type || 'unknown';
+                                                    
+                                                    // Color coding for null percentage
+                                                    const nullColor = parseFloat(nullPercent) > 50 ? '#dc3545' : parseFloat(nullPercent) > 10 ? '#ffc107' : '#28a745';
+                                                    const uniqueColor = parseFloat(uniquePercent) > 95 ? '#28a745' : parseFloat(uniquePercent) > 50 ? '#ffc107' : '#6c757d';
+                                                    
+                                                    return `
+                                                        <tr style="border-bottom:1px solid #e9ecef; ${colIdx % 2 === 0 ? 'background:#f8f9fa;' : 'background:white;'}">
+                                                            <td style="padding:12px; font-weight:600; color:#2d3748; font-size:0.9rem;">${col.column_name || 'Unknown'}</td>
+                                                            <td style="padding:12px; color:#495057; font-size:0.85rem;">
+                                                                <span style="background:#e3f2fd; color:#1976D2; padding:4px 8px; border-radius:4px; font-family:monospace; font-size:0.8rem;">
+                                                                    ${dataType}
+                                                                </span>
+                                                            </td>
+                                                            <td style="padding:12px; text-align:center;">
+                                                                <span style="color:${nullColor}; font-weight:600; font-size:0.9rem;">${nullPercent}%</span>
+                                                            </td>
+                                                            <td style="padding:12px; text-align:center;">
+                                                                <span style="color:${uniqueColor}; font-weight:600; font-size:0.9rem;">${uniquePercent}%</span>
+                                                            </td>
+                                                            <td style="padding:12px;">
+                                                                <span style="background:#fff3cd; color:#856404; padding:4px 10px; border-radius:12px; font-size:0.8rem; font-weight:600; text-transform:capitalize;">
+                                                                    ${pattern}
+                                                                </span>
+                                                            </td>
+                                                            <td style="padding:12px; max-width:300px;">
+                                                                <div style="font-size:0.85rem; color:#495057; font-family:monospace; overflow-wrap:break-word;">
+                                                                    ${sampleValues.length > 0 ? sampleValues.slice(0, 3).map(val => {
+                                                                        const strVal = String(val);
+                                                                        return strVal.length > 30 ? strVal.substring(0, 30) + '...' : strVal;
+                                                                    }).join(', ') + (sampleValues.length > 3 ? '...' : '') : 'No samples'}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    `;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div style="margin-top:20px; padding:14px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6;">
+                                        <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.9rem;">📊 Analysis Summary:</div>
+                                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; font-size:0.85rem;">
+                                            <div>
+                                                <strong>Total Columns Analyzed:</strong> ${columnAnalysis.length}
+                                            </div>
+                                            <div>
+                                                <strong>Numeric Columns:</strong> ${columnAnalysis.filter(c => c.data_type && (c.data_type.includes('int') || c.data_type.includes('float'))).length}
+                                            </div>
+                                            <div>
+                                                <strong>Text Columns:</strong> ${columnAnalysis.filter(c => c.data_type && c.data_type.includes('object')).length}
+                                            </div>
+                                            <div>
+                                                <strong>High Uniqueness (≥95%):</strong> ${columnAnalysis.filter(c => c.uniqueness_percentage >= 95).length}
+                                            </div>
+                                            <div>
+                                                <strong>Low Nulls (≤10%):</strong> ${columnAnalysis.filter(c => c.null_percentage <= 10).length}
+                                            </div>
+                                            <div>
+                                                <strong>ID Patterns:</strong> ${columnAnalysis.filter(c => c.pattern === 'id').length}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ` : `
+                                    <div style="padding:20px; text-align:center; color:#6c757d;">
+                                        <p style="margin:0; font-size:0.95rem;">No column analysis data available for this table.</p>
+                                    </div>
+                                `}
+                            </div>
+                        `;
+                    });
+                    
+                    columnAnalysisHtml += `</div>`;
+                    columnAnalysisContent.innerHTML = columnAnalysisHtml;
+                } else if (validatorData && !validatorData.error) {
+                    // Single table mode
                     const columnAnalysisHtml = `
                     <div class="section-header">
                         <h2 class="section-title">🔍 Column Analysis</h2>

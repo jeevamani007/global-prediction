@@ -1,35 +1,75 @@
--- CREATE TABLE
-CREATE TABLE banking_transactions (
-    account_number VARCHAR(16) NOT NULL,
-    customer_id VARCHAR(10) NOT NULL,
-    customer_name VARCHAR(50),
-    account_type VARCHAR(20),
-    account_status VARCHAR(10),
-    branch_code VARCHAR(10),
-    ifsc_code VARCHAR(11),
-    transaction_id VARCHAR(15) NOT NULL,
+CREATE TABLE customers (
+    customer_id VARCHAR(10) PRIMARY KEY,
+    customer_name VARCHAR(100) NOT NULL,
+    phone VARCHAR(15) UNIQUE,
+    email VARCHAR(100),
+    city VARCHAR(50)
+);
+
+INSERT INTO customers VALUES
+('CUST001','Ravi Kumar','9876543210','ravi@gmail.com','Chennai'),
+('CUST002','Anitha Rao','9876543211','anitha@gmail.com','Bangalore'),
+('CUST003','John Paul','9876543212','john@gmail.com','Coimbatore'),
+('CUST004','Priya Sharma','9876543213','priya@gmail.com','Delhi'),
+('CUST005','Arun Mehta','9876543214','arun@gmail.com','Mumbai'),
+('CUST006','Kavya Iyer','9876543215','kavya@gmail.com','Chennai'),
+('CUST007','Manoj Singh','9876543216','manoj@gmail.com','Patna'),
+('CUST008','Divya Nair','9876543217','divya@gmail.com','Kochi'),
+('CUST009','Suresh Babu','9876543218','suresh@gmail.com','Madurai'),
+('CUST010','Neha Gupta','9876543219','neha@gmail.com','Jaipur');
+
+
+
+CREATE TABLE transactions (
+    transaction_id VARCHAR(10) PRIMARY KEY,
+    account_number VARCHAR(10),
+    customer_id VARCHAR(10),
     transaction_date DATE,
     transaction_type VARCHAR(10),
     debit DECIMAL(10,2),
     credit DECIMAL(10,2),
-    opening_balance DECIMAL(10,2),
-    closing_balance DECIMAL(10,2),
-    phone VARCHAR(15)
+
+    FOREIGN KEY (account_number)
+    REFERENCES accounts(account_number),
+
+    FOREIGN KEY (customer_id)
+    REFERENCES customers(customer_id)
 );
 
--- INSERT SAMPLE DATA (50 rows)
-INSERT INTO banking_transactions 
-(account_number, customer_id, customer_name, account_type, account_status, branch_code, ifsc_code, transaction_id, transaction_date, transaction_type, debit, credit, opening_balance, closing_balance, phone)
-VALUES
-('123456789001','CUST1001','Alice Kumar','Savings','ACTIVE','BR001','IFSC0000001','TXN0001','2024-01-01','DEBIT',500.00,0.00,10000.00,9500.00,'9876543210'),
-('123456789001','CUST1001','Alice Kumar','Savings','ACTIVE','BR001','IFSC0000001','TXN0002','2024-01-05','CREDIT',0.00,2000.00,9500.00,11500.00,'9876543210'),
-('123456789002','CUST1002','Bob Sharma','Current','ACTIVE','BR002','IFSC0000002','TXN0003','2024-01-02','DEBIT',300.00,0.00,5000.00,4700.00,'9876543211'),
-('123456789002','CUST1002','Bob Sharma','Current','ACTIVE','BR002','IFSC0000002','TXN0004','2024-01-06','CREDIT',0.00,1000.00,4700.00,5700.00,'9876543211'),
-('123456789003','CUST1003','Carol Singh','Savings','ACTIVE','BR003','IFSC0000003','TXN0005','2024-01-03','DEBIT',200.00,0.00,8000.00,7800.00,'9876543212'),
-('123456789003','CUST1003','Carol Singh','Savings','ACTIVE','BR003','IFSC0000003','TXN0006','2024-01-07','CREDIT',0.00,500.00,7800.00,8300.00,'9876543212'),
-('123456789004','CUST1004','David Patel','Current','ACTIVE','BR004','IFSC0000004','TXN0007','2024-01-04','DEBIT',1000.00,0.00,12000.00,11000.00,'9876543213'),
-('123456789004','CUST1004','David Patel','Current','ACTIVE','BR004','IFSC0000004','TXN0008','2024-01-08','CREDIT',0.00,1500.00,11000.00,12500.00,'9876543213'),
-('123456789005','CUST1005','Eve Reddy','Savings','ACTIVE','BR005','IFSC0000005','TXN0009','2024-01-05','DEBIT',400.00,0.00,7000.00,6600.00,'9876543214'),
-('123456789005','CUST1005','Eve Reddy','Savings','ACTIVE','BR005','IFSC0000005','TXN0010','2024-01-09','CREDIT',0.00,1000.00,6600.00,7600.00,'9876543214');
+INSERT INTO transactions VALUES
+('TXN001','ACC1001','CUST001','2026-01-01','Debit',500,0),
+('TXN002','ACC1002','CUST002','2026-01-02','Credit',0,2000),
+('TXN003','ACC1003','CUST003','2026-01-03','Debit',1000,0),
+('TXN004','ACC1004','CUST004','2026-01-04','Credit',0,500),
+('TXN005','ACC1005','CUST005','2026-01-05','Debit',200,0),
+('TXN006','ACC1006','CUST006','2026-01-06','Credit',0,1000),
+('TXN007','ACC1007','CUST007','2026-01-07','Debit',1500,0),
+('TXN008','ACC1008','CUST008','2026-01-08','Credit',0,200),
+('TXN009','ACC1009','CUST009','2026-01-09','Debit',300,0),
+('TXN010','ACC1010','CUST010','2026-01-10','Credit',0,700);
 
--- Repeat similar INSERT statements till 50 rows
+
+
+
+CREATE TABLE accounts (
+    account_number VARCHAR(10) PRIMARY KEY,
+    customer_id VARCHAR(10),
+    account_type VARCHAR(20),
+    account_status VARCHAR(20),
+    opening_balance DECIMAL(10,2),
+
+    FOREIGN KEY (customer_id)
+    REFERENCES customers(customer_id)
+);
+
+INSERT INTO accounts VALUES
+('ACC1001','CUST001','Savings','Active',10000),
+('ACC1002','CUST002','Current','Active',5000),
+('ACC1003','CUST003','Savings','Active',15000),
+('ACC1004','CUST004','Current','Inactive',3000),
+('ACC1005','CUST005','Savings','Active',8000),
+('ACC1006','CUST006','Savings','Active',12000),
+('ACC1007','CUST007','Current','Active',6000),
+('ACC1008','CUST008','Savings','Inactive',4000),
+('ACC1009','CUST009','Savings','Active',9000),
+('ACC1010','CUST010','Current','Active',7000);
