@@ -44,7 +44,7 @@ class CompleteBankingValidator:
                 "required": False
             },
             "ifsc_code": {
-                "description": "IFSC code: Alphanumeric, 3-15 characters",
+                "description": "IFSC code: Alphanumeric, 8-11 characters",
                 "validation_func": self.validate_ifsc_code,
                 "required": False
             },
@@ -317,6 +317,12 @@ class CompleteBankingValidator:
                 alphanum_ratio = non_null_str.str.match(r'^[A-Za-z0-9]+$').mean()
                 return alphanum_ratio >= 0.8
             
+            elif standard_col == "ifsc_code":
+                # Should be alphanumeric, 8-11 characters
+                alphanum_ratio = non_null_str.str.match(r'^[A-Za-z0-9]+$').mean()
+                length_ok = non_null_str.str.len().between(8, 11).mean()
+                return alphanum_ratio >= 0.8 and length_ok >= 0.8
+            
             elif standard_col in ["debit", "credit", "opening_balance", "closing_balance"]:
                 # Should be numeric
                 numeric_series = pd.to_numeric(non_null_str, errors="coerce")
@@ -501,20 +507,20 @@ class CompleteBankingValidator:
         return status, confidence, issues
     
     def validate_ifsc_code(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate IFSC code: Alphanumeric, 3-15 characters (flexible format)"""
+        """Validate IFSC code: Alphanumeric, 8-11 characters"""
         issues = []
         non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        # Check if length is between 3-15 characters (flexible range)
-        length_mask = non_null.str.len().between(3, 15)
+        # Check if length is between 8-11 characters
+        length_mask = non_null.str.len().between(8, 11)
         length_ratio = length_mask.mean()
         
         if length_ratio < 0.95:
             invalid_values = non_null[~length_mask].head(3).tolist()
-            issues.append(f"Values not between 3-15 characters: {((1-length_ratio)*100):.1f}% - Sample: {invalid_values}")
+            issues.append(f"Values not between 8-11 characters: {((1-length_ratio)*100):.1f}% - Sample: {invalid_values}")
         
         # Check if alphanumeric (case-insensitive, allow uppercase)
         alphanum_mask = non_null.str.match(r'^[A-Za-z0-9]+$')

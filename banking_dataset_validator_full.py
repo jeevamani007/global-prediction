@@ -40,7 +40,7 @@ class BankingDatasetValidator:
                 "required": False
             },
             "ifsc_code": {
-                "description": "Exactly 11 characters, Letters + numbers",
+                "description": "8-11 characters, Letters + numbers",
                 "validation_func": self.validate_ifsc_code,
                 "required": False
             },
@@ -296,19 +296,20 @@ class BankingDatasetValidator:
         return status, confidence, issues
     
     def validate_ifsc_code(self, series: pd.Series) -> Tuple[str, float, List[str]]:
-        """Validate IFSC code: alphanumeric, 3-15 characters (flexible format)"""
+        """Validate IFSC code: alphanumeric, 8-11 characters"""
         issues = []
-        non_null = series.dropna().astype(str)
+        non_null = series.dropna().astype(str).str.strip()
         
         if len(non_null) == 0:
             return "FAIL", 0.0, ["Column is empty"]
         
-        # Check if length is between 3-15 characters (flexible format)
-        length_mask = non_null.str.len().between(3, 15)
+        # Check if length is between 8-11 characters
+        length_mask = non_null.str.len().between(8, 11)
         length_ratio = length_mask.mean()
         
         if length_ratio < 0.95:
-            issues.append(f"Values not between 3-15 characters: {(1 - length_ratio) * 100:.1f}%")
+            invalid_values = non_null[~length_mask].head(3).tolist()
+            issues.append(f"Values not between 8-11 characters: {(1 - length_ratio) * 100:.1f}% - Sample: {invalid_values}")
         
         # Check if alphanumeric
         alphanum_mask = non_null.str.match(r'^[A-Za-z0-9]+$')

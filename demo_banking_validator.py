@@ -138,7 +138,7 @@ def explain_features():
         "account_type: Only 'Savings' or 'Current'",
         "account_status: Only 'Active' or 'Deactive'",
         "branch: Alphanumeric",
-        "ifsc_code: Alphanumeric, 3-15 characters (flexible format)",
+        "ifsc_code: Alphanumeric, 8-11 characters",
         "transaction_id: Unique, alphanumeric",
         "txn_date: YYYY-MM-DD format",
         "transaction_type: Only 'Debit' or 'Credit'",

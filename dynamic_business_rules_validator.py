@@ -182,9 +182,9 @@ class DynamicBusinessRulesValidator:
                 return alphanumeric_space_ratio >= 0.8
             
             elif role == "ifsc_code":
-                # Alphanumeric, length 3-15
-                alphanumeric_ratio = non_null_str.str.fullmatch(r"[A-Z0-9]+").mean()
-                length_ratio = non_null_str.str.len().between(3, 15).mean()
+                # Alphanumeric, length 8-11
+                alphanumeric_ratio = non_null_str.str.fullmatch(r"[A-Za-z0-9]+").mean()
+                length_ratio = non_null_str.str.len().between(8, 11).mean()
                 return alphanumeric_ratio >= 0.8 and length_ratio >= 0.8
             
             elif role == "pan":
@@ -411,7 +411,7 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_ifsc_code(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: IFSC code must be alphanumeric, 3-15 characters (flexible format)."""
+        """Business Rule: IFSC code must be alphanumeric, 8-11 characters."""
         violations = []
         non_null = series.dropna().astype(str).str.strip()
         
@@ -423,13 +423,12 @@ class DynamicBusinessRulesValidator:
         if alphanumeric_ratio < 0.95:
             violations.append(f"Non-alphanumeric values: {(1-alphanumeric_ratio)*100:.1f}%")
         
-        # Rule 2: Reasonable length (3-15 characters) - flexible format
-        length_ok_ratio = non_null.str.len().between(3, 15).mean()
+        # Rule 2: Length between 8-11 characters
+        length_ok_ratio = non_null.str.len().between(8, 11).mean()
         if length_ok_ratio < 0.95:
-            violations.append(f"Invalid length: {(1-length_ok_ratio)*100:.1f}% (Expected: 3-15 characters)")
+            violations.append(f"Invalid length: {(1-length_ok_ratio)*100:.1f}% (Expected: 8-11 characters)")
         
-        # Note: We don't enforce strict IFSC format (4 letters + 0 + 6 digits) 
-        # because users may have their own format codes (e.g., IFSC0001, IFSC0000001, etc.)
+        # Note: Accepts IFSC codes between 8-11 characters (e.g., IFSC0001, IFSC0000001, etc.)
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",

@@ -76,7 +76,7 @@ Here are the detailed explanations of each banking column and its purpose:
 
 7. ifsc_code:
    - Purpose: Indian Financial System Code for bank identification
-   - Business Rule: Exactly 11 alphanumeric characters
+   - Business Rule: 8-11 alphanumeric characters
    - Used for: Electronic fund transfers and bank identification
 
 8. transaction_id:
