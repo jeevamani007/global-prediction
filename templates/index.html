@@ -710,6 +710,39 @@ function getConfidenceClass(confidence) {
     return "confidence-low";
 }
 
+function buildColumnExplanation(col) {
+    const name = col.name || "Unknown column";
+    const meaning = col.meaning || "";
+    const status = (col.status || "").toUpperCase();
+    const confidence = typeof col.confidence === "number" ? `${col.confidence}%` : "unknown confidence";
+    const rules = Array.isArray(col.applied_rules) ? col.applied_rules.filter(Boolean) : [];
+    const issues = Array.isArray(col.failures) ? col.failures.filter(Boolean) : [];
+
+    let intro = `The column "${name}" is treated as ${meaning ? `"${meaning}"` : "a banking-related field"}. `;
+
+    let ruleText = "";
+    if (rules.length === 1) {
+        ruleText = `The validator applied the following business rule: ${rules[0]}. `;
+    } else if (rules.length > 1) {
+        ruleText = `The validator applied multiple business rules, including: ${rules.join(", ")}. `;
+    } else {
+        ruleText = "The validator applied standard banking pattern checks for this column (format, consistency, and missing values). ";
+    }
+
+    let resultText = `Overall, this column ${status === "MATCH" ? "meets" : status === "WARNING" ? "mostly meets" : "does not fully meet"} the expected behaviour with a confidence of ${confidence}. `;
+
+    let issueText = "";
+    if (issues.length > 0) {
+        issueText = `The main issues detected are: ${issues.join("; ")}. `;
+    } else if (status !== "MATCH") {
+        issueText = "Some values do not fully follow the expected business behaviour, so you may want to review this column in more detail. ";
+    } else {
+        issueText = "No major issues were detected in this column based on the applied rules. ";
+    }
+
+    return intro + ruleText + resultText + issueText;
+}
+
 function renderRuleList(rules) {
     if (!rules) return "";
     return `
@@ -869,7 +902,7 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                         ${bankingValidatorResult.columns && bankingValidatorResult.columns.length > 0 ? `
                             <div style="margin-top:20px;">
                                 <h5 style="color:#1976D2; font-weight:600; margin-bottom:12px; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
-                                    <span>📊</span> Column-Level Business Rules Validation (${bankingValidatorResult.columns.length} columns)
+                                    <span>📊</span> Column-Level Validation Explanation (${bankingValidatorResult.columns.length} columns)
                                 </h5>
                                 <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px;">
                                     ${bankingValidatorResult.columns.map(col => `
@@ -883,26 +916,9 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                                                     ${col.status}
                                                 </span>
                                             </div>
-                                            <div style="display:flex; justify-content:space-between; margin:6px 0; font-size:0.9rem; padding:6px 0; border-top:1px solid #f0f0f0;">
-                                                <span>Confidence:</span>
-                                                <b style="color:#2196F3;">${col.confidence}%</b>
-                                            </div>
-                                            <div style="display:flex; justify-content:space-between; margin:4px 0; font-size:0.9rem;">
-                                                <span>Rules Passed:</span>
-                                                <b style="color:#4CAF50;">${col.rules_passed || 0}/${col.rules_total || 1}</b>
-                                            </div>
-                                            ${col.applied_rules && col.applied_rules.length > 0 ? `
-                                                <div style="margin-top:8px; padding:8px; background:#e3f2fd; border-radius:4px; border-left:3px solid #2196F3;">
-                                                    <div style="font-weight:600; color:#1976D2; font-size:0.85rem; margin-bottom:4px;">Applied Rules:</div>
-                                                    <div style="font-size:0.8rem; color:#1976D2;">${col.applied_rules.slice(0, 2).join(', ')}${col.applied_rules.length > 2 ? '...' : ''}</div>
-                                                </div>
-                                            ` : ''}
-                                            ${col.failures && col.failures.length > 0 ? `
-                                                <div style="margin-top:8px; padding:8px; background:#ffebee; border-radius:4px; border-left:3px solid #f44336;">
-                                                    <div style="font-weight:600; color:#d32f2f; font-size:0.85rem; margin-bottom:4px;">Issues:</div>
-                                                    <div style="font-size:0.8rem; color:#d32f2f;">${col.failures.slice(0, 2).join('; ')}${col.failures.length > 2 ? '...' : ''}</div>
-                                                </div>
-                                            ` : ''}
+                                            <p style="margin-top:8px; font-size:0.9rem; color:#4a5568; line-height:1.6;">
+                                                ${buildColumnExplanation(col)}
+                                            </p>
                                         </div>
                                     `).join('')}
                                 </div>
