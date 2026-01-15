@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Table Relationships & Data Flow Analysis</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .container {
+            background: #fff;
+            padding: 40px;
+            border-radius: 16px;
+            max-width: 1400px;
+            margin: 0 auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 12px 24px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .nav-btn:hover {
+            background: #1976D2;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.4);
+        }
+
+        .nav-btn.secondary {
+            background: #667eea;
+        }
+
+        .nav-btn.secondary:hover {
+            background: #5568d3;
+        }
+
+        .nav-btn.tertiary {
+            background: #673AB7;
+        }
+
+        .nav-btn.tertiary:hover {
+            background: #5E35B1;
+        }
+
+        .section-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            color: white;
+            padding: 24px 28px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-content {
+            padding: 28px;
+        }
+
+        .explanation-paragraph {
+            background: linear-gradient(135deg, #f0f8ff 0%, #ffffff 100%);
+            padding: 24px;
+            border-radius: 10px;
+            border-left: 5px solid #2196F3;
+            margin: 20px 0;
+            line-height: 2;
+            font-size: 1.05rem;
+            color: #424242;
+        }
+
+        .explanation-paragraph strong {
+            color: #1976D2;
+            font-weight: 700;
+        }
+
+        .relationship-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .relationship-card {
+            background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+            padding: 24px;
+            border-radius: 12px;
+            border-left: 5px solid #2196F3;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .relationship-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .relationship-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1976D2;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .relationship-detail {
+            margin: 10px 0;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: #424242;
+            border-left: 3px solid #64B5F6;
+        }
+
+        .relationship-detail strong {
+            color: #1976D2;
+            font-weight: 600;
+        }
+
+        .key-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            background: #673AB7;
+            color: white;
+            border-radius: 16px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            margin: 4px 4px 4px 0;
+        }
+
+        .key-badge.foreign {
+            background: #FF9800;
+        }
+
+        .key-badge.primary {
+            background: #4CAF50;
+        }
+
+        .domain-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin: 6px 6px 6px 0;
+        }
+
+        .flow-diagram {
+            background: #fafafa;
+            padding: 32px;
+            border-radius: 12px;
+            margin: 24px 0;
+            border: 2px dashed #2196F3;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin: 16px 0;
+            padding: 16px 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .flow-step strong {
+            color: #2196F3;
+            margin-right: 16px;
+            min-width: 80px;
+        }
+
+        .flow-arrow {
+            text-align: center;
+            color: #2196F3;
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 12px 0;
+        }
+
+        .connection-explanation {
+            background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);
+            padding: 28px;
+            border-radius: 12px;
+            border-left: 5px solid #FF9800;
+            margin: 24px 0;
+            line-height: 2;
+            font-size: 1.05rem;
+            color: #424242;
+        }
+
+        .connection-explanation h3 {
+            color: #E65100;
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            color: white;
+            padding: 16px 14px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        td {
+            padding: 14px;
+            border-bottom: 1px solid #E0E0E0;
+            font-size: 0.95rem;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #FAFAFA;
+        }
+
+        tbody tr:hover {
+            background: #F0F8FF;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 80px 20px;
+            color: #666;
+            font-size: 1.2rem;
+        }
+
+        .no-data-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 24px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .relationship-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-header {
+                font-size: 1.2rem;
+                padding: 20px 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>
+            <span style="font-size: 2rem;">🔗</span>
+            Table Relationships & Data Flow Analysis
+        </h1>
+
+        <div class="nav-buttons">
+            <a href="/" class="nav-btn secondary">← Back to Upload</a>
+            <a href="/rules" class="nav-btn tertiary">📊 View Business Rules</a>
+        </div>
+
+        <div id="content">
+            <div class="no-data">
+                <div class="no-data-icon">📭</div>
+                <p>No relationship data available</p>
+                <p style="font-size: 0.95rem; margin-top: 12px; color: #888;">
+                    Please upload multiple files from the main page to see relationship analysis.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check if multi-file mode is enabled
+        const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
+
+        if (isMultiFile) {
+            const relationships = sessionStorage.getItem('multiFileRelationships');
+            const primaryKeys = sessionStorage.getItem('multiFilePrimaryKeys');
+            const foreignKeys = sessionStorage.getItem('multiFileForeignKeys');
+            const domainDetection = sessionStorage.getItem('multiFileDomainDetection');
+            const tableResults = sessionStorage.getItem('multiFileTableResults');
+
+            if (relationships || primaryKeys || foreignKeys) {
+                renderRelationshipAnalysis(
+                    relationships ? JSON.parse(relationships) : [],
+                    primaryKeys ? JSON.parse(primaryKeys) : {},
+                    foreignKeys ? JSON.parse(foreignKeys) : [],
+                    domainDetection ? JSON.parse(domainDetection) : {},
+                    tableResults ? JSON.parse(tableResults) : []
+                );
+            }
+        }
+
+        function renderRelationshipAnalysis(relationships, primaryKeys, foreignKeys, domainDetection, tableResults) {
+            let html = '';
+
+            // Overview Explanation
+            html += `
+                <div class="explanation-paragraph">
+                    <strong>📊 Multi-Table Analysis Overview:</strong><br><br>
+                    This analysis examines the relationships between multiple uploaded data files to understand how they connect 
+                    and work together. By analyzing column names, data patterns, and domain context, the system identifies 
+                    primary keys (unique identifiers), foreign keys (connection points), and the overall data flow across tables. 
+                    This helps understand the complete picture of how your data is structured and how different entities relate to each other.
+                </div>
+            `;
+
+            // Domain Detection Summary
+            if (domainDetection && Object.keys(domainDetection).length > 0) {
+                html += `
+                    <div class="section-card">
+                        <div class="section-header">
+                            <span>🎯</span>
+                            Domain Classification Summary
+                        </div>
+                        <div class="section-content">
+                            <p style="margin-bottom: 20px; font-size: 1.05rem; color: #666;">
+                                Each uploaded file has been analyzed and classified into its respective business domain:
+                            </p>
+                            <div class="relationship-grid">
+                `;
+
+                for (const [filename, domain] of Object.entries(domainDetection)) {
+                    html += `
+                        <div class="relationship-card">
+                            <div class="relationship-title">
+                                <span>📄</span>
+                                ${filename}
+                            </div>
+                            <div class="relationship-detail">
+                                <strong>Detected Domain:</strong> 
+                                <span class="domain-badge">${domain}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Primary Keys Section with Explanation
+            if (primaryKeys && Object.keys(primaryKeys).length > 0) {
+                html += `
+                    <div class="section-card">
+                        <div class="section-header">
+                            <span>🔑</span>
+                            Primary Keys Detected
+                        </div>
+                        <div class="section-content">
+                            <div class="connection-explanation">
+                                <h3>🔍 What are Primary Keys?</h3>
+                                <p>
+                                    Primary Keys are unique identifiers for each record in a table. Think of them like passport numbers - 
+                                    each person has a unique passport number that identifies them specifically. In database tables, primary keys 
+                                    ensure that every row can be uniquely identified and retrieved. For example, in a Customer table, the 
+                                    Customer_ID would be the primary key because each customer has a unique ID. No two customers can have 
+                                    the same Customer_ID. Primary keys are essential because they: (1) Ensure data uniqueness and prevent duplicates, 
+                                    (2) Enable fast data retrieval and indexing, and (3) Serve as connection points for establishing relationships 
+                                    between tables. The system automatically detects primary keys by analyzing column uniqueness, naming patterns, 
+                                    and data characteristics.
+                                </p>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Table Name</th>
+                                        <th>Primary Key Column(s)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                `;
+
+                for (const [table, keys] of Object.entries(primaryKeys)) {
+                    const keyList = Array.isArray(keys) ? keys : [keys];
+                    html += `
+                        <tr>
+                            <td><strong>${table}</strong></td>
+                            <td>
+                                ${keyList.map(key => `<span class="key-badge primary">${key}</span>`).join(' ')}
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Foreign Keys & Relationships with Detailed Explanation
+            if (foreignKeys && foreignKeys.length > 0) {
+                html += `
+                    <div class="section-card">
+                        <div class="section-header">
+                            <span>🔗</span>
+                            Foreign Key Relationships
+                        </div>
+                        <div class="section-content">
+                            <div class="connection-explanation">
+                                <h3>🔗 Understanding Foreign Keys and Table Relationships</h3>
+                                <p>
+                                    Foreign Keys create connections between different tables by referencing the Primary Key from another table. 
+                                    Imagine a library system: the Books table might have a column called Author_ID that references the ID in the 
+                                    Authors table. This Author_ID in the Books table is a Foreign Key. It creates a relationship that allows us to 
+                                    know which author wrote which book. <br><br>
+                                    
+                                    <strong>How Relationships Work:</strong> When Table A has a Foreign Key pointing to Table B's Primary Key, 
+                                    it means each record in Table A is associated with a specific record in Table B. For instance: A Transactions 
+                                    table might have Account_Number as a Foreign Key linking to the Accounts table's Account_Number (Primary Key). 
+                                    This ensures every transaction is tied to a valid account. <br><br>
+                                    
+                                    <strong>Benefits of Foreign Keys:</strong> (1) Data Integrity - Ensures relationships are valid (you can't create 
+                                    a transaction for a non-existent account), (2) Data Organization - Keeps related data connected logically, 
+                                    (3) Query Power - Enables complex queries joining multiple tables to get complete information, and 
+                                    (4) Reduces Redundancy - Avoids storing duplicate information across tables. <br><br>
+                                    
+                                    The system detects foreign keys by analyzing column name similarities, data type matching, and value distributions 
+                                    across tables to find meaningful connections.
+                                </p>
+                            </div>
+                            <div class="relationship-grid">
+                `;
+
+                foreignKeys.forEach((fk, idx) => {
+                    html += `
+                        <div class="relationship-card">
+                            <div class="relationship-title">
+                                <span>🔗</span>
+                                Relationship ${idx + 1}
+                            </div>
+                            <div class="relationship-detail">
+                                <strong>From Table:</strong> ${fk.from_table || 'N/A'}
+                            </div>
+                            <div class="relationship-detail">
+                                <strong>From Column:</strong> 
+                                <span class="key-badge foreign">${fk.from_column || 'N/A'}</span>
+                            </div>
+                            <div class="relationship-detail">
+                                <strong>Links To Table:</strong> ${fk.to_table || 'N/A'}
+                            </div>
+                            <div class="relationship-detail">
+                                <strong>Links To Column:</strong> 
+                                <span class="key-badge primary">${fk.to_column || 'N/A'}</span>
+                            </div>
+                            ${fk.confidence ? `
+                                <div class="relationship-detail">
+                                    <strong>Confidence:</strong> ${fk.confidence}%
+                                </div>
+                            ` : ''}
+                            <div class="explanation-paragraph" style="margin-top: 12px; font-size: 0.92rem;">
+                                <strong>Connection Explanation:</strong> The column "${fk.from_column || 'N/A'}" in the 
+                                "${fk.from_table || 'N/A'}" table references the "${fk.to_column || 'N/A'}" column in the 
+                                "${fk.to_table || 'N/A'}" table. This means each record in ${fk.from_table || 'source table'} 
+                                is associated with a corresponding record in ${fk.to_table || 'target table'}, establishing a 
+                                parent-child relationship between the two tables.
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Data Flow Diagram
+            html += `
+                <div class="section-card">
+                    <div class="section-header">
+                        <span>🔄</span>
+                        Data Flow & Backend Processing
+                    </div>
+                    <div class="section-content">
+                        <div class="connection-explanation">
+                            <h3>⚙️ How the Backend Processes Your Data</h3>
+                            <p>
+                                When you upload multiple files, the backend goes through a sophisticated multi-step analysis pipeline. 
+                                First, files are validated and converted to a standardized format (CSV). Then, each file is analyzed independently 
+                                to detect its business domain (Banking, Financial, Insurance, etc.) by matching column patterns against known 
+                                schemas. Next, the system identifies Primary Keys by finding columns with unique values and standard naming patterns. 
+                                After that, Foreign Keys are discovered by comparing column names and data patterns across all files to find potential 
+                                relationships. Finally, business rules specific to the detected domain are applied to validate data quality, and 
+                                the results are compiled into a comprehensive report showing domain classifications, relationships, and validation results.
+                            </p>
+                        </div>
+                        
+                        <div class="flow-diagram">
+                            <div class="flow-step">
+                                <strong>STEP 1:</strong>
+                                Files uploaded and converted to CSV format for standardized processing
+                            </div>
+                            <div class="flow-arrow">↓</div>
+                            
+                            <div class="flow-step">
+                                <strong>STEP 2:</strong>
+                                Domain detection analyzes each file to identify the business domain (Banking, Financial, etc.)
+                            </div>
+                            <div class="flow-arrow">↓</div>
+                            
+                            <div class="flow-step">
+                                <strong>STEP 3:</strong>
+                                Primary key detection identifies unique identifiers in each table using pattern matching
+                            </div>
+                            <div class="flow-arrow">↓</div>
+                            
+                            <div class="flow-step">
+                                <strong>STEP 4:</strong>
+                                Foreign key detection discovers relationships by matching column names and analyzing data patterns
+                            </div>
+                            <div class="flow-arrow">↓</div>
+                            
+                            <div class="flow-step">
+                                <strong>STEP 5:</strong>
+                                Business rules validation applies domain-specific rules to ensure data quality and compliance
+                            </div>
+                            <div class="flow-arrow">↓</div>
+                            
+                            <div class="flow-step">
+                                <strong>STEP 6:</strong>
+                                Results aggregated and displayed with visualizations, confidence scores, and detailed explanations
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Table Processing Results
+            if (tableResults && tableResults.length > 0) {
+                html += `
+                    <div class="section-card">
+                        <div class="section-header">
+                            <span>📁</span>
+                            File Processing Summary
+                        </div>
+                        <div class="section-content">
+                            <p style="margin-bottom: 20px; font-size: 1.05rem; color: #666;">
+                                Summary of all uploaded files and their processing status:
+                            </p>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>File Name</th>
+                                        <th>Processing Status</th>
+                                        <th>Total Records</th>
+                                        <th>Total Columns</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                `;
+
+                tableResults.forEach(table => {
+                    const status = table.status || 'UNKNOWN';
+                    const statusColor = status === 'SUCCESS' ? '#4CAF50' : '#f44336';
+                    const statusIcon = status === 'SUCCESS' ? '✓' : '✗';
+
+                    html += `
+                        <tr>
+                            <td><strong>${table.table_name || 'Unknown'}</strong></td>
+                            <td>
+                                <span style="color: ${statusColor}; font-weight: 600;">
+                                    ${statusIcon} ${status}
+                                </span>
+                            </td>
+                            <td>${(table.record_count || 0).toLocaleString()}</td>
+                            <td>${table.column_count || 0}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('content').innerHTML = html;
+        }
+    </script>
+</body>
+
+</html>

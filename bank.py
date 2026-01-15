@@ -217,58 +217,258 @@ class BankingDomainDetector:
     
     def explain_column_purpose(self, column_name: str, series: pd.Series = None):
         """
-        Explain the purpose of a column based on predefined patterns and matches.
+        Explain the purpose of a column with detailed information for UI display.
+        Returns: {
+            "column_type": str,
+            "purpose": str,
+            "usage": str,
+            "business_rules": List[str],
+            "explanation": str
+        }
         """
         norm_col = self.normalize(column_name)
-        purpose_explanations = {
-            "customer_id": "CUSTOMER_ID: Internal customer identifier - Usually alphanumeric like CUST1001, Each customer has unique ID, Same ID appears across multiple accounts for same customer, Required field, Not used in balance calculations",
-            "customer_name": "CUSTOMER_NAME: Customer's full name - Contains letters and spaces, Same name may appear for multiple accounts of same person, Must be at least 3 characters, Not numeric data, Connected to customer ID",
-            "account_number": "ACCOUNT_NUMBER: Unique bank account number - Numbers only, Between 6 to 18 digits long, Same account number appears in multiple transaction rows, Required field, Used to connect transactions to accounts",
-            "account_type": "ACCOUNT_TYPE: Type of account like Savings, Current, Salary, Student, or Pension - Text values only, Limited options like Savings, Current, Salary, Student, Pension, Same type repeats for same account, Connected to account number",
-            "account_status": "ACCOUNT_STATUS: Is account active - Options like ACTIVE, INACTIVE, CLOSED, One status per account, Required field, Changes rarely, Not numeric data",
-            "transaction_id": "TRANSACTION_ID: Unique ID for each transaction - Different for most transactions, Mix of letters and numbers, Appears once per transaction row, Not used in math, Connected to account number",
-            "transaction_date": "TRANSACTION_DATE: When transaction happened - Format like YYYY-MM-DD, May repeat for same day, Not money amounts, Connected to debit/credit, Helps order transactions",
-            "transaction_type": "TRANSACTION_TYPE: Type of transaction like deposit or withdraw - Text only like deposit, withdraw, transfer, Few different types, Same type repeats many times, Not date data, Controls debit/credit logic",
-            "debit": "DEBIT: Money going out - Numbers only, Zero or positive amounts, Zero allowed often, Only debit OR credit has value (not both), Reduces account balance",
-            "credit": "CREDIT: Money coming in - Numbers only, Zero or positive amounts, Zero allowed often, Only credit OR debit has value (not both), Increases account balance",
-            "opening_balance": "OPENING_BALANCE: Starting balance - Numbers only, Zero or positive amounts, Same for first transaction of each account, Used in balance calculation formula, Required field",
-            "closing_balance": "CLOSING_BALANCE: Ending balance - Numbers only, Calculated value, Depends on debit and credit amounts, Rarely missing, Must follow formula rules",
-            "branch_code": "BRANCH_CODE: Bank branch identifier - Mix of letters and numbers, Short length, Same branch code for multiple customers, Not balance related, Connected to account",
-            "ifsc_code": "IFSC_CODE: Indian bank branch code - Exactly 11 characters, Mix of letters and numbers, Same code per branch, Required field, Not used in calculations",
-            "mode_of_transaction": "MODE_OF_TRANSACTION: How transaction happened like CASH or UPI - Text options like CASH, UPI, NEFT, IMPS, Few different modes, Same mode repeats, Not numeric data, Only in transaction rows"
+        
+        # Enhanced purpose definitions with separate purpose, usage, rules, and explanation
+        purpose_definitions = {
+            "customer_id": {
+                "purpose": "Unique identifier for each customer in the banking system",
+                "usage": "Used to link all accounts, transactions, and services to a specific customer. Every customer interaction references this ID to maintain relationship continuity.",
+                "business_rules": [
+                    "Must be unique across all customers",
+                    "Format: Alphanumeric (e.g., CUST1001, C001)",
+                    "Length: 3-10 characters",
+                    "Cannot be null or empty",
+                    "No special characters allowed",
+                    "Same ID appears across multiple accounts for the same customer"
+                ],
+                "explanation": "The Customer ID is the core identifier that ties together all of a customer's banking relationships. When a customer opens multiple accounts, takes a loan, or uses any banking service, this single ID connects everything. It's like a passport number - unique to each person and used throughout their banking journey."
+            },
+            "customer_name": {
+                "purpose": "Full legal name of the account holder",
+                "usage": "Used for identification, communications, legal documents, and KYC compliance. Appears on statements, cheques, and all official correspondence.",
+                "business_rules": [
+                    "Must contain only letters and spaces",
+                    "Minimum length: 3 characters",
+                    "Maximum length: 100 characters",
+                    "Cannot be purely numeric",
+                    "Should match government-issued ID documents",
+                    "May appear multiple times if customer has multiple accounts"
+                ],
+                "explanation": "Customer Name is the account holder's legal name as per their official documents. It's crucial for KYC (Know Your Customer) compliance and ensures the bank knows exactly who owns each account. This name appears on all bank documents and must match identity proofs."
+            },
+            "account_number": {
+                "purpose": "Unique identifier for each bank account",
+                "usage": "Primary key for account identification in all transactions. Used when transferring money, checking balance, or linking transactions to specific accounts.",
+                "business_rules": [
+                    "Must be numeric only (digits 0-9)",
+                    "Length: 6-18 digits",
+                    "Must be globally unique",
+                    "Cannot be null or empty",
+                    "Used as foreign key in transaction tables",
+                    "Remains constant throughout account lifetime"
+                ],
+                "explanation": "Account Number is like your account's unique fingerprint. Every transaction, deposit, withdrawal, or balance check uses this number to ensure money goes to the right place. Unlike customer ID which represents a person, account number represents a specific account - one person can have multiple account numbers."
+            },
+            "account_type": {
+                "purpose": "Classification of the account based on its purpose and features",
+                "usage": "Determines account features, interest rates, minimum balance requirements, and available services.",
+                "business_rules": [
+                    "Must be from predefined list: Savings, Current, Salary, Student, Pension",
+                    "Cannot be null",
+                    "Each account has exactly one type",
+                    "Type determines applicable banking rules",
+                    "Type rarely changes after account opening"
+                ],
+                "explanation": "Account Type defines what kind of account you have. Savings accounts earn interest and have withdrawal limits, Current accounts are for businesses with no interest, Salary accounts are for salaried individuals with zero balance facility, Student accounts have special features for students, and Pension accounts are for retirees."
+            },
+            "account_status": {
+                "purpose": "Current operational status of the account",
+                "usage": "Controls whether transactions can be performed. Active accounts allow all operations, Inactive accounts may have restrictions, Closed accounts don't allow transactions.",
+                "business_rules": [
+                    "Valid values: ACTIVE, INACTIVE, CLOSED, FROZEN",
+                    "Must have exactly one status at any time",
+                    "Cannot be null",
+                    "Changes tracked for audit purposes",
+                    "ACTIVE allows all transactions, CLOSED prevents all operations"
+                ],
+                "explanation": "Account Status shows whether your account is operational. ACTIVE means you can deposit, withdraw, and transfer freely. INACTIVE means limited activity (often due to no transactions for long time). CLOSED means the account is permanently shut. FROZEN means temporarily blocked due to investigations or legal requirements."
+            },
+            "transaction_id": {
+                "purpose": "Unique identifier for each financial transaction",
+                "usage": "Used to track, query, and dispute specific transactions. Essential for audit trails and reconciliation.",
+                "business_rules": [
+                    "Must be unique across all transactions",
+                    "Format: Alphanumeric (e.g., TXN001, T12345)",
+                    "Generated automatically by system",
+                    "Cannot be null or duplicate",
+                    "Immutable once created",
+                    "Used for transaction tracking and disputes"
+                ],
+                "explanation": "Transaction ID is like a receipt number for every banking operation. When you deposit money, withdraw cash, or transfer funds, each action gets a unique transaction ID. This helps you track your money movement, dispute errors, and maintain financial records. Banks use this for auditing and ensuring every rupee is accounted for."
+            },
+            "transaction_date": {
+                "purpose": "Date and time when the transaction occurred",
+                "usage": "Used to order transactions chronologically, calculate interest, generate statements, and track account activity over time.",
+                "business_rules": [
+                    "Must be valid date format (YYYY-MM-DD or DD/MM/YYYY)",
+                    "Cannot be future date",
+                    "Used for chronological ordering",
+                    "Essential for statement generation",
+                    "Multiple transactions can have same date",
+                    "Required for all transactions"
+                ],
+                "explanation": "Transaction Date records exactly when each banking operation happened. This is crucial for calculating interest (which accrues daily), generating monthly statements, and understanding your account history. When you check 'transactions for last month', the bank uses this date to filter your activity."
+            },
+            "transaction_type": {
+                "purpose": "Category of the transaction (deposit, withdrawal, transfer, etc.)",
+                "usage": "Determines whether money is added or removed, affects balance calculations, and categorizes spending patterns.",
+                "business_rules": [
+                    "Must be from predefined list: Deposit, Withdrawal, Transfer, Payment",
+                    "Cannot be null",
+                    "Determines debit/credit logic",
+                    "Used for transaction categorization",
+                    "Affects account balance calculation"
+                ],
+                "explanation": "Transaction Type tells you what kind of banking operation occurred. DEPOSIT means money coming in, WITHDRAWAL means cash taken out, TRANSFER means money moved to another account, PAYMENT means bill payment or purchase. This categorization helps you understand where your money is going and coming from."
+            },
+            "debit": {
+                "purpose": "Amount of money deducted from the account",
+                "usage": "Represents cash withdrawals, transfers out, bill payments - any transaction that reduces your balance.",
+                "business_rules": [
+                    "Must be numeric (decimal allowed)",
+                    "Must be zero or positive",
+                    "Usually only debit OR credit has value in a row",
+                    "Zero is allowed (no debit in that transaction)",
+                    "Reduces account balance",
+                    "Used in formula: Closing = Opening + Credit - Debit"
+                ],
+                "explanation": "Debit is money going OUT of your account. When you withdraw cash from ATM, pay bills, or transfer to someone, that amount appears in the Debit column. It reduces your account balance. In banking, debit means reduction in your account (though you're debited, hence money leaves)."
+            },
+            "credit": {
+                "purpose": "Amount of money added to the account",
+                "usage": "Represents deposits, salary credits, transfers received - any transaction that increases your balance.",
+                "business_rules": [
+                    "Must be numeric (decimal allowed)",
+                    "Must be zero or positive",
+                    "Usually only credit OR debit has value in a row",
+                    "Zero is allowed (no credit in that transaction)",
+                    "Increases account balance",
+                    "Used in formula: Closing = Opening + Credit - Debit"
+                ],
+                "explanation": "Credit is money coming INTO your account. When salary is deposited, you receive a transfer, or deposit cash, that amount appears in Credit column. It increases your account balance. In banking, credit means addition to your account (money is credited to you)."
+            },
+            "opening_balance": {
+                "purpose": "Account balance at the start of the transaction period",
+                "usage": "Starting point for calculating closing balance after transaction. Essential for balance verification and reconciliation.",
+                "business_rules": [
+                    "Must be numeric (decimal allowed)",
+                    "Can be zero or positive (can be negative in case of overdraft)",
+                    "Must match closing balance of previous transaction",
+                    "Required for balance calculation",
+                    "Same for first transaction of each account",
+                    "Used in formula: Closing = Opening + Credit - Debit"
+                ],
+                "explanation": "Opening Balance is your account balance before a transaction happens. If you had ₹10,000 in your account and you withdraw ₹2,000, your opening balance for that transaction is ₹10,000. This ensures every transaction starts with the correct balance and helps detect any discrepancies."
+            },
+            "closing_balance": {
+                "purpose": "Account balance after the transaction is completed",
+                "usage": "Final balance after adding credits and subtracting debits. Becomes opening balance for next transaction.",
+                "business_rules": [
+                    "Must be numeric (decimal allowed)",
+                    "Calculated value: Opening + Credit - Debit",
+                    "Rarely manually entered",
+                    "Must follow mathematical formula",
+                    "Becomes opening balance of next transaction",
+                    "Should not have data entry errors"
+                ],
+                "explanation": "Closing Balance is your balance after the transaction completes. If you had ₹10,000 and deposited ₹5,000, your closing balance is ₹15,000. This value must always equal: Opening Balance + Credit - Debit. Any violation indicates a system error or fraud."
+            },
+            "branch_code": {
+                "purpose": "Unique identifier for the bank branch",
+                "usage": "Identifies which bank branch manages the account. Used for routing, customer service, and operational purposes.",
+                "business_rules": [
+                    "Alphanumeric format",
+                    "Usually 4-6 characters",
+                    "Same branch code for all accounts in that branch",
+                    "Cannot be null",
+                    "Linked to branch master data"
+                ],
+                "explanation": "Branch Code identifies which bank branch your account belongs to. Even if you can do transactions anywhere, your account is 'home' to one specific branch. This is used for administrative purposes, account management, and routing certain services to the right branch."
+            },
+            "ifsc_code": {
+                "purpose": "Indian Financial System Code - unique identifier for bank branches in India",
+                "usage": "Required for NEFT, RTGS, and IMPS transfers. Identifies bank and branch for interbank transactions.",
+                "business_rules": [
+                    "Must be exactly 11 characters",
+                    "Format: AAAA0BBBBBB (4 letters + 1 zero + 6 alphanumeric)",
+                    "First 4 letters: Bank code",
+                    "5th character: Always zero",
+                    "Last 6: Branch code",
+                    "Required for all interbank transfers"
+                ],
+                "explanation": "IFSC Code is mandatory for transferring money between different banks in India. It's like a postal code for banks - it tells the banking system exactly which bank and which branch to send money to. Every branch has a unique IFSC code assigned by RBI."
+            },
+            "mode_of_transaction": {
+                "purpose": "Method or channel used to perform the transaction",
+                "usage": "Tracks how customers prefer to bank (online, ATM, branch). Used for analytics and channel optimization.",
+                "business_rules": [
+                    "Valid values: CASH, UPI, NEFT, RTGS, IMPS, ATM, CHEQUE, ONLINE",
+                    "Cannot be null for transactions",
+                    "Determines processing time and fees",
+                    "Used for channel analytics"
+                ],
+                "explanation": "Mode of Transaction tells you HOW the transaction was done. CASH means branch counter, UPI means instant phone payment, NEFT/RTGS/IMPS mean online bank transfers, ATM means cash machine, CHEQUE means paper cheque deposit. Each mode has different processing times and sometimes different charges."
+            }
         }
         
-        # Check for direct matches with predefined column types
-        for col_type, explanation in purpose_explanations.items():
+        # Try to match column to known types
+        matched_type = None
+        for col_type in purpose_definitions.keys():
             norm_type = self.normalize(col_type)
             if norm_type in norm_col or norm_col in norm_type or fuzz.ratio(norm_col, norm_type) >= 85:
-                return {
-                    "column_type": col_type,
-                    "explanation": explanation,
-                    "confidence": fuzz.ratio(norm_col, norm_type) / 100.0
-                }
+                matched_type = col_type
+                break
         
-        # Check for keyword matches
+        # If matched, return detailed information
+        if matched_type and matched_type in purpose_definitions:
+            definition = purpose_definitions[matched_type]
+            return {
+                "column_type": matched_type,
+                "purpose": definition["purpose"],
+                "usage": definition["usage"],
+                "business_rules": definition["business_rules"],
+                "explanation": definition["explanation"]
+            }
+        
+        # Try keyword-based matching for common patterns
         for keyword in self.keywords:
             if keyword in norm_col or fuzz.ratio(norm_col, keyword) >= 85:
-                # Determine type based on the keyword
-                if any(t in keyword for t in ["customer", "cust", "client"]):
+                if any(t in keyword for t in ["customer", "cust", "client"]) and "customer_id" in purpose_definitions:
+                    definition = purpose_definitions["customer_id"]
                     return {
                         "column_type": "customer_id",
-                        "explanation": purpose_explanations["customer_id"],
-                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                        "purpose": definition["purpose"],
+                        "usage": definition["usage"],
+                        "business_rules": definition["business_rules"],
+                        "explanation": definition["explanation"]
                     }
-                elif any(t in keyword for t in ["name", "holder"]):
+                elif any(t in keyword for t in ["name", "holder"]) and "customer_name" in purpose_definitions:
+                    definition = purpose_definitions["customer_name"]
                     return {
                         "column_type": "customer_name",
-                        "explanation": purpose_explanations["customer_name"],
-                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                        "purpose": definition["purpose"],
+                        "usage": definition["usage"],
+                        "business_rules": definition["business_rules"],
+                        "explanation": definition["explanation"]
                     }
-                elif any(t in keyword for t in ["account", "acc", "acct"]):
+                elif any(t in keyword for t in ["account", "acc", "acct"]) and "account_number" in purpose_definitions:
+                    definition = purpose_definitions["account_number"]
                     return {
                         "column_type": "account_number",
-                        "explanation": purpose_explanations["account_number"],
-                        "confidence": fuzz.ratio(norm_col, keyword) / 100.0
+                        "purpose": definition["purpose"],
+                        "usage": definition["usage"],
+                        "business_rules": definition["business_rules"],
+                        "explanation": definition["explanation"]
                     }
                 elif any(t in keyword for t in ["type", "account_type", "savings", "current"]):
                     return {

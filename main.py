@@ -102,7 +102,22 @@ async def upload_file(file: UploadFile = File(...)):
             
             # Banking Dataset Validator - run validation on banking datasets
             banking_validator_result = None
+            application_type_result = None
+            
             if banking_result and isinstance(banking_result, dict) and banking_result.get("decision") not in (None, "UNKNOWN"):
+                try:
+                    # Read DataFrame for application type detection
+                    import pandas as pd
+                    df = pd.read_csv(file_path)
+                    
+                    # Detect application type based on columns
+                    from application_detector import BankingApplicationDetector
+                    app_detector = BankingApplicationDetector()
+                    application_type_result = app_detector.detect_application_type(df.columns.tolist())
+                except Exception as e:
+                    print(f"Warning: Application detection error: {str(e)}")
+                    application_type_result = None
+                
                 try:
                     # Use our new complete banking validator
                     complete_validator = CompleteBankingValidator()
@@ -116,17 +131,43 @@ async def upload_file(file: UploadFile = File(...)):
                         columns_result = []
                         for col in column_validation_results:
                             status = col.get("validation_result", "FAIL").upper()
+                            col_name = col.get("column_name", "Unknown")
+                            standard_name = col.get("standard_name", "Unknown")
+                            business_rule = col.get("business_rule", "Standard validation rules")
+                            
+                            # Try to get detailed column explanation, but don't fail if it errors
+                            try:
+                                banking_detector_for_cols = BankingDomainDetector()
+                                col_explanation = banking_detector_for_cols.explain_column_purpose(col_name, None)
+                                column_type = col_explanation.get("column_type", "banking_field")
+                                purpose = col_explanation.get("purpose", standard_name)
+                                usage = col_explanation.get("usage", "Used in banking data processing and validation")
+                                business_rules = col_explanation.get("business_rules", [business_rule])
+                                explanation = col_explanation.get("explanation", f"The {col_name} field is a banking data column used for {standard_name.lower()} operations")
+                            except Exception as exp_err:
+                                print(f"Warning: Could not get explanation for {col_name}: {exp_err}")
+                                column_type = "banking_field"
+                                purpose = standard_name
+                                usage = "Used in banking data processing and validation"
+                                business_rules = [business_rule]
+                                explanation = f"The {col_name} field is a banking data column"
                             
                             columns_result.append({
-                                "name": col.get("column_name", "Unknown"),
-                                "meaning": col.get("standard_name", "Unknown"),
+                                "name": col_name,
+                                "meaning": standard_name,
                                 "status": status,
-                                "confidence": col.get("confidence_percentage", 0),  # Already in percentage
-                                "rules_passed": 1,  # Placeholder - would need actual count
-                                "rules_total": 1,   # Placeholder - would need actual count
+                                "confidence": col.get("confidence_percentage", 0),
+                                "rules_passed": 1,
+                                "rules_total": 1,
                                 "failures": col.get("detected_issue", []),
-                                "applied_rules": [col.get("business_rule", "General Rule")],
-                                "reasons": col.get("detected_issue", [])
+                                "applied_rules": [business_rule],
+                                "reasons": col.get("detected_issue", []),
+                                # Add detailed fields for frontend
+                                "column_type": column_type,
+                                "purpose": purpose,
+                                "usage": usage,
+                                "business_rules": business_rules,
+                                "explanation": explanation
                             })
                         
                         # Calculate overall dataset confidence
@@ -282,8 +323,12 @@ async def upload_file(file: UploadFile = File(...)):
                 # 🔥 BANKING DATASET VALIDATOR RESULTS
                 "banking_dataset_validator": banking_validator_result,
                 
+                # 🎯 BANKING APPLICATION TYPE DETECTION
+                "banking_application_type": application_type_result,
+                
                 # 🔥 CORE BANKING VALIDATION ENGINE RESULTS
                 "core_banking_validator": core_banking_validator_result,
+                
                 
                 "financial": financial_result,
                 "insurance": insurance_result,
@@ -427,6 +472,26 @@ async def account_page(request: Request):
 async def account_page_html(request: Request):
     """Return the account.html page (html suffix)"""
     return templates.TemplateResponse("account.html", {"request": request})
+
+@app.get("/rules", response_class=HTMLResponse)
+async def rules_page(request: Request):
+    """Return the rules.html page for business rules validation"""
+    return templates.TemplateResponse("rules.html", {"request": request})
+
+@app.get("/rules.html", response_class=HTMLResponse)
+async def rules_page_html(request: Request):
+    """Return the rules.html page (html suffix)"""
+    return templates.TemplateResponse("rules.html", {"request": request})
+
+@app.get("/relation", response_class=HTMLResponse)
+async def relation_page(request: Request):
+    """Return the relation.html page for multi-file relationship analysis"""
+    return templates.TemplateResponse("relation.html", {"request": request})
+
+@app.get("/relation.html", response_class=HTMLResponse)
+async def relation_page_html(request: Request):
+    """Return the relation.html page (html suffix)"""
+    return templates.TemplateResponse("relation.html", {"request": request})
 
 
 if __name__ == "__main__":
