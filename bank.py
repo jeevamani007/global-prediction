@@ -3,6 +3,10 @@ import numpy as np
 from rapidfuzz import fuzz
 from sqlalchemy import text
 from database import engine
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
+import os
 
 
 class BankingDomainDetector:

@@ -1,0 +1,21 @@
+branch_id,branch_name,city
+BR001,Main Branch,Chennai
+BR002,North Branch,Coimbatore
+BR003,South Branch,Madurai
+BR004,East Branch,Salem
+BR005,West Branch,Trichy
+BR006,Central Branch,Erode
+BR007,Metro Branch,Vellore
+BR008,City Branch,Tirunelveli
+BR009,Town Branch,Thoothukudi
+BR010,Urban Branch,Chennai
+BR011,Rural Branch,Coimbatore
+BR012,Market Branch,Madurai
+BR013,Industrial Branch,Salem
+BR014,Highway Branch,Trichy
+BR015,Service Branch,Erode
+BR016,IT Park Branch,Vellore
+BR017,Harbor Branch,Tirunelveli
+BR018,Airport Branch,Thoothukudi
+BR019,Suburban Branch,Chennai
+BR020,Regional Branch,Coimbatore
