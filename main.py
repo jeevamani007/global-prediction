@@ -285,6 +285,9 @@ async def upload_file(file: UploadFile = File(...)):
                 # 🔥 CORE BANKING VALIDATION ENGINE RESULTS
                 "core_banking_validator": core_banking_validator_result,
                 
+                # 🔥 BANKING APPLICATION TYPE PREDICTION (NEW)
+                "banking_application_type": banking_result.get("banking_application_type"),
+                
                 "financial": financial_result,
                 "insurance": insurance_result,
                 "government": government_result,

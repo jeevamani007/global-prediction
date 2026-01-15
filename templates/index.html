@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>File Upload System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
-        * { 
-            box-sizing: border-box; 
-            margin: 0; 
-            padding: 0; 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
@@ -30,13 +31,13 @@
             border-radius: 16px;
             width: 100%;
             max-width: 1000px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             margin: 20px 0;
         }
 
-        h1 { 
-            text-align: center; 
-            margin-bottom: 30px; 
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
             font-size: 2rem;
             font-weight: 700;
             color: #2d3748;
@@ -77,12 +78,12 @@
             display: block;
         }
 
-        input[type=file] { 
-            display: none; 
+        input[type=file] {
+            display: none;
         }
 
-        .file-info { 
-            margin-top: 20px; 
+        .file-info {
+            margin-top: 20px;
             display: none;
             padding: 16px;
             background: #f7fafc;
@@ -90,8 +91,8 @@
             border-left: 4px solid #667eea;
         }
 
-        .file-info.show { 
-            display: block; 
+        .file-info.show {
+            display: block;
         }
 
         .file-info p {
@@ -131,8 +132,8 @@
             cursor: not-allowed;
         }
 
-        .upload-btn.show { 
-            display: block; 
+        .upload-btn.show {
+            display: block;
         }
 
         .upload-btn.secondary {
@@ -145,9 +146,9 @@
             box-shadow: 0 4px 8px rgba(33, 150, 243, 0.4);
         }
 
-        .loading { 
-            display: none; 
-            text-align: center; 
+        .loading {
+            display: none;
+            text-align: center;
             margin-top: 20px;
             padding: 16px;
             font-size: 1rem;
@@ -155,8 +156,8 @@
             font-weight: 500;
         }
 
-        .loading.show { 
-            display: block; 
+        .loading.show {
+            display: block;
         }
 
         .response {
@@ -169,18 +170,18 @@
             border-left: 4px solid;
         }
 
-        .response.show { 
-            display: block; 
+        .response.show {
+            display: block;
         }
 
-        .response.success { 
-            background: #d4edda; 
+        .response.success {
+            background: #d4edda;
             color: #155724;
             border-left-color: #28a745;
         }
 
-        .response.error { 
-            background: #f8d7da; 
+        .response.error {
+            background: #f8d7da;
             color: #721c24;
             border-left-color: #dc3545;
         }
@@ -195,27 +196,27 @@
             border-radius: 12px;
             border-left: 4px solid #667eea;
             background: #ffffff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .domain-section:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
         }
 
         .domain-section.banking {
             background: linear-gradient(135deg, #e8f4f8 0%, #ffffff 100%);
             border-left-color: #2196F3;
         }
-        
+
         .domain-section.banking-priority {
             transform: scale(1.02);
             border-left: 5px solid #2196F3;
             box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
             animation: highlightGlow 2s infinite alternate;
         }
-        
+
         .business-rules-summary {
             background: linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 100%);
             border-radius: 12px;
@@ -223,10 +224,15 @@
             margin: 16px 0;
             border-left: 4px solid #2196F3;
         }
-        
+
         @keyframes highlightGlow {
-            from { box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3); }
-            to { box-shadow: 0 6px 24px rgba(33, 150, 243, 0.5); }
+            from {
+                box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
+            }
+
+            to {
+                box-shadow: 0 6px 24px rgba(33, 150, 243, 0.5);
+            }
         }
 
         .domain-section.financial {
@@ -303,7 +309,7 @@
             font-weight: 600;
             font-size: 0.9rem;
             margin-left: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .confidence-high {
@@ -321,8 +327,8 @@
             color: white;
         }
 
-        ul { 
-            margin: 12px 0 12px 24px; 
+        ul {
+            margin: 12px 0 12px 24px;
             line-height: 1.8;
         }
 
@@ -404,348 +410,353 @@
 </head>
 
 <body>
-<div class="container">
-    <h1>📁 File Upload</h1>
+    <div class="container">
+        <h1>📁 File Upload</h1>
 
-    <div class="upload-area" id="uploadArea">
-        <p>Click or Drag & Drop</p>
-        <small>.sql, .csv, .xlsx, .xls (Multiple files supported)</small>
+        <div class="upload-area" id="uploadArea">
+            <p>Click or Drag & Drop</p>
+            <small>.sql, .csv, .xlsx, .xls (Multiple files supported)</small>
+        </div>
+
+        <input type="file" id="fileInput" accept=".sql,.csv,.xlsx,.xls" multiple>
+
+        <div class="file-info" id="fileInfo">
+            <p id="fileName"></p>
+            <p id="fileSize"></p>
+        </div>
+
+        <button class="upload-btn" id="uploadBtn">Upload</button>
+
+        <div class="loading" id="loading">Uploading...</div>
+
+        <div class="response" id="response"></div>
+
+        <!-- 🔥 RESULT UI -->
+        <div id="resultBox"></div>
+
+        <button class="upload-btn secondary" id="accountBtn" style="margin-top: 20px; display: none;">
+            View Account Number Detection
+        </button>
     </div>
 
-    <input type="file" id="fileInput" accept=".sql,.csv,.xlsx,.xls" multiple>
+    <script>
+        const uploadArea = document.getElementById("uploadArea");
+        const fileInput = document.getElementById("fileInput");
+        const fileInfo = document.getElementById("fileInfo");
+        const fileName = document.getElementById("fileName");
+        const fileSize = document.getElementById("fileSize");
+        const uploadBtn = document.getElementById("uploadBtn");
+        const loading = document.getElementById("loading");
+        const response = document.getElementById("response");
+        const resultBox = document.getElementById("resultBox");
+        const accountBtn = document.getElementById("accountBtn");
 
-    <div class="file-info" id="fileInfo">
-        <p id="fileName"></p>
-        <p id="fileSize"></p>
-    </div>
+        let selectedFiles = [];
 
-    <button class="upload-btn" id="uploadBtn">Upload</button>
+        /* ---------------- Upload Handling ---------------- */
 
-    <div class="loading" id="loading">Uploading...</div>
+        uploadArea.onclick = () => fileInput.click();
 
-    <div class="response" id="response"></div>
+        fileInput.onchange = e => handleFiles(e.target.files);
 
-    <!-- 🔥 RESULT UI -->
-    <div id="resultBox"></div>
+        uploadArea.ondragover = e => {
+            e.preventDefault();
+            uploadArea.classList.add("dragover");
+        };
 
-    <button class="upload-btn secondary" id="accountBtn" style="margin-top: 20px; display: none;">
-        View Account Number Detection
-    </button>
-</div>
+        uploadArea.ondragleave = () => uploadArea.classList.remove("dragover");
 
-<script>
-const uploadArea = document.getElementById("uploadArea");
-const fileInput = document.getElementById("fileInput");
-const fileInfo = document.getElementById("fileInfo");
-const fileName = document.getElementById("fileName");
-const fileSize = document.getElementById("fileSize");
-const uploadBtn = document.getElementById("uploadBtn");
-const loading = document.getElementById("loading");
-const response = document.getElementById("response");
-const resultBox = document.getElementById("resultBox");
-const accountBtn = document.getElementById("accountBtn");
+        uploadArea.ondrop = e => {
+            e.preventDefault();
+            uploadArea.classList.remove("dragover");
+            handleFiles(e.dataTransfer.files);
+        };
 
-let selectedFiles = [];
+        function handleFiles(files) {
+            if (!files || files.length === 0) return;
 
-/* ---------------- Upload Handling ---------------- */
+            selectedFiles = Array.from(files);
 
-uploadArea.onclick = () => fileInput.click();
-
-fileInput.onchange = e => handleFiles(e.target.files);
-
-uploadArea.ondragover = e => {
-    e.preventDefault();
-    uploadArea.classList.add("dragover");
-};
-
-uploadArea.ondragleave = () => uploadArea.classList.remove("dragover");
-
-uploadArea.ondrop = e => {
-    e.preventDefault();
-    uploadArea.classList.remove("dragover");
-    handleFiles(e.dataTransfer.files);
-};
-
-function handleFiles(files) {
-    if (!files || files.length === 0) return;
-
-    selectedFiles = Array.from(files);
-    
-    if (selectedFiles.length === 1) {
-        fileName.textContent = "📄 " + selectedFiles[0].name;
-        fileSize.textContent = "Size: " + formatFileSize(selectedFiles[0].size);
-    } else {
-        fileName.textContent = `📄 ${selectedFiles.length} files selected`;
-        const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
-        fileSize.innerHTML = "Total Size: " + formatFileSize(totalSize) + "<br>" +
-            selectedFiles.map(f => `  • ${f.name} (${formatFileSize(f.size)})`).join('<br>');
-    }
-
-    fileInfo.classList.add("show");
-    uploadBtn.classList.add("show");
-}
-
-function formatFileSize(bytes) {
-    const sizes = ["Bytes", "KB", "MB"];
-    let i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
-}
-
-/* ---------------- Upload API Call ---------------- */
-
-uploadBtn.onclick = async () => {
-    const formData = new FormData();
-    
-    // Use multi-file endpoint if multiple files, otherwise single-file endpoint
-    const isMultiFile = selectedFiles.length > 1;
-    const endpoint = isMultiFile ? "http://localhost:8000/upload-multiple" : "http://localhost:8000/upload";
-    
-    if (isMultiFile) {
-        // Multi-file mode
-        selectedFiles.forEach(file => {
-            formData.append("files", file);
-        });
-    } else {
-        // Single file mode (backward compatible)
-        formData.append("file", selectedFiles[0]);
-    }
-
-    uploadBtn.disabled = true;
-    loading.classList.add("show");
-    resultBox.innerHTML = "";
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for multi-file
-
-        const res = await fetch(endpoint, {
-            method: "POST",
-            body: formData,
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!res.ok) {
-            let errorMsg = "Upload failed";
-            try {
-                const errorData = await res.json();
-                errorMsg = errorData.detail || errorMsg;
-            } catch (e) {
-                errorMsg = `Server error: ${res.status} ${res.statusText}`;
-            }
-            showResponse(errorMsg, "error");
-            return;
-        }
-
-        const data = await res.json();
-
-        showResponse("Upload Success ✅", "success");
-
-        // Store account validation data for account.html page
-        if (data.banking_account_validation) {
-            sessionStorage.setItem("accountValidation", JSON.stringify(data.banking_account_validation));
-        }
-        if (data.banking_account_check) {
-            sessionStorage.setItem("accountNumberCheck", JSON.stringify(data.banking_account_check));
-        } else if (data.banking && data.banking.account_number_check) {
-            sessionStorage.setItem("accountNumberCheck", JSON.stringify(data.banking.account_number_check));
-        }
-        if (data.banking_account_status) {
-            sessionStorage.setItem("accountStatus", JSON.stringify(data.banking_account_status));
-        }
-        if (data.banking_missing_columns) {
-            sessionStorage.setItem("missingColumns", JSON.stringify(data.banking_missing_columns));
-        }
-        if (data.banking_balance_analysis) {
-            sessionStorage.setItem("balanceAnalysis", JSON.stringify(data.banking_balance_analysis));
-        }
-        // KYC and Branch Code removed - no longer storing in sessionStorage
-        if (data.banking_customer_id_validation) {
-            sessionStorage.setItem("customerIdValidation", JSON.stringify(data.banking_customer_id_validation));
-        }
-        if (data.banking_transaction_validation) {
-            sessionStorage.setItem("transactionValidation", JSON.stringify(data.banking_transaction_validation));
-        }
-        if (data.banking_transaction_type_validation) {
-            sessionStorage.setItem("transactionTypeValidation", JSON.stringify(data.banking_transaction_type_validation));
-        }
-        if (data.banking_pan_validation) {
-            sessionStorage.setItem("panValidation", JSON.stringify(data.banking_pan_validation));
-        }
-        if (data.banking_debit_credit_validation) {
-            sessionStorage.setItem("debitCreditValidation", JSON.stringify(data.banking_debit_credit_validation));
-        }
-        if (data.banking_fraud_detection) {
-            sessionStorage.setItem("fraudDetection", JSON.stringify(data.banking_fraud_detection));
-        }
-        if (data.banking_foreign_key_check) {
-            sessionStorage.setItem("foreignKeyCheck", JSON.stringify(data.banking_foreign_key_check));
-        }
-        if (data.banking_purpose_detection) {
-            sessionStorage.setItem("purposeDetection", JSON.stringify(data.banking_purpose_detection));
-        }
-        if (data.banking_final_decision) {
-            sessionStorage.setItem("finalDecision", JSON.stringify(data.banking_final_decision));
-        }
-        if (data.banking_risk_assessment) {
-            sessionStorage.setItem("riskAssessment", JSON.stringify(data.banking_risk_assessment));
-        }
-        if (data.banking_column_purpose_report) {
-            sessionStorage.setItem("columnPurposeReport", JSON.stringify(data.banking_column_purpose_report));
-        }
-        if (data.banking_probability_explanations) {
-            sessionStorage.setItem("probabilityExplanations", JSON.stringify(data.banking_probability_explanations));
-        }
-        if (data.banking_transaction_rules) {
-            sessionStorage.setItem("bankingTransactionRules", JSON.stringify(data.banking_transaction_rules));
-        }
-        if (data.banking_dataset_validator) {
-            sessionStorage.setItem("bankingDatasetValidator", JSON.stringify(data.banking_dataset_validator));
-        }
-        if (data.core_banking_validator) {
-            sessionStorage.setItem("coreBankingValidator", JSON.stringify(data.core_banking_validator));
-        }
-        
-        // Store multi-file metadata if available
-        if (data.multi_file_mode) {
-            sessionStorage.setItem("multiFileMode", "true");
-            if (data.relationships) {
-                sessionStorage.setItem("multiFileRelationships", JSON.stringify(data.relationships));
-            }
-            if (data.primary_keys) {
-                sessionStorage.setItem("multiFilePrimaryKeys", JSON.stringify(data.primary_keys));
-            }
-            if (data.foreign_keys) {
-                sessionStorage.setItem("multiFileForeignKeys", JSON.stringify(data.foreign_keys));
-            }
-            if (data.domain_detection) {
-                sessionStorage.setItem("multiFileDomainDetection", JSON.stringify(data.domain_detection));
-            }
-            if (data.table_results) {
-                sessionStorage.setItem("multiFileTableResults", JSON.stringify(data.table_results));
-            }
-        } else {
-            sessionStorage.setItem("multiFileMode", "false");
-        }
-
-        // Display domain results on index.html page
-        // Always show results if any domain data exists
-        if (data.banking || data.financial || data.insurance || data.government || data.healthcare || data.retail || data.space || data.human_resource) {
-            console.log("Banking data:", data.banking);
-            console.log("Banking account validation:", data.banking_account_validation);
-            
-            showDomainResults(
-                data.banking,
-                data.banking_account_validation,
-                data.financial,
-                data.insurance,
-                data.government,
-                data.healthcare,
-                data.retail,
-                data.space,
-                data.human_resource,
-                data.banking_dataset_validator,
-                data.core_banking_validator
-            );
-
-            // Show account button with HIGH PRIORITY when banking domain is detected
-            if (data.banking && data.banking !== null) {
-                // Check if this is a high-priority banking detection
-                const isHighPriority = data.banking.decision && data.banking.decision.toLowerCase() !== 'unknown' && (data.banking.confidence_percentage || 0) > 70;
-                
-                accountBtn.style.display = "block";
-                console.log("Account button should be visible");
-                
-                // Update button text for high priority detections
-                if (isHighPriority) {
-                    accountBtn.innerHTML = "View Banking Validation Results (HIGH PRIORITY)";
-                    accountBtn.style.background = "linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)";
-                    accountBtn.style.boxShadow = "0 4px 12px rgba(25, 118, 210, 0.4)";
-                } else {
-                    accountBtn.innerHTML = "View Account Number Detection";
-                    accountBtn.style.background = "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)";
-                    accountBtn.style.boxShadow = "0 2px 4px rgba(33, 150, 243, 0.3)";
-                }
+            if (selectedFiles.length === 1) {
+                fileName.textContent = "📄 " + selectedFiles[0].name;
+                fileSize.textContent = "Size: " + formatFileSize(selectedFiles[0].size);
             } else {
-                accountBtn.style.display = "none";
-                console.log("Account button hidden - no banking data");
+                fileName.textContent = `📄 ${selectedFiles.length} files selected`;
+                const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+                fileSize.innerHTML = "Total Size: " + formatFileSize(totalSize) + "<br>" +
+                    selectedFiles.map(f => `  • ${f.name} (${formatFileSize(f.size)})`).join('<br>');
             }
-        } else {
-            showResponse("Analysis data not found in response", "error");
-            accountBtn.style.display = "none";
+
+            fileInfo.classList.add("show");
+            uploadBtn.classList.add("show");
         }
 
-    } catch (err) {
-        let errorMsg = "Failed to fetch";
-        if (err.name === "AbortError") {
-            errorMsg = "Request timeout - server took too long to respond";
-        } else if (err.message) {
-            errorMsg = `Network error: ${err.message}`;
-        } else if (err instanceof TypeError) {
-            errorMsg = "Cannot connect to server. Make sure the server is running on http://localhost:8000";
+        function formatFileSize(bytes) {
+            const sizes = ["Bytes", "KB", "MB"];
+            let i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
         }
-        showResponse(errorMsg, "error");
-        console.error("Upload error:", err);
-    } finally {
-        uploadBtn.disabled = false;
-        loading.classList.remove("show");
-    }
-};
 
-accountBtn.onclick = () => {
-    window.location.href = "/account";
-};
+        /* ---------------- Upload API Call ---------------- */
 
-function showResponse(msg, type) {
-    response.textContent = msg;
-    response.className = `response ${type} show`;
-}
+        uploadBtn.onclick = async () => {
+            const formData = new FormData();
 
-/* ---------------- RESULT UI ---------------- */
+            // Use multi-file endpoint if multiple files, otherwise single-file endpoint
+            const isMultiFile = selectedFiles.length > 1;
+            const endpoint = isMultiFile ? "http://localhost:8000/upload-multiple" : "http://localhost:8000/upload";
 
-function getConfidenceClass(confidence) {
-    if (confidence >= 70) return "confidence-high";
-    if (confidence >= 50) return "confidence-medium";
-    return "confidence-low";
-}
+            if (isMultiFile) {
+                // Multi-file mode
+                selectedFiles.forEach(file => {
+                    formData.append("files", file);
+                });
+            } else {
+                // Single file mode (backward compatible)
+                formData.append("file", selectedFiles[0]);
+            }
 
-function buildColumnExplanation(col) {
-    const name = col.name || "Unknown column";
-    const meaning = col.meaning || "";
-    const status = (col.status || "").toUpperCase();
-    const confidence = typeof col.confidence === "number" ? `${col.confidence}%` : "unknown confidence";
-    const rules = Array.isArray(col.applied_rules) ? col.applied_rules.filter(Boolean) : [];
-    const issues = Array.isArray(col.failures) ? col.failures.filter(Boolean) : [];
+            uploadBtn.disabled = true;
+            loading.classList.add("show");
+            resultBox.innerHTML = "";
 
-    let intro = `The column "${name}" is treated as ${meaning ? `"${meaning}"` : "a banking-related field"}. `;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for multi-file
 
-    let ruleText = "";
-    if (rules.length === 1) {
-        ruleText = `The validator applied the following business rule: ${rules[0]}. `;
-    } else if (rules.length > 1) {
-        ruleText = `The validator applied multiple business rules, including: ${rules.join(", ")}. `;
-    } else {
-        ruleText = "The validator applied standard banking pattern checks for this column (format, consistency, and missing values). ";
-    }
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    body: formData,
+                    signal: controller.signal
+                });
 
-    let resultText = `Overall, this column ${status === "MATCH" ? "meets" : status === "WARNING" ? "mostly meets" : "does not fully meet"} the expected behaviour with a confidence of ${confidence}. `;
+                clearTimeout(timeoutId);
 
-    let issueText = "";
-    if (issues.length > 0) {
-        issueText = `The main issues detected are: ${issues.join("; ")}. `;
-    } else if (status !== "MATCH") {
-        issueText = "Some values do not fully follow the expected business behaviour, so you may want to review this column in more detail. ";
-    } else {
-        issueText = "No major issues were detected in this column based on the applied rules. ";
-    }
+                if (!res.ok) {
+                    let errorMsg = "Upload failed";
+                    try {
+                        const errorData = await res.json();
+                        errorMsg = errorData.detail || errorMsg;
+                    } catch (e) {
+                        errorMsg = `Server error: ${res.status} ${res.statusText}`;
+                    }
+                    showResponse(errorMsg, "error");
+                    return;
+                }
 
-    return intro + ruleText + resultText + issueText;
-}
+                const data = await res.json();
 
-function renderRuleList(rules) {
-    if (!rules) return "";
-    return `
+                showResponse("Upload Success ✅", "success");
+
+                // Store account validation data for account.html page
+                if (data.banking_account_validation) {
+                    sessionStorage.setItem("accountValidation", JSON.stringify(data.banking_account_validation));
+                }
+                if (data.banking_account_check) {
+                    sessionStorage.setItem("accountNumberCheck", JSON.stringify(data.banking_account_check));
+                } else if (data.banking && data.banking.account_number_check) {
+                    sessionStorage.setItem("accountNumberCheck", JSON.stringify(data.banking.account_number_check));
+                }
+                if (data.banking_account_status) {
+                    sessionStorage.setItem("accountStatus", JSON.stringify(data.banking_account_status));
+                }
+                if (data.banking_missing_columns) {
+                    sessionStorage.setItem("missingColumns", JSON.stringify(data.banking_missing_columns));
+                }
+                if (data.banking_balance_analysis) {
+                    sessionStorage.setItem("balanceAnalysis", JSON.stringify(data.banking_balance_analysis));
+                }
+                // KYC and Branch Code removed - no longer storing in sessionStorage
+                if (data.banking_customer_id_validation) {
+                    sessionStorage.setItem("customerIdValidation", JSON.stringify(data.banking_customer_id_validation));
+                }
+                if (data.banking_transaction_validation) {
+                    sessionStorage.setItem("transactionValidation", JSON.stringify(data.banking_transaction_validation));
+                }
+                if (data.banking_transaction_type_validation) {
+                    sessionStorage.setItem("transactionTypeValidation", JSON.stringify(data.banking_transaction_type_validation));
+                }
+                if (data.banking_pan_validation) {
+                    sessionStorage.setItem("panValidation", JSON.stringify(data.banking_pan_validation));
+                }
+                if (data.banking_debit_credit_validation) {
+                    sessionStorage.setItem("debitCreditValidation", JSON.stringify(data.banking_debit_credit_validation));
+                }
+                if (data.banking_fraud_detection) {
+                    sessionStorage.setItem("fraudDetection", JSON.stringify(data.banking_fraud_detection));
+                }
+                if (data.banking_foreign_key_check) {
+                    sessionStorage.setItem("foreignKeyCheck", JSON.stringify(data.banking_foreign_key_check));
+                }
+                if (data.banking_purpose_detection) {
+                    sessionStorage.setItem("purposeDetection", JSON.stringify(data.banking_purpose_detection));
+                }
+                if (data.banking_final_decision) {
+                    sessionStorage.setItem("finalDecision", JSON.stringify(data.banking_final_decision));
+                }
+                if (data.banking_risk_assessment) {
+                    sessionStorage.setItem("riskAssessment", JSON.stringify(data.banking_risk_assessment));
+                }
+                if (data.banking_column_purpose_report) {
+                    sessionStorage.setItem("columnPurposeReport", JSON.stringify(data.banking_column_purpose_report));
+                }
+                if (data.banking_probability_explanations) {
+                    sessionStorage.setItem("probabilityExplanations", JSON.stringify(data.banking_probability_explanations));
+                }
+                if (data.banking_transaction_rules) {
+                    sessionStorage.setItem("bankingTransactionRules", JSON.stringify(data.banking_transaction_rules));
+                }
+                if (data.banking_dataset_validator) {
+                    sessionStorage.setItem("bankingDatasetValidator", JSON.stringify(data.banking_dataset_validator));
+                }
+                if (data.core_banking_validator) {
+                    sessionStorage.setItem("coreBankingValidator", JSON.stringify(data.core_banking_validator));
+                }
+
+                // 🔥 NEW: Store banking application type prediction
+                if (data.banking_application_type) {
+                    sessionStorage.setItem("bankingApplicationType", JSON.stringify(data.banking_application_type));
+                }
+
+                // Store multi-file metadata if available
+                if (data.multi_file_mode) {
+                    sessionStorage.setItem("multiFileMode", "true");
+                    if (data.relationships) {
+                        sessionStorage.setItem("multiFileRelationships", JSON.stringify(data.relationships));
+                    }
+                    if (data.primary_keys) {
+                        sessionStorage.setItem("multiFilePrimaryKeys", JSON.stringify(data.primary_keys));
+                    }
+                    if (data.foreign_keys) {
+                        sessionStorage.setItem("multiFileForeignKeys", JSON.stringify(data.foreign_keys));
+                    }
+                    if (data.domain_detection) {
+                        sessionStorage.setItem("multiFileDomainDetection", JSON.stringify(data.domain_detection));
+                    }
+                    if (data.table_results) {
+                        sessionStorage.setItem("multiFileTableResults", JSON.stringify(data.table_results));
+                    }
+                } else {
+                    sessionStorage.setItem("multiFileMode", "false");
+                }
+
+                // Display domain results on index.html page
+                // Always show results if any domain data exists
+                if (data.banking || data.financial || data.insurance || data.government || data.healthcare || data.retail || data.space || data.human_resource) {
+                    console.log("Banking data:", data.banking);
+                    console.log("Banking account validation:", data.banking_account_validation);
+
+                    showDomainResults(
+                        data.banking,
+                        data.banking_account_validation,
+                        data.financial,
+                        data.insurance,
+                        data.government,
+                        data.healthcare,
+                        data.retail,
+                        data.space,
+                        data.human_resource,
+                        data.banking_dataset_validator,
+                        data.core_banking_validator
+                    );
+
+                    // Show account button with HIGH PRIORITY when banking domain is detected
+                    if (data.banking && data.banking !== null) {
+                        // Check if this is a high-priority banking detection
+                        const isHighPriority = data.banking.decision && data.banking.decision.toLowerCase() !== 'unknown' && (data.banking.confidence_percentage || 0) > 70;
+
+                        accountBtn.style.display = "block";
+                        console.log("Account button should be visible");
+
+                        // Update button text for high priority detections
+                        if (isHighPriority) {
+                            accountBtn.innerHTML = "View Banking Validation Results (HIGH PRIORITY)";
+                            accountBtn.style.background = "linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)";
+                            accountBtn.style.boxShadow = "0 4px 12px rgba(25, 118, 210, 0.4)";
+                        } else {
+                            accountBtn.innerHTML = "View Account Number Detection";
+                            accountBtn.style.background = "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)";
+                            accountBtn.style.boxShadow = "0 2px 4px rgba(33, 150, 243, 0.3)";
+                        }
+                    } else {
+                        accountBtn.style.display = "none";
+                        console.log("Account button hidden - no banking data");
+                    }
+                } else {
+                    showResponse("Analysis data not found in response", "error");
+                    accountBtn.style.display = "none";
+                }
+
+            } catch (err) {
+                let errorMsg = "Failed to fetch";
+                if (err.name === "AbortError") {
+                    errorMsg = "Request timeout - server took too long to respond";
+                } else if (err.message) {
+                    errorMsg = `Network error: ${err.message}`;
+                } else if (err instanceof TypeError) {
+                    errorMsg = "Cannot connect to server. Make sure the server is running on http://localhost:8000";
+                }
+                showResponse(errorMsg, "error");
+                console.error("Upload error:", err);
+            } finally {
+                uploadBtn.disabled = false;
+                loading.classList.remove("show");
+            }
+        };
+
+        accountBtn.onclick = () => {
+            window.location.href = "/account";
+        };
+
+        function showResponse(msg, type) {
+            response.textContent = msg;
+            response.className = `response ${type} show`;
+        }
+
+        /* ---------------- RESULT UI ---------------- */
+
+        function getConfidenceClass(confidence) {
+            if (confidence >= 70) return "confidence-high";
+            if (confidence >= 50) return "confidence-medium";
+            return "confidence-low";
+        }
+
+        function buildColumnExplanation(col) {
+            const name = col.name || "Unknown column";
+            const meaning = col.meaning || "";
+            const status = (col.status || "").toUpperCase();
+            const confidence = typeof col.confidence === "number" ? `${col.confidence}%` : "unknown confidence";
+            const rules = Array.isArray(col.applied_rules) ? col.applied_rules.filter(Boolean) : [];
+            const issues = Array.isArray(col.failures) ? col.failures.filter(Boolean) : [];
+
+            let intro = `The column "${name}" is treated as ${meaning ? `"${meaning}"` : "a banking-related field"}. `;
+
+            let ruleText = "";
+            if (rules.length === 1) {
+                ruleText = `The validator applied the following business rule: ${rules[0]}. `;
+            } else if (rules.length > 1) {
+                ruleText = `The validator applied multiple business rules, including: ${rules.join(", ")}. `;
+            } else {
+                ruleText = "The validator applied standard banking pattern checks for this column (format, consistency, and missing values). ";
+            }
+
+            let resultText = `Overall, this column ${status === "MATCH" ? "meets" : status === "WARNING" ? "mostly meets" : "does not fully meet"} the expected behaviour with a confidence of ${confidence}. `;
+
+            let issueText = "";
+            if (issues.length > 0) {
+                issueText = `The main issues detected are: ${issues.join("; ")}. `;
+            } else if (status !== "MATCH") {
+                issueText = "Some values do not fully follow the expected business behaviour, so you may want to review this column in more detail. ";
+            } else {
+                issueText = "No major issues were detected in this column based on the applied rules. ";
+            }
+
+            return intro + ruleText + resultText + issueText;
+        }
+
+        function renderRuleList(rules) {
+            if (!rules) return "";
+            return `
         <ul>
             <li>Digits only: ${rules.digits_only_ratio ?? "N/A"}</li>
             <li>Length 6-16: ${rules.length_6_16_ratio ?? "N/A"}</li>
@@ -755,15 +766,97 @@ function renderRuleList(rules) {
             <li>Randomized: ${rules.randomized ?? "N/A"}</li>
         </ul>
     `;
-}
+        }
 
-function renderAccountValidation(accountValidation) {
-    if (!accountValidation || !accountValidation.account_like_columns || accountValidation.account_like_columns.length === 0) {
-        return "<p>No account-like columns detected.</p>";
-    }
+        /* 🔥 BANKING APPLICATION TYPE PREDICTION RENDERER */
+        function renderBankingApplicationType(appType) {
+            if (!appType || !appType.predicted_application) return '';
 
-    const best = accountValidation.summary?.best_match;
-    const cards = accountValidation.account_like_columns.map(item => `
+            // Application type icons
+            const appIcons = {
+                'Core Banking System': '🏦',
+                'Loan Management System': '💳',
+                'Payment Gateway': '💸',
+                'Card Management System': '💳',
+                'Treasury Management': '📊',
+                'Trade Finance': '🌐',
+                'Wealth Management': '💰',
+                'Digital Banking': '📱'
+            };
+
+            // Application type colors
+            const appColors = {
+                'Core Banking System': 'linear-gradient(135deg, #1976D2 0%, #0D47A1 100%)',
+                'Loan Management System': 'linear-gradient(135deg, #7B1FA2 0%, #4A148C 100%)',
+                'Payment Gateway': 'linear-gradient(135deg, #388E3C 0%, #1B5E20 100%)',
+                'Card Management System': 'linear-gradient(135deg, #F57C00 0%, #E65100 100%)',
+                'Treasury Management': 'linear-gradient(135deg, #0097A7 0%, #006064 100%)',
+                'Trade Finance': 'linear-gradient(135deg, #5D4037 0%, #3E2723 100%)',
+                'Wealth Management': 'linear-gradient(135deg, #C2185B 0%, #880E4F 100%)',
+                'Digital Banking': 'linear-gradient(135deg, #512DA8 0%, #311B92 100%)'
+            };
+
+            const icon = appIcons[appType.predicted_application] || '🏦';
+            const bgColor = appColors[appType.predicted_application] || 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)';
+            const confidence = appType.confidence || 0;
+
+            let html = `
+        <div style="margin:24px 0; padding:24px; background:${bgColor}; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.25); animation:fadeInUp 0.5s ease-out;">
+            <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+                <span style="font-size:3rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">${icon}</span>
+                <div>
+                    <div style="font-size:0.85rem; color:rgba(255,255,255,0.8); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Predicted Banking Application</div>
+                    <div style="font-size:1.8rem; font-weight:700; color:white; text-shadow:0 2px 4px rgba(0,0,0,0.2);">${appType.predicted_application}</div>
+                </div>
+                <div style="margin-left:auto; text-align:center; background:rgba(255,255,255,0.2); padding:12px 20px; border-radius:12px; backdrop-filter:blur(10px);">
+                    <div style="font-size:2rem; font-weight:700; color:white;">${confidence}%</div>
+                    <div style="font-size:0.75rem; color:rgba(255,255,255,0.8); text-transform:uppercase;">Confidence</div>
+                </div>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.15); padding:16px; border-radius:10px; backdrop-filter:blur(10px); margin-top:12px;">
+                <p style="margin:0; color:white; font-size:0.95rem; line-height:1.6;">${appType.explanation || 'Banking application type detected based on column patterns.'}</p>
+            </div>
+            
+            ${appType.matched_keywords && appType.matched_keywords.length > 0 ? `
+                <div style="margin-top:16px;">
+                    <div style="font-size:0.8rem; color:rgba(255,255,255,0.7); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Matched Patterns</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        ${appType.matched_keywords.slice(0, 8).map(kw => `
+                            <span style="background:rgba(255,255,255,0.25); padding:6px 14px; border-radius:20px; font-size:0.85rem; color:white; font-weight:500;">${kw}</span>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${appType.all_matches && appType.all_matches.length > 1 ? `
+                <div style="margin-top:20px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.2);">
+                    <div style="font-size:0.8rem; color:rgba(255,255,255,0.7); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Other Possible Applications</div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                        ${appType.all_matches.slice(1).map(match => `
+                            <div style="background:rgba(255,255,255,0.1); padding:12px; border-radius:8px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between;">
+                                    <span style="color:white; font-weight:600; font-size:0.9rem;">${appIcons[match.application_type] || '📊'} ${match.application_type}</span>
+                                    <span style="background:rgba(255,255,255,0.2); padding:4px 10px; border-radius:12px; color:white; font-size:0.8rem;">${match.confidence}%</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+            return html;
+        }
+
+        function renderAccountValidation(accountValidation) {
+            if (!accountValidation || !accountValidation.account_like_columns || accountValidation.account_like_columns.length === 0) {
+                return "<p>No account-like columns detected.</p>";
+            }
+
+            const best = accountValidation.summary?.best_match;
+            const cards = accountValidation.account_like_columns.map(item => `
         <div style="margin-bottom:12px;padding:10px;border-radius:8px;background:#f0f4ff;">
             <p><b>Column:</b> ${item.column}</p>
             <p><b>Decision:</b> ${item.decision}</p>
@@ -777,25 +870,25 @@ function renderAccountValidation(accountValidation) {
         </div>
     `).join("");
 
-    return `
+            return `
         <div style="margin-top:10px;">
             ${best ? `<p><b>Best match:</b> ${best.column} (${best.probability_account_number}% - ${best.decision})</p>` : ""}
             ${cards}
         </div>
     `;
-}
+        }
 
-function showDomainResults(bankingResult, bankingAccountValidation, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult, bankingValidatorResult, coreBankingValidatorResult) {
-    let html = '<div class="results-grid">';
-    
-    // Banking Results - ALWAYS SHOW FIRST with HIGH PRIORITY when banking data exists
-    if (bankingResult && bankingResult !== null && typeof bankingResult === 'object') {
-        const bankingConfidence = bankingResult.confidence_percentage || 0;
-        // Highlight banking domain with special prominence when keywords match
-        const isHighPriority = bankingResult.decision && bankingResult.decision.toLowerCase() !== 'unknown' && bankingConfidence > 70;
-        const bankingSectionClass = isHighPriority ? 'domain-section banking banking-priority' : 'domain-section banking';
-        
-        html += `
+        function showDomainResults(bankingResult, bankingAccountValidation, financialResult, insuranceResult, governmentResult, healthcareResult, retailResult, spaceResult, humanResourceResult, bankingValidatorResult, coreBankingValidatorResult) {
+            let html = '<div class="results-grid">';
+
+            // Banking Results - ALWAYS SHOW FIRST with HIGH PRIORITY when banking data exists
+            if (bankingResult && bankingResult !== null && typeof bankingResult === 'object') {
+                const bankingConfidence = bankingResult.confidence_percentage || 0;
+                // Highlight banking domain with special prominence when keywords match
+                const isHighPriority = bankingResult.decision && bankingResult.decision.toLowerCase() !== 'unknown' && bankingConfidence > 70;
+                const bankingSectionClass = isHighPriority ? 'domain-section banking banking-priority' : 'domain-section banking';
+
+                html += `
             <div class="${bankingSectionClass}" style="${isHighPriority ? 'transform: scale(1.02); border-left: 5px solid #2196F3; box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);' : ''}">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                     <h3 class="domain-title">
@@ -839,6 +932,9 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                     </div>
                     <p style="text-align:center; margin:12px 0 0 0; font-size:0.9rem; color:#666;"><b>Empty Columns:</b> ${(bankingResult.empty_columns || []).join(", ") || "None"}</p>
                 </div>
+                
+                <!-- 🔥 BANKING APPLICATION TYPE PREDICTION (NEW FEATURE) -->
+                ${renderBankingApplicationType(bankingResult.banking_application_type)}
                 
                 ${bankingResult.matched_keywords && bankingResult.matched_keywords.length > 0 ? `
                     <div style="margin:16px 0;">
@@ -930,20 +1026,20 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 <!-- Core Banking Validator only shown in account.html, not in index.html -->
             </div>
         `;
-    } else if (bankingResult !== null && bankingResult !== undefined) {
-        // Fallback: show basic banking info even if structure is unexpected
-        html += `
+            } else if (bankingResult !== null && bankingResult !== undefined) {
+                // Fallback: show basic banking info even if structure is unexpected
+                html += `
             <div class="domain-section banking">
                 <h3 class="domain-title">🏦 Banking Domain Detection</h3>
                 <p>Banking data received but format may be unexpected.</p>
                 <pre>${JSON.stringify(bankingResult, null, 2).substring(0, 200)}</pre>
             </div>
         `;
-    }
-    
-    // Financial Results (hide if explicitly skipped after banking success)
-    if (financialResult && financialResult.decision !== "SKIPPED") {
-        html += `
+            }
+
+            // Financial Results (hide if explicitly skipped after banking success)
+            if (financialResult && financialResult.decision !== "SKIPPED") {
+                html += `
             <div class="domain-section financial">
                 <h3 class="domain-title">💰 Financial Domain Detection
                     <span class="confidence-badge ${getConfidenceClass(financialResult.confidence_percentage)}">
@@ -969,11 +1065,11 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 ` : ''}
             </div>
         `;
-    }
+            }
 
-    // Insurance Results
-    if (insuranceResult) {
-        html += `
+            // Insurance Results
+            if (insuranceResult) {
+                html += `
             <div class="domain-section insurance">
                 <h3 class="domain-title">🛡️ Insurance Domain Detection
                     <span class="confidence-badge ${getConfidenceClass(insuranceResult.confidence_percentage)}">
@@ -999,11 +1095,11 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 ` : ''}
             </div>
         `;
-    }
+            }
 
-    // Government Results
-    if (governmentResult) {
-        html += `
+            // Government Results
+            if (governmentResult) {
+                html += `
             <div class="domain-section government">
                 <h3 class="domain-title">🏛️ Government Domain Detection
                     <span class="confidence-badge ${getConfidenceClass(governmentResult.confidence_percentage)}">
@@ -1029,11 +1125,11 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 ` : ''}
             </div>
         `;
-    }
+            }
 
-    // Healthcare Results
-    if (healthcareResult) {
-        html += `
+            // Healthcare Results
+            if (healthcareResult) {
+                html += `
             <div class="domain-section healthcare">
                 <h3 class="domain-title">🩺 Healthcare Domain Detection
                     <span class="confidence-badge ${getConfidenceClass(healthcareResult.confidence_percentage)}">
@@ -1059,11 +1155,11 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 ` : ''}
             </div>
         `;
-    }
+            }
 
-    // Retail Results
-    if (retailResult) {
-        html += `
+            // Retail Results
+            if (retailResult) {
+                html += `
             <div class="domain-section retail">
                 <h3 class="domain-title">🛍️ Retail Domain Detection
                     <span class="confidence-badge ${getConfidenceClass(retailResult.confidence_percentage)}">
@@ -1089,11 +1185,11 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 ` : ''}
             </div>
         `;
-    }
+            }
 
-    // Space Results
-    if (spaceResult) {
-        html += `
+            // Space Results
+            if (spaceResult) {
+                html += `
             <div class="domain-section space">
                 <h3 class="domain-title">🚀 Space Domain Detection
                     <span class="confidence-badge ${getConfidenceClass(spaceResult.confidence_percentage)}">
@@ -1119,11 +1215,11 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 ` : ''}
             </div>
         `;
-    }
+            }
 
-    // Human Resource Results
-    if (humanResourceResult) {
-        html += `
+            // Human Resource Results
+            if (humanResourceResult) {
+                html += `
             <div class="domain-section human-resource">
                 <h3 class="domain-title">👥 Human Resource Domain Detection
                     <span class="confidence-badge ${getConfidenceClass(humanResourceResult.confidence_percentage)}">
@@ -1149,22 +1245,22 @@ function showDomainResults(bankingResult, bankingAccountValidation, financialRes
                 ` : ''}
             </div>
         `;
-    }
-    
-    html += '</div>';
-    resultBox.innerHTML = html;
-}
+            }
 
-/* ---------------- CORE BANKING VALIDATOR RENDERER ---------------- */
+            html += '</div>';
+            resultBox.innerHTML = html;
+        }
 
-function renderCoreBankingValidator(result) {
-    if (!result || result.error) return '';
-    
-    const decision = result.final_decision || 'UNKNOWN';
-    const decisionColor = decision === 'PASS' ? '#4CAF50' : decision === 'PASS WITH WARNINGS' ? '#FF9800' : '#f44336';
-    const decisionIcon = decision === 'PASS' ? '✅' : decision === 'PASS WITH WARNINGS' ? '⚠️' : '❌';
-    
-    let html = `
+        /* ---------------- CORE BANKING VALIDATOR RENDERER ---------------- */
+
+        function renderCoreBankingValidator(result) {
+            if (!result || result.error) return '';
+
+            const decision = result.final_decision || 'UNKNOWN';
+            const decisionColor = decision === 'PASS' ? '#4CAF50' : decision === 'PASS WITH WARNINGS' ? '#FF9800' : '#f44336';
+            const decisionIcon = decision === 'PASS' ? '✅' : decision === 'PASS WITH WARNINGS' ? '⚠️' : '❌';
+
+            let html = `
         <div style="margin-top:30px; padding:24px; background:linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); border-radius:12px; border-left:5px solid ${decisionColor}; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
                 <h3 style="margin:0; font-size:1.5rem; color:#1976D2; font-weight:700;">
@@ -1179,11 +1275,11 @@ function renderCoreBankingValidator(result) {
                 <p style="margin:8px 0; font-size:1rem;"><b style="color:#424242;">Final Reason:</b> <span style="color:#616161;">${result.final_reason || 'N/A'}</span></p>
             </div>
     `;
-    
-    // Domain Detection
-    if (result.detected_domain) {
-        const domain = result.detected_domain;
-        html += `
+
+            // Domain Detection
+            if (result.detected_domain) {
+                const domain = result.detected_domain;
+                html += `
             <div style="background:white; padding:16px; border-radius:8px; margin-bottom:16px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
                 <h4 style="margin:0 0 12px 0; color:#1976D2; font-size:1.1rem; font-weight:600;">📋 Domain Detection</h4>
                 <p style="margin:6px 0;"><b>Domain:</b> ${domain.domain || 'N/A'}</p>
@@ -1191,14 +1287,14 @@ function renderCoreBankingValidator(result) {
                 <p style="margin:6px 0;"><b>Purpose:</b> ${domain.purpose || 'N/A'}</p>
             </div>
         `;
-    }
-    
-    // Column Identification
-    if (result.column_identification) {
-        const colId = result.column_identification;
-        const identifiedCols = Object.entries(colId.identified_columns || {}).filter(([k, v]) => v !== null);
-        
-        html += `
+            }
+
+            // Column Identification
+            if (result.column_identification) {
+                const colId = result.column_identification;
+                const identifiedCols = Object.entries(colId.identified_columns || {}).filter(([k, v]) => v !== null);
+
+                html += `
             <div style="background:white; padding:16px; border-radius:8px; margin-bottom:16px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
                 <h4 style="margin:0 0 12px 0; color:#1976D2; font-size:1.1rem; font-weight:600;">🔍 Column Identification</h4>
                 <p style="margin:6px 0;"><b>Total Columns:</b> ${colId.total_columns || 0}</p>
@@ -1215,21 +1311,21 @@ function renderCoreBankingValidator(result) {
                 </details>
             </div>
         `;
-    }
-    
-    // Critical Rules
-    if (result.critical_rules && result.critical_rules.length > 0) {
-        html += `
+            }
+
+            // Critical Rules
+            if (result.critical_rules && result.critical_rules.length > 0) {
+                html += `
             <div style="background:white; padding:16px; border-radius:8px; margin-bottom:16px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
                 <h4 style="margin:0 0 12px 0; color:#d32f2f; font-size:1.1rem; font-weight:600;">🚨 CRITICAL Rules</h4>
         `;
-        
-        result.critical_rules.forEach(rule => {
-            const ruleStatus = rule.status || 'UNKNOWN';
-            const ruleColor = ruleStatus === 'PASS' ? '#4CAF50' : '#f44336';
-            const ruleIcon = ruleStatus === 'PASS' ? '✅' : '❌';
-            
-            html += `
+
+                result.critical_rules.forEach(rule => {
+                    const ruleStatus = rule.status || 'UNKNOWN';
+                    const ruleColor = ruleStatus === 'PASS' ? '#4CAF50' : '#f44336';
+                    const ruleIcon = ruleStatus === 'PASS' ? '✅' : '❌';
+
+                    html += `
                 <div style="margin:12px 0; padding:12px; background:#fafafa; border-radius:6px; border-left:4px solid ${ruleColor};">
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
                         <h5 style="margin:0; font-size:1rem; font-weight:600; color:#424242;">${ruleIcon} ${rule.rule_name}</h5>
@@ -1248,35 +1344,35 @@ function renderCoreBankingValidator(result) {
                     ` : '<p style="margin:4px 0; color:#4CAF50; font-size:0.9rem;">✓ No violations found</p>'}
                 </div>
             `;
-        });
-        
-        html += `</div>`;
-    }
-    
-    // Warning Rules
-    if (result.warning_rules && result.warning_rules.length > 0) {
-        html += `
+                });
+
+                html += `</div>`;
+            }
+
+            // Warning Rules
+            if (result.warning_rules && result.warning_rules.length > 0) {
+                html += `
             <div style="background:white; padding:16px; border-radius:8px; margin-bottom:16px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
                 <h4 style="margin:0 0 12px 0; color:#ff9800; font-size:1.1rem; font-weight:600;">⚠️ WARNING Rules</h4>
         `;
-        
-        result.warning_rules.forEach(warning => {
-            html += `
+
+                result.warning_rules.forEach(warning => {
+                    html += `
                 <div style="margin:8px 0; padding:10px; background:#fff3e0; border-radius:6px; border-left:3px solid #ff9800;">
                     <p style="margin:4px 0; font-weight:600; color:#e65100;">${warning.rule_name}</p>
                     <p style="margin:4px 0; color:#616161; font-size:0.9rem;"><b>Column:</b> ${warning.column || 'N/A'}</p>
                     <p style="margin:4px 0; color:#616161; font-size:0.9rem;"><b>Issue:</b> ${warning.issue || 'N/A'}</p>
                 </div>
             `;
-        });
-        
-        html += `</div>`;
-    }
-    
-    // Dataset Summary
-    if (result.dataset_summary) {
-        const summary = result.dataset_summary;
-        html += `
+                });
+
+                html += `</div>`;
+            }
+
+            // Dataset Summary
+            if (result.dataset_summary) {
+                const summary = result.dataset_summary;
+                html += `
             <div style="background:white; padding:16px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
                 <h4 style="margin:0 0 12px 0; color:#1976D2; font-size:1.1rem; font-weight:600;">📊 Dataset Summary</h4>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px;">
@@ -1299,11 +1395,12 @@ function renderCoreBankingValidator(result) {
                 </div>
             </div>
         `;
-    }
-    
-    html += `</div>`;
-    return html;
-}
-</script>
+            }
+
+            html += `</div>`;
+            return html;
+        }
+    </script>
 </body>
+
 </html>

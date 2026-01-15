@@ -2661,6 +2661,167 @@ class BankingDomainDetector:
             "explanations": explanations
         }
 
+    def detect_banking_application_type(self, df: pd.DataFrame, matched_columns: list = None) -> dict:
+        """
+        🏦 Banking Application Type Prediction Engine
+        
+        Analyzes column patterns across multiple files to predict the type of 
+        banking application the data belongs to.
+        
+        Application Types:
+        1. Core Banking System (CBS) - Customer, Account, Transaction, Balance
+        2. Loan Management System (LMS) - Loan, EMI, Principal, Interest, Tenure
+        3. Payment Gateway - Payment, UPI, Merchant, Gateway, Transaction Status
+        4. Card Management System - Card, CVV, Expiry, PIN, Card Type, Limit
+        5. Treasury Management - Investment, Bond, Portfolio, Yield, Maturity
+        6. Trade Finance - LC, Bill of Exchange, Import, Export, SWIFT
+        7. Wealth Management - Portfolio, NAV, Mutual Fund, SIP, Dividend
+        8. Digital Banking - Mobile, OTP, UPI, QR, App Transaction
+        """
+        
+        columns_lower = [str(col).lower().replace('_', ' ').replace('-', ' ') for col in df.columns]
+        columns_str = ' '.join(columns_lower)
+        
+        # Application type patterns with weights
+        app_patterns = {
+            'Core Banking System': {
+                'keywords': ['account', 'customer', 'balance', 'transaction', 'deposit', 'withdrawal',
+                             'account number', 'customer id', 'account type', 'savings', 'current',
+                             'account status', 'branch', 'ifsc', 'opening balance', 'closing balance'],
+                'mandatory': ['account', 'customer'],
+                'weight': 1.0,
+                'description': 'Primary banking system for managing customer accounts, deposits, withdrawals, and balances.'
+            },
+            'Loan Management System': {
+                'keywords': ['loan', 'emi', 'principal', 'interest', 'tenure', 'disbursement',
+                             'loan id', 'loan type', 'sanctioned amount', 'outstanding', 'repayment',
+                             'installment', 'due date', 'overdue', 'collateral', 'mortgage'],
+                'mandatory': ['loan'],
+                'weight': 0.95,
+                'description': 'System for managing loans, EMIs, interest calculations, and repayment schedules.'
+            },
+            'Payment Gateway': {
+                'keywords': ['payment', 'upi', 'merchant', 'gateway', 'payment status', 'reference',
+                             'pgr', 'payment mode', 'neft', 'rtgs', 'imps', 'settlement',
+                             'beneficiary', 'payer', 'payment date', 'payment amount'],
+                'mandatory': ['payment'],
+                'weight': 0.9,
+                'description': 'System for processing digital payments, fund transfers, and settlements.'
+            },
+            'Card Management System': {
+                'keywords': ['card', 'card number', 'cvv', 'expiry', 'pin', 'card type',
+                             'credit card', 'debit card', 'card limit', 'card status', 'atm',
+                             'pos', 'card holder', 'billing', 'statement'],
+                'mandatory': ['card'],
+                'weight': 0.9,
+                'description': 'System for managing credit/debit cards, limits, and card transactions.'
+            },
+            'Treasury Management': {
+                'keywords': ['treasury', 'investment', 'bond', 'portfolio', 'yield', 'maturity',
+                             'fixed deposit', 'fd', 'rd', 'securities', 'forex', 'liquidity',
+                             'capital', 'asset', 'liability'],
+                'mandatory': ['investment', 'treasury', 'bond', 'fixed deposit', 'fd'],
+                'weight': 0.85,
+                'description': 'System for managing bank investments, securities, and treasury operations.'
+            },
+            'Trade Finance': {
+                'keywords': ['trade', 'lc', 'letter of credit', 'bill of exchange', 'import',
+                             'export', 'swift', 'documentary', 'bill of lading', 'shipment',
+                             'incoterms', 'bank guarantee'],
+                'mandatory': ['trade', 'lc', 'import', 'export'],
+                'weight': 0.85,
+                'description': 'System for managing international trade finance and documentary credits.'
+            },
+            'Wealth Management': {
+                'keywords': ['portfolio', 'nav', 'mutual fund', 'sip', 'dividend', 'wealth',
+                             'equity', 'stock', 'shares', 'broker', 'demat', 'holdings',
+                             'units', 'redemption', 'scheme'],
+                'mandatory': ['portfolio', 'mutual fund', 'nav', 'sip'],
+                'weight': 0.85,
+                'description': 'System for managing investments, portfolios, and wealth advisory services.'
+            },
+            'Digital Banking': {
+                'keywords': ['mobile', 'otp', 'upi', 'qr', 'app', 'digital', 'online',
+                             'internet banking', 'net banking', 'channel', 'device',
+                             'session', 'login', 'authentication'],
+                'mandatory': ['mobile', 'otp', 'upi', 'digital', 'app'],
+                'weight': 0.8,
+                'description': 'System for managing mobile and internet banking channels.'
+            }
+        }
+        
+        # Score each application type
+        app_scores = {}
+        app_details = {}
+        
+        for app_type, patterns in app_patterns.items():
+            score = 0
+            matched_keywords = []
+            has_mandatory = False
+            
+            # Check for keyword matches
+            for keyword in patterns['keywords']:
+                if keyword in columns_str:
+                    score += 10
+                    matched_keywords.append(keyword)
+            
+            # Check for mandatory keywords
+            for mandatory_kw in patterns['mandatory']:
+                if mandatory_kw in columns_str:
+                    has_mandatory = True
+                    break
+            
+            # Boost score if mandatory keyword present
+            if has_mandatory:
+                score *= 1.5
+            
+            # Apply weight
+            score *= patterns['weight']
+            
+            if score > 0:
+                app_scores[app_type] = score
+                app_details[app_type] = {
+                    'matched_keywords': matched_keywords,
+                    'has_mandatory': has_mandatory,
+                    'description': patterns['description']
+                }
+        
+        # Sort by score
+        sorted_apps = sorted(app_scores.items(), key=lambda x: x[1], reverse=True)
+        
+        if not sorted_apps:
+            return {
+                'predicted_application': 'Unknown Banking Application',
+                'confidence': 0,
+                'explanation': 'Could not determine the specific banking application type.',
+                'all_matches': []
+            }
+        
+        # Get top prediction
+        top_app, top_score = sorted_apps[0]
+        total_score = sum(app_scores.values())
+        confidence = round((top_score / total_score) * 100, 1) if total_score > 0 else 0
+        
+        # Get top 3 matches
+        top_matches = []
+        for app_name, score in sorted_apps[:3]:
+            details = app_details.get(app_name, {})
+            app_confidence = round((score / total_score) * 100, 1) if total_score > 0 else 0
+            top_matches.append({
+                'application_type': app_name,
+                'confidence': app_confidence,
+                'matched_keywords': details.get('matched_keywords', []),
+                'description': details.get('description', '')
+            })
+        
+        return {
+            'predicted_application': top_app,
+            'confidence': confidence,
+            'explanation': app_details.get(top_app, {}).get('description', ''),
+            'matched_keywords': app_details.get(top_app, {}).get('matched_keywords', []),
+            'all_matches': top_matches
+        }
+
     def predict(self, csv_path):
         try:
             df = pd.read_csv(csv_path)
@@ -2842,6 +3003,9 @@ class BankingDomainDetector:
         # 🔥 BANKING COLUMN MAPPER: Use Banking Column Mapper for pattern-based column detection
         banking_column_mapper = BankingColumnMapper()
         column_mapping_result = banking_column_mapper.map_columns(csv_path)
+        
+        # 🔥 BANKING APPLICATION TYPE PREDICTION (NEW FEATURE)
+        banking_app_type_prediction = self.detect_banking_application_type(df, matched_columns)
 
         # 🔥 CORE ENGINE: Use Core Banking Engine results (KYC REMOVED)
         core_final_decision = core_analysis.get("final_decision", {})
@@ -2949,6 +3113,9 @@ class BankingDomainDetector:
             
             # 🔥 BANKING COLUMN MAPPER RESULTS (PATTERN-BASED COLUMN DETECTION)
             "banking_column_mapping": column_mapping_result,
+            
+            # 🔥 BANKING APPLICATION TYPE PREDICTION (NEW FEATURE)
+            "banking_application_type": banking_app_type_prediction,
             
             "ordered_summary": filtered_ordered_summary
         }
