@@ -90,6 +90,21 @@ async def upload_file(file: UploadFile = File(...)):
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
+        # 🔥 STEP 0: CORE BANKING BUSINESS RULES ENGINE (RUNS FIRST)
+        core_banking_rules_result = None
+        try:
+            from core_banking_business_rules_engine import CoreBankingBusinessRulesEngine
+            import pandas as pd
+            core_rules_engine = CoreBankingBusinessRulesEngine()
+            df_for_rules = pd.read_csv(file_path)
+            core_banking_rules_result = core_rules_engine.analyze_dataset(file_path, df_for_rules)
+            print(f"Core Banking Business Rules Engine: Analyzed {core_banking_rules_result.get('total_columns', 0)} columns")
+        except Exception as e:
+            print(f"Warning: Core Banking Business Rules Engine error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            core_banking_rules_result = {"error": str(e)}
+
         # Run domain detection – banking first, then others as needed
         try:
             # Banking domain detection
@@ -253,12 +268,52 @@ async def upload_file(file: UploadFile = File(...)):
         banking_blueprint = None
         try:
             from banking_blueprint_engine import BankingBlueprintEngine
+            import pandas as pd
             blueprint_engine = BankingBlueprintEngine()
-            # Wrap file_path in a list for the multi-file analyzer
-            blueprint_result = blueprint_engine.analyze_multiple_files([file_path])
-            banking_blueprint = blueprint_result
+            # For single file, use analyze_file method
+            try:
+                df = pd.read_csv(file_path)
+                blueprint_result = blueprint_engine.analyze_file(file_path, df)
+                banking_blueprint = blueprint_result
+            except Exception as e:
+                print(f"Warning: Could not analyze file for blueprint: {str(e)}")
+                # Fallback: try with file path as dict key
+                try:
+                    df = pd.read_csv(file_path)
+                    blueprint_result = blueprint_engine.analyze_multiple_files({file.filename: df})
+                    banking_blueprint = blueprint_result
+                except Exception as e2:
+                    print(f"Warning: Multi-file fallback also failed: {str(e2)}")
+                    raise e
         except Exception as e:
             print(f"Warning: Banking blueprint analysis error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Generate minimal blueprint with business rules only
+            try:
+                import pandas as pd
+                from banking_blueprint_engine import BankingBlueprintEngine
+                df = pd.read_csv(file_path)
+                blueprint_engine = BankingBlueprintEngine()
+                # At minimum, generate business rules
+                columns = list(df.columns)
+                business_rules = blueprint_engine.apply_business_rules(columns, df)
+                banking_blueprint = {
+                    "domain": "Banking",
+                    "confidence_percentage": 50,
+                    "application": "Unknown",
+                    "application_confidence": 0,
+                    "business_rules": business_rules,
+                    "error": f"Partial analysis due to: {str(e)}"
+                }
+            except Exception as fallback_e:
+                print(f"Warning: Fallback blueprint generation also failed: {str(fallback_e)}")
+                banking_blueprint = {
+                    "domain": "Banking",
+                    "confidence_percentage": 0,
+                    "application": "Unknown",
+                    "error": f"Blueprint analysis failed: {str(fallback_e)}"
+                }
 
         return JSONResponse(
             content={
@@ -283,6 +338,9 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_transaction_rules": banking_result.get("banking_transaction_rules"),
                 "banking_column_purpose_report": banking_result.get("column_purpose_report"),
                 "banking_column_mapping": banking_result.get("banking_column_mapping"),
+                
+                # 🔥 CORE BANKING BUSINESS RULES ENGINE (PRIMARY - RUNS FIRST)
+                "core_banking_business_rules": core_banking_rules_result,
                 
                 # 🔥 BANKING BLUEPRINT (NEW UNIFIED ANALYSIS)
                 "banking_blueprint": banking_blueprint,
@@ -363,6 +421,25 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
         if not file_paths:
             raise HTTPException(status_code=400, detail="No valid files to process")
         
+        # 🔥 STEP 0: CORE BANKING BUSINESS RULES ENGINE (RUNS FIRST FOR EACH FILE)
+        core_banking_rules_results = {}
+        try:
+            from core_banking_business_rules_engine import CoreBankingBusinessRulesEngine
+            import pandas as pd
+            core_rules_engine = CoreBankingBusinessRulesEngine()
+            
+            for file_path in file_paths:
+                try:
+                    df = pd.read_csv(file_path)
+                    file_name = os.path.basename(file_path)
+                    core_rules_result = core_rules_engine.analyze_dataset(file_path, df)
+                    core_banking_rules_results[file_name] = core_rules_result
+                except Exception as e:
+                    print(f"Warning: Core Banking Rules analysis failed for {file_path}: {str(e)}")
+                    core_banking_rules_results[os.path.basename(file_path)] = {"error": str(e)}
+        except Exception as e:
+            print(f"Warning: Core Banking Business Rules Engine initialization error: {str(e)}")
+        
         # Process multiple files using multi-file processor
         try:
             multi_file_processor = MultiFileProcessor()
@@ -387,6 +464,8 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     "message": "Files analyzed successfully",
                     "multi_file_mode": True,
                     "total_files": result.get("total_files", len(file_paths)),
+                    # 🔥 CORE BANKING BUSINESS RULES ENGINE (PRIMARY - RUNS FIRST)
+                    "core_banking_business_rules": core_banking_rules_results,
                     "banking": banking_result,
                     "banking_dataset_validator": banking_validator_result,
                     "core_banking_validator": core_banking_validator_result,

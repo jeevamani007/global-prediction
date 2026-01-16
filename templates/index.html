@@ -631,7 +631,8 @@
         uploadBtn.onclick = async () => {
             const formData = new FormData();
             const isMulti = selectedFiles.length > 1;
-            const endpoint = isMulti ? "http://localhost:8000/upload-multiple" : "http://localhost:8000/upload";
+            // Use relative URLs to work with any host/port
+            const endpoint = isMulti ? "/upload-multiple" : "/upload";
 
             if (isMulti) {
                 selectedFiles.forEach(f => formData.append("files", f));
@@ -684,6 +685,9 @@
         };
 
         function storeSessionData(data) {
+            // Store Core Banking Business Rules (PRIORITY - Runs First)
+            if (data.core_banking_business_rules) sessionStorage.setItem('coreBankingBusinessRules', JSON.stringify(data.core_banking_business_rules));
+            
             // Store main banking data
             if (data.banking) sessionStorage.setItem('bankingResult', JSON.stringify(data.banking));
             if (data.banking_dataset_validator) sessionStorage.setItem('bankingDatasetValidator', JSON.stringify(data.banking_dataset_validator));
@@ -705,6 +709,16 @@
             if (data.banking_blueprint) sessionStorage.setItem('bankingBlueprint', JSON.stringify(data.banking_blueprint));
             if (data.multi_file_mode) {
                 sessionStorage.setItem('multiFileMode', 'true');
+                // Store Core Banking Business Rules for multi-file (per-file results)
+                if (data.core_banking_business_rules) {
+                    // Combine all file results into one structure for UI
+                    const combinedRules = {
+                        multi_file: true,
+                        files: data.core_banking_business_rules,
+                        total_files: Object.keys(data.core_banking_business_rules).length
+                    };
+                    sessionStorage.setItem('coreBankingBusinessRules', JSON.stringify(combinedRules));
+                }
                 if (data.relationships) sessionStorage.setItem('multiFileRelationships', JSON.stringify(data.relationships));
                 if (data.primary_keys) sessionStorage.setItem('multiFilePrimaryKeys', JSON.stringify(data.primary_keys));
                 if (data.foreign_keys) sessionStorage.setItem('multiFileForeignKeys', JSON.stringify(data.foreign_keys));

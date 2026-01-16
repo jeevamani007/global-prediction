@@ -1214,6 +1214,8 @@
         }
 
         function loadBusinessRules() {
+            // PRIORITY 1: Core Banking Business Rules Engine (Runs First)
+            const coreBankingRules = JSON.parse(sessionStorage.getItem('coreBankingBusinessRules') || 'null');
             const blueprint = JSON.parse(sessionStorage.getItem('bankingBlueprint') || 'null');
             const bankingResult = JSON.parse(sessionStorage.getItem('bankingResult') || 'null');
             const tableResults = JSON.parse(sessionStorage.getItem('multiFileTableResults') || '[]');
@@ -1222,17 +1224,167 @@
 
             let rulesHtml = '';
 
-            // 1. Unified Banking Blueprint Rules (Highest Priority)
-            if (blueprint && blueprint.business_rules) {
+            // 1. CORE BANKING BUSINESS RULES ENGINE (HIGHEST PRIORITY - UI-READY FORMAT)
+            // Handle both single-file and multi-file results
+            let columnsToDisplay = [];
+            let summaryToDisplay = null;
+            
+            if (coreBankingRules && !coreBankingRules.error) {
+                if (coreBankingRules.multi_file && coreBankingRules.files) {
+                    // Multi-file: combine all columns from all files
+                    Object.entries(coreBankingRules.files).forEach(([fileName, fileData]) => {
+                        if (fileData && !fileData.error && fileData.columns_analysis && Array.isArray(fileData.columns_analysis)) {
+                            fileData.columns_analysis.forEach(col => {
+                                if (col && col.column_name) {
+                                    columnsToDisplay.push({
+                                        ...col,
+                                        source_file: fileName
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    // Calculate combined summary
+                    if (columnsToDisplay.length > 0) {
+                        const totalCols = columnsToDisplay.length;
+                        const identified = columnsToDisplay.filter(c => c.step2_identified_as && c.step2_identified_as !== 'unknown').length;
+                        const avgConf = columnsToDisplay.reduce((sum, c) => sum + (c.step3_confidence_score || 0), 0) / totalCols;
+                        summaryToDisplay = {
+                            total_columns: totalCols,
+                            identified_columns: identified,
+                            average_confidence: avgConf
+                        };
+                    }
+                } else if (coreBankingRules.columns_analysis && Array.isArray(coreBankingRules.columns_analysis)) {
+                    // Single file
+                    columnsToDisplay = coreBankingRules.columns_analysis.filter(col => col && col.column_name);
+                    summaryToDisplay = coreBankingRules.summary;
+                }
+            }
+            
+            // Debug: Log if no data found
+            if (!coreBankingRules) {
+                console.log('No Core Banking Rules data found in sessionStorage');
+            } else if (coreBankingRules.error) {
+                console.warn('Core Banking Rules Error:', coreBankingRules.error);
+            } else if (columnsToDisplay.length === 0) {
+                console.warn('Core Banking Rules data structure:', JSON.stringify(coreBankingRules, null, 2));
+            }
+            
+            if (columnsToDisplay.length > 0) {
                 rulesHtml += `
                     <div style="text-align: center; margin-bottom: 32px;">
-                        <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 8px;">🏛️ Unified Banking Business Rules</h2>
-                        <p style="color: var(--text-muted); font-size: 1.05rem;">Integrated analysis of business workflows across all datasets</p>
+                        <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 8px;">🏦 Core Banking Business Rules</h2>
+                        <p style="color: var(--text-muted); font-size: 1.05rem;">Industry-standard banking rules applied to each column</p>
+                        ${summaryToDisplay ? `
+                            <div style="display: flex; justify-content: center; gap: 20px; margin-top: 16px; flex-wrap: wrap;">
+                                <div style="background: #f0f5ff; padding: 12px 20px; border-radius: 8px;">
+                                    <strong>${summaryToDisplay.identified_columns}</strong> / ${summaryToDisplay.total_columns} Identified
+                                </div>
+                                <div style="background: #f0f5ff; padding: 12px 20px; border-radius: 8px;">
+                                    <strong>${summaryToDisplay.average_confidence?.toFixed(1) || 0}%</strong> Avg Confidence
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 `;
 
-                // Render File-wise Rules
-                if (blueprint.business_rules.files) {
+                // Display each column analysis in UI-ready format
+                columnsToDisplay.forEach((colAnalysis, idx) => {
+                    const uiFormat = colAnalysis.ui_ready_format || {};
+                    const confidence = colAnalysis.step3_confidence_score || 0;
+                    const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
+                    
+                    rulesHtml += `
+                        <div class="card" style="margin-bottom: 24px; border-left: 4px solid ${confidenceColor};">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+                                <div>
+                                    <h4 style="color: var(--primary); font-size: 1.1rem; margin: 0;">
+                                        ${idx + 1}. ${uiFormat['Column Name'] || colAnalysis.column_name}
+                                    </h4>
+                                    ${colAnalysis.source_file ? `
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                                            📄 Source: ${colAnalysis.source_file}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <span style="background: ${confidenceColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
+                                    ${uiFormat['Confidence'] || '0%'}
+                                </span>
+                            </div>
+                            
+                            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+                                <div style="margin-bottom: 12px;">
+                                    <strong style="color: #374151;">Identified As:</strong>
+                                    <div style="margin-top: 4px; color: var(--primary); font-weight: 600;">
+                                        ${uiFormat['Identified As'] || colAnalysis.step2_identified_as || 'Unknown'}
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-bottom: 12px;">
+                                    <strong style="color: #374151;">Business Meaning:</strong>
+                                    <div style="margin-top: 4px; color: #1f2937; line-height: 1.6;">
+                                        ${uiFormat['Business Meaning'] || colAnalysis.step4_business_meaning || 'Not available'}
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-bottom: 12px;">
+                                    <strong style="color: #374151;">Business Rules:</strong>
+                                    <div style="margin-top: 4px; color: #1f2937; white-space: pre-line; line-height: 1.8;">
+                                        ${uiFormat['Business Rules'] || colAnalysis.step4_business_rules?.rules_display || 'Standard banking rules apply'}
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-bottom: 12px;">
+                                    <strong style="color: #374151;">Why This Rule Exists:</strong>
+                                    <div style="margin-top: 4px; color: #1f2937; line-height: 1.6;">
+                                        ${uiFormat['Why This Rule Exists'] || colAnalysis.step4_why_rule_exists || 'Standard banking requirement'}
+                                    </div>
+                                </div>
+                                
+                                <div style="background: #fee2e2; padding: 12px; border-radius: 6px; border-left: 3px solid #dc2626;">
+                                    <strong style="color: #991b1b;">⚠️ Violation Impact:</strong>
+                                    <div style="margin-top: 4px; color: #7f1d1d; line-height: 1.6; font-size: 0.9rem;">
+                                        ${uiFormat['Violation Impact'] || colAnalysis.step4_violation_impact || 'Business, financial, and compliance risks'}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${colAnalysis.step1_profile ? `
+                                <details style="margin-top: 12px;">
+                                    <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 8px;">
+                                        📊 Column Profile Details
+                                    </summary>
+                                    <div style="margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 0.9rem;">
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                                            <div><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
+                                            <div><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
+                                            <div><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
+                                            <div><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
+                                        </div>
+                                    </div>
+                                </details>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                // Set HTML and return early - Core Banking Rules take priority
+                document.getElementById('businessRulesContent').innerHTML = rulesHtml;
+                return;
+            }
+
+            // 2. Unified Banking Blueprint Rules (Fallback if Core Rules not available)
+            if (blueprint && blueprint.business_rules) {
+                rulesHtml += `
+                    <div style="text-align: center; margin-bottom: 32px;">
+                        <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 8px;">🏛️ Dynamic Business Rules</h2>
+                        <p style="color: var(--text-muted); font-size: 1.05rem;">Business rules automatically generated based on your data columns</p>
+                    </div>
+                `;
+
+                // Render File-wise Rules (for multi-file)
+                if (blueprint.business_rules.files && Object.keys(blueprint.business_rules.files).length > 0) {
                     for (const [fileName, fileData] of Object.entries(blueprint.business_rules.files)) {
                         rulesHtml += `
                             <div class="card" style="margin-bottom: 24px;">
@@ -1241,7 +1393,7 @@
                                 </h4>
                         `;
 
-                        if (fileData.rules) {
+                        if (fileData.rules && Object.keys(fileData.rules).length > 0) {
                             rulesHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
                             for (const [colName, ruleData] of Object.entries(fileData.rules)) {
                                 if (!ruleData.explanation || ruleData.explanation === "No specific rules found.") continue;
@@ -1253,11 +1405,20 @@
                                             <span class="rule-title">${colName}</span>
                                         </div>
                                         <div class="rule-content">
+                                            <strong>${ruleData.title || colName}:</strong><br>
                                             ${ruleData.explanation}
                                         </div>
                                         ${ruleData.workflow ? `
                                             <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); padding: 8px; background: #f8fafc; border-radius: 6px;">
                                                 <strong>Workflow:</strong> ${ruleData.workflow}
+                                            </div>
+                                        ` : ''}
+                                        ${ruleData.simple_rules && ruleData.simple_rules.length > 0 ? `
+                                            <div style="margin-top: 10px; font-size: 0.85rem;">
+                                                <strong>Key Rules:</strong>
+                                                <ul style="margin: 4px 0 0 20px; padding: 0;">
+                                                    ${ruleData.simple_rules.map(rule => `<li>${rule}</li>`).join('')}
+                                                </ul>
                                             </div>
                                         ` : ''}
                                     </div>
@@ -1267,6 +1428,40 @@
                         }
                         rulesHtml += '</div>';
                     }
+                }
+                // Render consolidated column-wise rules (for single file or fallback)
+                else if (blueprint.business_rules.column_wise_rules && Object.keys(blueprint.business_rules.column_wise_rules).length > 0) {
+                    rulesHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
+                    for (const [colName, ruleData] of Object.entries(blueprint.business_rules.column_wise_rules)) {
+                        if (!ruleData.explanation || ruleData.explanation === "No specific rules found.") continue;
+
+                        rulesHtml += `
+                            <div class="business-rule-card">
+                                <div class="rule-header">
+                                    <span class="rule-icon">${ruleData.icon || '📊'}</span>
+                                    <span class="rule-title">${colName}</span>
+                                </div>
+                                <div class="rule-content">
+                                    <strong>${ruleData.title || colName}:</strong><br>
+                                    ${ruleData.explanation}
+                                </div>
+                                ${ruleData.workflow ? `
+                                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); padding: 8px; background: #f8fafc; border-radius: 6px;">
+                                        <strong>Workflow:</strong> ${ruleData.workflow}
+                                    </div>
+                                ` : ''}
+                                ${ruleData.simple_rules && ruleData.simple_rules.length > 0 ? `
+                                    <div style="margin-top: 10px; font-size: 0.85rem;">
+                                        <strong>Key Rules:</strong>
+                                        <ul style="margin: 4px 0 0 20px; padding: 0;">
+                                            ${ruleData.simple_rules.map(rule => `<li>${rule}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }
+                    rulesHtml += '</div>';
                 }
             }
             // 2. Legacy/Fallback Rules
@@ -1321,11 +1516,25 @@
                 rulesHtml += `</div>`;
             }
 
-            if (!rulesHtml) {
+            if (!rulesHtml || rulesHtml.trim() === '') {
                 rulesHtml = `
-                    <div class="empty-state">
-                        <div class="icon">📋</div>
-                        <p>No business rules detected. Upload banking data to see applicable rules.</p>
+                    <div class="empty-state" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                        <div style="font-size: 3rem; margin-bottom: 16px;">📋</div>
+                        <h3 style="color: var(--primary); margin-bottom: 8px;">No Business Rules Detected</h3>
+                        <p style="font-size: 1rem; margin-bottom: 8px;">Upload banking data files to see automatically generated business rules.</p>
+                        <p style="font-size: 0.9rem; color: #6b7280;">
+                            The Core Banking Business Rules Engine will analyze your columns and apply industry-standard banking rules.
+                        </p>
+                        ${coreBankingRules && coreBankingRules.error ? `
+                            <div style="margin-top: 16px; padding: 12px; background: #fee2e2; border-radius: 8px; color: #991b1b; max-width: 600px; margin-left: auto; margin-right: auto;">
+                                <strong>⚠️ Error:</strong> ${coreBankingRules.error}
+                            </div>
+                        ` : ''}
+                        ${!coreBankingRules ? `
+                            <div style="margin-top: 16px; padding: 12px; background: #fef3c7; border-radius: 8px; color: #92400e; max-width: 600px; margin-left: auto; margin-right: auto;">
+                                <strong>ℹ️ Info:</strong> Core Banking Business Rules data not found. Please upload a file to generate rules.
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             }

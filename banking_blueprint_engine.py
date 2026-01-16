@@ -347,23 +347,48 @@ class BankingBlueprintEngine:
     def apply_business_rules(self, columns: List[str], df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """
         Apply business rules to each column based on its type
+        Dynamically generates rules based on actual data when available
         """
         column_rules = {}
         
         for col in columns:
             # Use Enhanced Business Rules Engine for richer descriptions
-            data_series = df[col] if df is not None and col in df.columns else pd.Series()
-            enhanced_rule = self.enhanced_rules_engine.explain_column_business_meaning(col, data_series)
+            # Only use actual data if DataFrame is provided and column exists
+            if df is not None and col in df.columns:
+                data_series = df[col]
+            else:
+                # Create a minimal series for dynamic inference when no data available
+                # This allows the engine to still generate rules based on column name patterns
+                data_series = pd.Series([], dtype=object)
             
-            column_rules[col] = {
-                "column_name": col,
-                "title": enhanced_rule.get("title", f"{col} Rule"),
-                "explanation": enhanced_rule.get("detailed_explanation", "No specific rules found."),
-                "workflow": enhanced_rule.get("business_workflow", ""),
-                "icon": enhanced_rule.get("icon", "📊"),
-                "simple_rules": enhanced_rule.get("simple_rules", []),
-                "data_rules": enhanced_rule.get("data_rules", [])
-            }
+            try:
+                enhanced_rule = self.enhanced_rules_engine.explain_column_business_meaning(col, data_series)
+                
+                column_rules[col] = {
+                    "column_name": col,
+                    "title": enhanced_rule.get("title", f"{col} Rule"),
+                    "explanation": enhanced_rule.get("detailed_explanation", "No specific rules found."),
+                    "workflow": enhanced_rule.get("business_workflow", ""),
+                    "icon": enhanced_rule.get("icon", "📊"),
+                    "simple_rules": enhanced_rule.get("simple_rules", enhanced_rule.get("data_rules", [])[:3]),
+                    "data_rules": enhanced_rule.get("data_rules", []),
+                    "section": enhanced_rule.get("section", "General Banking"),
+                    "purpose": enhanced_rule.get("purpose", f"Stores information related to {col}")
+                }
+            except Exception as e:
+                # Fallback if rule generation fails
+                print(f"Warning: Could not generate rule for column {col}: {str(e)}")
+                column_rules[col] = {
+                    "column_name": col,
+                    "title": f"{col} Data Field",
+                    "explanation": f"The {col} column contains data relevant to banking operations. Business rules are determined based on the column's purpose and data patterns.",
+                    "workflow": f"This field is used in banking operations where {col} information is required.",
+                    "icon": "📋",
+                    "simple_rules": ["Data validation required", "Must follow banking standards"],
+                    "data_rules": ["Data validation required", "Must follow banking standards"],
+                    "section": "General Banking",
+                    "purpose": f"Stores information related to {col}"
+                }
         
         return {
             "column_wise_rules": column_rules,
@@ -677,16 +702,32 @@ class BankingBlueprintEngine:
             
             # Step 5: Business Rules Application (Detailed for each file)
             file_rules = {}
+            all_column_rules = {}
+            
             for file_name, df in file_dataframes.items():
                 cols = self.extract_column_names(df)
+                file_column_rules = self.apply_business_rules(cols, df)["column_wise_rules"]
                 file_rules[file_name] = {
-                    "rules": self.apply_business_rules(cols, df)["column_wise_rules"],
+                    "rules": file_column_rules,
                     "table_purpose": self.enhanced_rules_engine._detect_table_purpose(df, file_name)
                 }
+                # Merge into consolidated rules (file-specific rules take precedence)
+                for col, rule in file_column_rules.items():
+                    if col not in all_column_rules:
+                        all_column_rules[col] = rule
+            
+            # For columns not in any file, generate rules based on name only
+            for col in unique_columns:
+                if col not in all_column_rules:
+                    # Use first file's DataFrame if available, otherwise None
+                    first_df = next(iter(file_dataframes.values())) if file_dataframes else None
+                    rule = self.apply_business_rules([col], first_df)["column_wise_rules"].get(col, {})
+                    if rule:
+                        all_column_rules[col] = rule
             
             business_rules = {
                 "files": file_rules,
-                "column_wise_rules": self.apply_business_rules(unique_columns, None)["column_wise_rules"], # Legacy/Consolidated
+                "column_wise_rules": all_column_rules,  # Consolidated rules from all files
                 "total_rules_applied": sum(len(f["rules"]) for f in file_rules.values())
             }
             

@@ -665,31 +665,210 @@ The data in this table is used for daily operations, reporting, compliance, and 
         return max(0, min(100, score))
     
     def _generate_generic_explanation(self, column_name: str, series: pd.Series) -> Dict[str, Any]:
-        """Generate basic explanation for columns without predefined rules"""
-        # Detect column type
-        column_type = "Unknown"
-        if pd.api.types.is_numeric_dtype(series):
-            column_type = "Numeric Amount or Identifier"
-        elif pd.api.types.is_datetime64_any_dtype(series):
-            column_type = "Date/Time Field"
-        else:
-            column_type = "Text/Categorical Field"
+        """Generate dynamic explanation for columns without predefined rules based on data analysis"""
+        normalized = self._normalize_column_name(column_name)
+        stats = self._calculate_column_statistics(series)
+        
+        # Detect column type and patterns
+        is_numeric = pd.api.types.is_numeric_dtype(series)
+        is_datetime = pd.api.types.is_datetime64_any_dtype(series)
+        is_text = not is_numeric and not is_datetime
+        
+        # Analyze column name for semantic meaning
+        title, purpose, explanation, workflow, data_rules = self._infer_column_meaning(
+            column_name, normalized, series, is_numeric, is_datetime, is_text, stats
+        )
+        
+        # Add section and icon based on detected meaning
+        section = self._detect_section(normalized)
+        icon = self._detect_icon(normalized)
         
         return {
             "column_name": column_name,
-            "title": f"{column_name} Data Field",
-            "purpose": f"Stores {column_type.lower()} information",
-            "detailed_explanation": f"""The {column_name} column contains {column_type.lower()} data that is part of this banking table. 
-Based on the data patterns, this field appears to store information relevant to banking operations. The exact business meaning 
-should be confirmed with domain experts or documentation.""",
-            "business_workflow": f"This field is used in banking operations where {column_name} information is required.",
-            "data_rules": [
-                f"Data type: {column_type}",
-                f"Contains {series.notna().sum()} non-null values out of {len(series)} total records"
-            ],
-            "data_statistics": self._calculate_column_statistics(series),
-            "quality_score": self._calculate_quality_score(series, [])
+            "title": title,
+            "section": section,
+            "icon": icon,
+            "purpose": purpose,
+            "detailed_explanation": explanation,
+            "business_workflow": workflow,
+            "data_rules": data_rules,
+            "simple_rules": data_rules[:3] if len(data_rules) > 3 else data_rules,
+            "data_statistics": stats,
+            "quality_score": self._calculate_quality_score(series, data_rules)
         }
+    
+    def _infer_column_meaning(self, column_name: str, normalized: str, series: pd.Series, 
+                              is_numeric: bool, is_datetime: bool, is_text: bool, stats: Dict) -> tuple:
+        """Dynamically infer business meaning from column name and data patterns"""
+        
+        # Pattern matching for common banking terms
+        patterns = {
+            # ID fields
+            'id': ('Identifier Field', 'Uniquely identifies records in the system',
+                   f'The {column_name} column serves as a unique identifier for each record. This field is critical for tracking, linking related data, and ensuring data integrity. Each value should be unique to prevent duplicate records.',
+                   f'When a new record is created, the system assigns a unique {column_name}. This identifier is used throughout the system to reference this specific record.',
+                   ['Must be unique across all records', 'Cannot be null', 'Used as primary reference key']),
+            
+            # Amount/Money fields
+            'amount': ('Amount Field', 'Stores monetary values',
+                      f'The {column_name} column contains financial amounts in currency units. This field is essential for all monetary calculations, balance tracking, and financial reporting.',
+                      f'When processing transactions, the {column_name} is used to calculate balances, generate statements, and track financial movements.',
+                      ['Must be numeric', 'Cannot be negative (unless overdraft allowed)', 'Precision typically 2 decimal places']),
+            
+            'balance': ('Balance Field', 'Tracks account or transaction balances',
+                      f'The {column_name} represents the current balance or remaining amount. This is calculated based on opening balance plus credits minus debits.',
+                      f'The {column_name} is updated after each transaction to reflect the current state. It is used for balance checks, overdraft prevention, and reporting.',
+                      ['Must be numeric', 'Updated in real-time', 'Used for balance validation']),
+            
+            # Date fields
+            'date': ('Date Field', 'Records temporal information',
+                    f'The {column_name} column stores date information critical for time-based operations, reporting, and compliance. Dates are used for sorting, filtering, and generating time-based reports.',
+                    f'When records are created or transactions occur, the {column_name} is automatically captured. This date is used for statement generation, interest calculation, and audit trails.',
+                    ['Must be valid date format', 'Cannot be future date (except scheduled)', 'Used for chronological ordering']),
+            
+            # Status fields
+            'status': ('Status Field', 'Indicates current state or condition',
+                     f'The {column_name} column tracks the operational state of records. This determines what actions can be performed and how the record behaves in the system.',
+                     f'The {column_name} changes based on business events. For example, accounts can be Active, Inactive, Frozen, or Closed, each allowing different operations.',
+                     ['Must be from predefined list', 'Cannot be null', 'Controls operational behavior']),
+            
+            # Type fields
+            'type': ('Classification Field', 'Categorizes records by type',
+                    f'The {column_name} column classifies records into different categories. Each type has specific rules, features, and behaviors associated with it.',
+                    f'When creating records, users select a {column_name}. This selection determines applicable rules, fees, limits, and features for that record.',
+                    ['Must be valid type from allowed list', 'Cannot be null', 'Determines business rules']),
+            
+            # Code fields
+            'code': ('Code Field', 'Stores standardized codes or identifiers',
+                    f'The {column_name} column contains codes that follow specific formats or standards. These codes are used for identification, routing, or classification purposes.',
+                    f'The {column_name} is assigned based on predefined rules or standards. It is used for system routing, validation, and cross-referencing.',
+                    ['Must follow specific format', 'Typically alphanumeric', 'Used for system routing']),
+            
+            # Name fields
+            'name': ('Name Field', 'Stores descriptive names or labels',
+                    f'The {column_name} column contains human-readable names or labels. This information is used for display, identification, and user interaction.',
+                    f'Users enter or select {column_name} values when creating records. This name appears in reports, statements, and user interfaces.',
+                    ['Must be text', 'Required for identification', 'Used in user interfaces']),
+        }
+        
+        # Check for pattern matches
+        for pattern, (title, purpose, explanation, workflow, rules) in patterns.items():
+            if pattern in normalized:
+                # Enhance rules based on data statistics
+                enhanced_rules = list(rules)
+                
+                if is_numeric and 'amount' in normalized or 'balance' in normalized:
+                    if stats.get('min_value', 0) < 0:
+                        enhanced_rules.append('Negative values allowed (overdraft)')
+                    else:
+                        enhanced_rules.append('Must be non-negative')
+                
+                if stats.get('unique_count', 0) == stats.get('total_records', 0) and 'id' in normalized:
+                    enhanced_rules.append('All values are unique (as expected for ID)')
+                elif stats.get('unique_count', 0) < stats.get('total_records', 0) * 0.1 and 'id' not in normalized:
+                    enhanced_rules.append('Low uniqueness - may be categorical/enum field')
+                
+                if stats.get('null_percentage', 0) > 10:
+                    enhanced_rules.append(f'Contains {stats["null_percentage"]:.1f}% null values - may need data cleanup')
+                
+                return (title, purpose, explanation, workflow, enhanced_rules)
+        
+        # Generic inference based on data characteristics
+        if is_numeric:
+            if stats.get('unique_count', 0) == stats.get('total_records', 0):
+                title = f'{column_name} Unique Identifier'
+                purpose = 'Stores unique numeric identifiers'
+                explanation = f'The {column_name} column contains unique numeric values that identify each record. This appears to be an identifier field used for referencing and linking data.'
+                workflow = f'The system uses {column_name} to uniquely identify and reference records in operations and queries.'
+                rules = ['Must be unique', 'Numeric format', 'Cannot be null']
+            elif stats.get('min_value', 0) >= 0 and stats.get('max_value', 0) > 1000:
+                title = f'{column_name} Amount Field'
+                purpose = 'Stores monetary or large numeric values'
+                explanation = f'The {column_name} column contains numeric values that appear to represent amounts, quantities, or large numeric data. This field is used in calculations and reporting.'
+                workflow = f'The {column_name} is used in financial calculations, balance tracking, or quantitative analysis within the banking system.'
+                rules = ['Must be numeric', 'Used in calculations', 'Precision important']
+            else:
+                title = f'{column_name} Numeric Field'
+                purpose = 'Stores numeric data'
+                explanation = f'The {column_name} column contains numeric data relevant to banking operations. The values are used for calculations, comparisons, or quantitative tracking.'
+                workflow = f'The {column_name} values are processed and used in various banking operations and reports.'
+                rules = ['Must be numeric', 'Used in calculations']
+        
+        elif is_datetime:
+            title = f'{column_name} Date/Time Field'
+            purpose = 'Stores temporal information'
+            explanation = f'The {column_name} column contains date and/or time information. This is critical for time-based operations, reporting, compliance, and audit trails.'
+            workflow = f'The {column_name} is captured when events occur and is used for chronological ordering, reporting periods, and time-based analysis.'
+            rules = ['Must be valid date/time format', 'Used for temporal analysis', 'Critical for reporting']
+        
+        else:  # Text field
+            unique_ratio = stats.get('uniqueness_percentage', 0)
+            if unique_ratio > 90:
+                title = f'{column_name} Unique Text Identifier'
+                purpose = 'Stores unique text identifiers or codes'
+                explanation = f'The {column_name} column contains unique text values that serve as identifiers or codes. Each value is distinct and used for referencing records.'
+                workflow = f'The {column_name} is used as a unique reference code or identifier in the banking system.'
+                rules = ['Must be unique', 'Text format', 'Used as identifier']
+            elif unique_ratio < 20:
+                title = f'{column_name} Categorical Field'
+                purpose = 'Stores categorical or classification data'
+                explanation = f'The {column_name} column contains categorical data with limited distinct values. This field is used for classification, grouping, or filtering records.'
+                workflow = f'The {column_name} categorizes records into groups, enabling filtering, reporting, and applying group-specific rules.'
+                rules = ['Limited distinct values', 'Used for categorization', 'May have predefined list']
+            else:
+                title = f'{column_name} Text Field'
+                purpose = 'Stores descriptive text information'
+                explanation = f'The {column_name} column contains text data that provides descriptive information about records. This field is used for identification, description, or user-facing information.'
+                workflow = f'The {column_name} stores descriptive information that appears in reports, statements, and user interfaces.'
+                rules = ['Text format', 'Used for description/identification']
+        
+        # Add data quality rules
+        if stats.get('null_percentage', 0) > 0:
+            rules.append(f'Contains {stats["null_percentage"]:.1f}% null values')
+        if stats.get('null_percentage', 0) == 0:
+            rules.append('No null values (required field)')
+        
+        return (title, purpose, explanation, workflow, rules)
+    
+    def _detect_section(self, normalized: str) -> str:
+        """Detect which section this column belongs to"""
+        if any(term in normalized for term in ['customer', 'client', 'name', 'email', 'phone']):
+            return "Customer Details"
+        elif any(term in normalized for term in ['account', 'balance', 'ifsc', 'branch']):
+            return "Account Details"
+        elif any(term in normalized for term in ['transaction', 'debit', 'credit', 'payment', 'txn']):
+            return "Transaction Details"
+        elif any(term in normalized for term in ['loan', 'emi', 'interest', 'principal']):
+            return "Loan Details"
+        elif any(term in normalized for term in ['card', 'cvv', 'expiry', 'limit']):
+            return "Card Details"
+        else:
+            return "General Banking"
+    
+    def _detect_icon(self, normalized: str) -> str:
+        """Detect appropriate icon for column type"""
+        if 'id' in normalized or 'number' in normalized:
+            return "🔢"
+        elif 'amount' in normalized or 'balance' in normalized or 'money' in normalized:
+            return "💰"
+        elif 'date' in normalized or 'time' in normalized:
+            return "📅"
+        elif 'status' in normalized or 'state' in normalized:
+            return "📊"
+        elif 'type' in normalized or 'category' in normalized:
+            return "🏷️"
+        elif 'customer' in normalized or 'name' in normalized:
+            return "👤"
+        elif 'account' in normalized:
+            return "💳"
+        elif 'transaction' in normalized:
+            return "💸"
+        elif 'loan' in normalized:
+            return "🏛️"
+        elif 'card' in normalized:
+            return "💳"
+        else:
+            return "📋"
     
     def _generate_data_quality_summary(self, df: pd.DataFrame) -> str:
         """Generate overall data quality summary for the table"""
