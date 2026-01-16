@@ -474,6 +474,7 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     "primary_keys": result.get("primary_keys"),
                     "foreign_keys": result.get("foreign_keys"),
                     "relationships": result.get("relationships"),
+                    "file_relationships": result.get("file_relationships", []),  # File-to-file relationships with explanations
                     "overall_verdict": result.get("overall_verdict"),
                     "overall_confidence": result.get("overall_confidence"),
                     "business_explanation": result.get("business_explanation"),

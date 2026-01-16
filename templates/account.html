@@ -719,6 +719,19 @@
                         <p>No relationships detected yet.</p>
                     </div>
                 </div>
+
+                <h4 style="margin: 32px 0 16px; color: var(--text-dark); border-top: 2px solid var(--border); padding-top: 24px;">
+                    📋 File-to-File Connections with Detailed Explanations
+                </h4>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">
+                    Detailed analysis of how your uploaded files are connected, why they are linked, and their business purpose.
+                </p>
+                <div id="fileRelationshipsContent">
+                    <div class="empty-state">
+                        <div class="icon">📁</div>
+                        <p>Loading file relationship analysis...</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -962,6 +975,9 @@
 
             // Display relationships
             displayRelationships(relationships, foreignKeys);
+            
+            // Display file-to-file relationships with detailed explanations
+            displayFileRelationships();
         }
 
         function loadSingleFileData() {
@@ -1058,6 +1074,94 @@
                     `;
                 });
                 document.getElementById('relationshipsContent').innerHTML = html;
+            }
+        }
+
+        function displayFileRelationships() {
+            // Get file relationships from sessionStorage or from the API response
+            const fileRelationships = JSON.parse(sessionStorage.getItem('fileRelationships') || '[]');
+            
+            console.log('File Relationships from sessionStorage:', fileRelationships);
+            
+            if (fileRelationships && fileRelationships.length > 0) {
+                let html = '';
+                
+                fileRelationships.forEach((rel, index) => {
+                    const overlapPercent = (rel.overlap_info?.overlap_ratio || 0) * 100;
+                    const overlapColor = overlapPercent >= 70 ? 'var(--success)' : overlapPercent >= 40 ? 'var(--warning)' : 'var(--danger)';
+                    
+                    html += `
+                        <div class="card" style="margin-bottom: 24px; border-left: 5px solid ${overlapColor};">
+                            <div class="card-header">
+                                <h3 class="card-title" style="font-size: 1.1rem;">
+                                    🔗 Connection ${index + 1}: ${rel.parent_file} ↔ ${rel.child_file}
+                                </h3>
+                                <span class="badge" style="background: ${overlapColor}; color: white;">
+                                    ${overlapPercent.toFixed(1)}% Match
+                                </span>
+                            </div>
+                            
+                            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 16px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                    <div>
+                                        <strong style="color: var(--primary); display: block; margin-bottom: 4px;">Parent File:</strong>
+                                        <span>${rel.parent_file}</span>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                                            Entity: ${rel.parent_entity} | Column: ${rel.parent_column} (${rel.parent_column_type})
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <strong style="color: var(--primary); display: block; margin-bottom: 4px;">Child File:</strong>
+                                        <span>${rel.child_file}</span>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                                            Entity: ${rel.child_entity} | Column: ${rel.child_column} (${rel.child_column_type})
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="background: white; padding: 16px; border-radius: 8px; border-left: 4px solid var(--primary);">
+                                    <strong style="color: var(--primary); display: block; margin-bottom: 8px;">Relationship Type:</strong>
+                                    <span style="font-size: 1rem; font-weight: 600;">${rel.relationship_type}</span>
+                                </div>
+                            </div>
+                            
+                            <div style="background: linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%); padding: 20px; border-radius: 8px; border: 1px solid #c7d2fe;">
+                                <h4 style="color: var(--primary); margin-bottom: 12px; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                                    💡 Detailed Explanation
+                                </h4>
+                                <div style="line-height: 1.8; color: #1f2937; font-size: 0.95rem;">
+                                    ${rel.detailed_explanation || rel.purpose || 'Relationship detected between files.'}
+                                </div>
+                            </div>
+                            
+                            ${rel.overlap_info ? `
+                            <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                                <div style="background: #f8fafc; padding: 12px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${rel.overlap_info.overlap_count}</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Matching Values</div>
+                                </div>
+                                <div style="background: #f8fafc; padding: 12px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${rel.overlap_info.total_unique_file1}</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Unique in ${rel.parent_file}</div>
+                                </div>
+                                <div style="background: #f8fafc; padding: 12px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${rel.overlap_info.total_unique_file2}</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Unique in ${rel.child_file}</div>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('fileRelationshipsContent').innerHTML = html;
+            } else {
+                document.getElementById('fileRelationshipsContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📁</div>
+                        <p>No file-to-file relationships detected. Upload multiple files to see connections.</p>
+                    </div>
+                `;
             }
         }
 
