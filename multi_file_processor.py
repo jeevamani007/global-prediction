@@ -19,6 +19,9 @@ import re
 from bank import BankingDomainDetector
 from complete_banking_validator import CompleteBankingValidator
 from core_banking_validator import CoreBankingValidator
+from enhanced_business_rules_engine import EnhancedBusinessRulesEngine
+from column_predictor import ColumnPredictor
+from banking_blueprint_engine import BankingBlueprintEngine
 
 
 class MultiFileProcessor:
@@ -28,6 +31,9 @@ class MultiFileProcessor:
         self.banking_detector = BankingDomainDetector()
         self.complete_validator = CompleteBankingValidator()
         self.core_validator = CoreBankingValidator()
+        self.business_rules_engine = EnhancedBusinessRulesEngine()
+        self.column_predictor = ColumnPredictor()
+        self.blueprint_engine = BankingBlueprintEngine()
     
     def _format_validator_result(self, validator_result: Dict) -> Dict:
         """Format validator result to match UI expected format (same as single-file endpoint)"""
@@ -131,9 +137,15 @@ class MultiFileProcessor:
         
         # STEP 6: Apply business rules (already done in single-file processing)
         
-        # STEP 7: Consolidate results
+        # STEP 7: Unified Banking Blueprint Analysis (New)
+        try:
+            banking_blueprint = self.blueprint_engine.analyze_multiple_files(table_dataframes)
+        except Exception as e:
+            banking_blueprint = {"error": f"Blueprint analysis failed: {str(e)}"}
+            
+        # STEP 8: Consolidate results
         consolidated_result = self._consolidate_results(
-            table_results, domain_results, primary_keys, foreign_keys, relationships
+            table_results, domain_results, primary_keys, foreign_keys, relationships, banking_blueprint
         )
         
         return consolidated_result
@@ -175,6 +187,27 @@ class MultiFileProcessor:
             column_analysis = self._analyze_columns(df)
             result["column_analysis"] = column_analysis
             
+            # Generate enhanced business rules for this table
+            try:
+                business_rules = self.business_rules_engine.generate_table_business_rules(df, table_name)
+                result["business_rules"] = business_rules
+                
+                # Format rules as paragraphs
+                rules_paragraphs = self.business_rules_engine.format_rules_as_paragraphs(business_rules)
+                result["business_rules_paragraphs"] = rules_paragraphs
+            except Exception as e:
+                result["business_rules_error"] = str(e)
+            
+            # Generate column predictions
+            try:
+                column_predictions = []
+                for column in df.columns:
+                    prediction = self.column_predictor.predict_column_type(column, df[column])
+                    column_predictions.append(prediction)
+                result["column_predictions"] = column_predictions
+            except Exception as e:
+                result["column_predictions_error"] = str(e)
+            
         except Exception as e:
             result["error"] = str(e)
             result["status"] = "FAILED"
@@ -187,13 +220,17 @@ class MultiFileProcessor:
         
         for col in df.columns:
             series = df[col]
+            # Convert numpy types to Python native types
+            null_pct = float((series.isnull().sum() / len(series)) * 100) if len(series) > 0 else 0.0
+            unique_pct = float((series.nunique() / len(series)) * 100) if len(series) > 0 else 0.0
+            
             analysis = {
                 "column_name": col,
                 "data_type": str(series.dtype),
-                "null_percentage": (series.isnull().sum() / len(series)) * 100,
-                "uniqueness_percentage": (series.nunique() / len(series)) * 100 if len(series) > 0 else 0,
+                "null_percentage": round(null_pct, 2),
+                "uniqueness_percentage": round(unique_pct, 2),
                 "pattern": self._detect_pattern(series),
-                "sample_values": series.dropna().head(5).tolist() if len(series.dropna()) > 0 else []
+                "sample_values": [str(v) for v in series.dropna().head(5).tolist()] if len(series.dropna()) > 0 else []
             }
             column_results.append(analysis)
         
@@ -402,7 +439,7 @@ class MultiFileProcessor:
     def _build_relationships(self, table_dataframes: Dict[str, pd.DataFrame],
                            primary_keys: Dict[str, Optional[str]],
                            foreign_keys: List[Dict]) -> List[Dict[str, Any]]:
-        """Build logical relationship map (textual ER)"""
+        """Build logical relationship map (textual ER) with detailed explanations"""
         relationships = []
         
         for fk in foreign_keys:
@@ -410,6 +447,7 @@ class MultiFileProcessor:
             child_table = fk["child_table"]
             parent_col = fk["parent_column"]
             child_col = fk["child_column"]
+            overlap_ratio = fk.get("overlap_ratio", 0)
             
             # Determine relationship type
             parent_df = table_dataframes[parent_table]
@@ -427,6 +465,14 @@ class MultiFileProcessor:
                 relationship_type = "Many-to-One"
                 description = f"{child_table}.{child_col} -> {parent_table}.{parent_col}"
             
+            # Generate detailed paragraph explanation using business rules engine
+            try:
+                paragraph_explanation = self.business_rules_engine.generate_relationship_explanation(
+                    parent_table, child_table, parent_col, overlap_ratio
+                )
+            except:
+                paragraph_explanation = f"Tables {parent_table} and {child_table} are connected through {parent_col}."
+            
             relationships.append({
                 "parent_table": parent_table,
                 "parent_column": parent_col,
@@ -434,14 +480,15 @@ class MultiFileProcessor:
                 "child_column": child_col,
                 "relationship_type": relationship_type,
                 "description": description,
-                "overlap_ratio": fk.get("overlap_ratio", 0)
+                "overlap_ratio": overlap_ratio,
+                "detailed_explanation": paragraph_explanation
             })
         
         return relationships
     
     def _consolidate_results(self, table_results: List[Dict], domain_results: Dict,
                             primary_keys: Dict, foreign_keys: List[Dict],
-                            relationships: List[Dict]) -> Dict[str, Any]:
+                            relationships: List[Dict], banking_blueprint: Dict) -> Dict[str, Any]:
         """Consolidate all results into final format"""
         
         # Calculate overall system verdict
@@ -491,6 +538,7 @@ class MultiFileProcessor:
             "relationships": relationships,
             "overall_verdict": overall_verdict,
             "overall_confidence": round(overall_confidence, 2),
+            "banking_blueprint": banking_blueprint,
             "business_explanation": self._generate_business_explanation(
                 table_results, domain_results, relationships, primary_keys
             )

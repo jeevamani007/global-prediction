@@ -7,6 +7,7 @@ from sqlalchemy import text
 from database import engine
 from banking_core_engine import CoreBankingEngine
 from banking_column_mapper import BankingColumnMapper
+from banking_blueprint_engine import BankingBlueprintEngine
 
 
 class BankingDomainDetector:

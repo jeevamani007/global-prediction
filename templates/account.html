@@ -866,10 +866,16 @@
         }
 
         function loadApplicationType() {
+            const blueprint = JSON.parse(sessionStorage.getItem('bankingBlueprint') || 'null');
             const appType = JSON.parse(sessionStorage.getItem('bankingApplicationType') || 'null');
             const bankingResult = JSON.parse(sessionStorage.getItem('bankingResult') || 'null');
 
-            if (appType && appType.predicted_application) {
+            if (blueprint) {
+                const banner = document.getElementById('appTypeBanner');
+                banner.style.display = 'flex';
+                document.getElementById('appName').textContent = blueprint.application || 'Core Banking System';
+                document.getElementById('appConfidence').textContent = `${blueprint.application_confidence || 0}%`;
+            } else if (appType && appType.predicted_application) {
                 const banner = document.getElementById('appTypeBanner');
                 banner.style.display = 'flex';
                 document.getElementById('appName').textContent = appType.predicted_application;
@@ -1145,62 +1151,61 @@
         }
 
         function loadFinalDecision() {
+            const blueprint = JSON.parse(sessionStorage.getItem('bankingBlueprint') || 'null');
             const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
-            const appType = JSON.parse(sessionStorage.getItem('bankingApplicationType') || 'null');
             const tableResults = JSON.parse(sessionStorage.getItem('multiFileTableResults') || '[]');
             const overallVerdict = JSON.parse(sessionStorage.getItem('overallVerdict') || 'null');
-            const businessExplanation = JSON.parse(sessionStorage.getItem('businessExplanation') || 'null');
 
             const decisionBox = document.getElementById('decisionBox');
             const decisionTitle = document.getElementById('decisionTitle');
             const decisionSubtitle = document.getElementById('decisionSubtitle');
             const simpleExplanation = document.getElementById('simpleExplanation');
 
-            let appName = appType?.predicted_application || 'Core Banking System';
-            let modules = new Set();
+            let appName = blueprint?.application || 'Core Banking System';
+            let moduleList = [];
 
-            tableResults.forEach(table => {
-                modules.add(detectApplicationTag(table.columns || []));
-            });
+            if (blueprint && blueprint.multi_file_metadata && blueprint.multi_file_metadata.column_distribution) {
+                moduleList = Object.keys(blueprint.multi_file_metadata.column_distribution);
+            } else {
+                const modules = new Set();
+                tableResults.forEach(table => {
+                    modules.add(detectApplicationTag(table.columns || []));
+                });
+                moduleList = Array.from(modules);
+            }
 
-            const moduleList = Array.from(modules);
-            const isSingleApp = moduleList.every(m =>
-                m.includes('Banking') || m.includes('Core') || m.includes('Customer') ||
-                m.includes('Transaction') || m.includes('Account') || m.includes('Management')
-            );
+            const isSingleApp = (blueprint && blueprint.application_confidence > 70) ||
+                overallVerdict === 'SINGLE_APPLICATION';
 
-            if (isSingleApp || overallVerdict === 'SINGLE_APPLICATION') {
+            if (isSingleApp) {
                 decisionBox.className = 'decision-box single';
                 decisionTitle.textContent = '✅ ONE Application Detected';
                 decisionSubtitle.innerHTML = `<strong>Application:</strong> ${appName}`;
 
                 simpleExplanation.innerHTML = `
                     <strong>What does this mean?</strong><br><br>
-                    All your uploaded files belong to a <strong>single banking system</strong>. 
-                    Think of it like different departments (Customer Service, Accounts, Transactions) 
-                    in the same bank - they all work together and share the same customer information.<br><br>
-                    <strong>In simple terms:</strong> Your data is connected. A customer in one file can be 
-                    linked to their account in another file, and their transactions in a third file. 
-                    This is good because it means your data is organized correctly for banking operations.
+                    Integrated analysis of your data confirms it belongs to a <strong>single banking system</strong>: ${appName}. 
+                    The column patterns across all files align with the ${blueprint?.app_description || 'standard banking system'} architecture.<br><br>
+                    <strong>In simple terms:</strong> Your data is highly connected and forms a complete operational workflow. 
+                    This is ideal for system migration or auditing as it shows a consistent domain structure.
                 `;
             } else {
                 decisionBox.className = 'decision-box multiple';
-                decisionTitle.textContent = '⚠️ MULTIPLE Applications Detected';
-                decisionSubtitle.innerHTML = `Found <strong>${moduleList.length}</strong> separate modules`;
+                decisionTitle.textContent = '⚠️ Separate Banking Modules Detected';
+                decisionSubtitle.innerHTML = `Found <strong>${moduleList.length}</strong> distinct file groups`;
 
                 simpleExplanation.innerHTML = `
                     <strong>What does this mean?</strong><br><br>
-                    Your files appear to come from <strong>different systems</strong> or serve different purposes. 
-                    While they may all be banking-related, they don't necessarily connect directly.<br><br>
-                    <strong>Modules Found:</strong> ${moduleList.join(', ')}<br><br>
-                    <strong>In simple terms:</strong> Imagine having data from different banks or different software systems. 
-                    They're all about banking, but they don't share a common link. You may need to add common identifiers 
-                    (like customer ID) to connect them.
+                    Your files appear to represent <strong>different functional modules</strong> within a banking environment. 
+                    While all are banking-related, they may be parts of separate subsystems or different stages of a project.<br><br>
+                    <strong>Modules Found:</strong> ${moduleList.join(', ') || 'N/A'}<br><br>
+                    <strong>In simple terms:</strong> You have uploaded components that serve different purposes (e.g., some for Accounts, some for Loans). 
+                    They are all part of the bank, but may not be directly linked in a single operational table.
                 `;
             }
 
             // Update confidence
-            document.getElementById('domainConfidence').textContent = `${appType?.confidence || 0}%`;
+            document.getElementById('domainConfidence').textContent = `${blueprint?.application_confidence || 0}%`;
 
             // Show modules
             document.getElementById('modulesList').innerHTML = moduleList.map(m =>
@@ -1209,165 +1214,169 @@
         }
 
         function loadBusinessRules() {
+            const blueprint = JSON.parse(sessionStorage.getItem('bankingBlueprint') || 'null');
             const bankingResult = JSON.parse(sessionStorage.getItem('bankingResult') || 'null');
             const tableResults = JSON.parse(sessionStorage.getItem('multiFileTableResults') || '[]');
             const validator = JSON.parse(sessionStorage.getItem('bankingDatasetValidator') || 'null');
-
-            // Collect all columns
-            let allColumns = [];
-            if (bankingResult && bankingResult.matched_columns) {
-                allColumns = allColumns.concat(bankingResult.matched_columns);
-            }
-            tableResults.forEach(t => {
-                if (t.columns) allColumns = allColumns.concat(t.columns);
-            });
-
-            // Generate dynamic business rules based on detected columns
-            const rules = generateBusinessRules(allColumns, validator);
+            const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
 
             let rulesHtml = '';
-            rules.forEach(rule => {
+
+            // 1. Unified Banking Blueprint Rules (Highest Priority)
+            if (blueprint && blueprint.business_rules) {
                 rulesHtml += `
-                    <div class="business-rule-card">
-                        <div class="rule-header">
-                            <span class="rule-icon">${rule.icon}</span>
-                            <span class="rule-title">${rule.title}</span>
-                        </div>
-                        <div class="rule-content">
-                            <strong>Purpose:</strong> ${rule.purpose}<br><br>
-                            <strong>Usage:</strong> ${rule.usage}<br><br>
-                            <strong>Validation Rules:</strong> ${rule.rules}
-                        </div>
-                        <div class="rule-tags">
-                            ${rule.tags.map(t => `<span class="rule-tag ${t.status}">${t.name}</span>`).join('')}
-                        </div>
+                    <div style="text-align: center; margin-bottom: 32px;">
+                        <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 8px;">🏛️ Unified Banking Business Rules</h2>
+                        <p style="color: var(--text-muted); font-size: 1.05rem;">Integrated analysis of business workflows across all datasets</p>
                     </div>
                 `;
-            });
 
-            document.getElementById('businessRulesContent').innerHTML = rulesHtml || `
-                <div class="empty-state">
-                    <div class="icon">📋</div>
-                    <p>No specific business rules detected. Upload banking data to see applicable rules.</p>
-                </div>
-            `;
+                // Render File-wise Rules
+                if (blueprint.business_rules.files) {
+                    for (const [fileName, fileData] of Object.entries(blueprint.business_rules.files)) {
+                        rulesHtml += `
+                            <div class="card" style="margin-bottom: 24px;">
+                                <h4 style="color: var(--primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                    📄 ${fileName}
+                                </h4>
+                        `;
+
+                        if (fileData.rules) {
+                            rulesHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
+                            for (const [colName, ruleData] of Object.entries(fileData.rules)) {
+                                if (!ruleData.explanation || ruleData.explanation === "No specific rules found.") continue;
+
+                                rulesHtml += `
+                                    <div class="business-rule-card" style="margin-bottom: 0;">
+                                        <div class="rule-header">
+                                            <span class="rule-icon">${ruleData.icon || '📊'}</span>
+                                            <span class="rule-title">${colName}</span>
+                                        </div>
+                                        <div class="rule-content">
+                                            ${ruleData.explanation}
+                                        </div>
+                                        ${ruleData.workflow ? `
+                                            <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); padding: 8px; background: #f8fafc; border-radius: 6px;">
+                                                <strong>Workflow:</strong> ${ruleData.workflow}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }
+                            rulesHtml += '</div>';
+                        }
+                        rulesHtml += '</div>';
+                    }
+                }
+            }
+            // 2. Legacy/Fallback Rules
+            else if (isMultiFile && tableResults.length > 0) {
+                const sectionRules = {};
+                tableResults.forEach((table, idx) => {
+                    if (table.business_rules && table.business_rules.column_rules) {
+                        table.business_rules.column_rules.forEach(colRule => {
+                            const section = colRule.section || 'General Banking';
+                            if (!sectionRules[section]) {
+                                sectionRules[section] = { icon: colRule.icon || '📋', rules: [] };
+                            }
+                            if (colRule.simple_rules && colRule.simple_rules.length > 0) {
+                                sectionRules[section].rules.push(...colRule.simple_rules);
+                            } else {
+                                sectionRules[section].rules.push(colRule.purpose || colRule.title);
+                            }
+                        });
+                    }
+                });
+
+                if (Object.keys(sectionRules).length > 0) {
+                    rulesHtml += `
+                        <div class="rules-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                    `;
+                    for (const [sectionName, section] of Object.entries(sectionRules)) {
+                        const uniqueRules = [...new Set(section.rules)];
+                        rulesHtml += `
+                            <div class="section-rule-card" style="background: white; border-radius: 12px; padding: 24px; border-left: 5px solid var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                                <h3 style="color: var(--primary); font-size: 1.15rem; margin-bottom: 16px;">${section.icon} ${sectionName}</h3>
+                                <ul style="margin: 0; padding-left: 20px; list-style: disc;">
+                                    ${uniqueRules.slice(0, 5).map(rule => `<li style="margin-bottom: 8px;">${rule}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+                    rulesHtml += `</div>`;
+                }
+            } else if (bankingResult) {
+                const sectionRules = generateBusinessRulesSections(bankingResult.matched_columns || [], validator);
+                rulesHtml += `<div class="rules-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">`;
+                for (const [sectionName, section] of Object.entries(sectionRules)) {
+                    rulesHtml += `
+                        <div class="section-rule-card" style="background: white; border-radius: 12px; padding: 24px; border-left: 5px solid var(--primary);">
+                            <h3 style="color: var(--primary); font-size: 1.15rem; margin-bottom: 16px;">${section.icon} ${sectionName}</h3>
+                            <ul style="margin: 0; padding-left: 20px; list-style: disc;">
+                                ${section.rules.map(rule => `<li style="margin-bottom: 8px;">${rule}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                rulesHtml += `</div>`;
+            }
+
+            if (!rulesHtml) {
+                rulesHtml = `
+                    <div class="empty-state">
+                        <div class="icon">📋</div>
+                        <p>No business rules detected. Upload banking data to see applicable rules.</p>
+                    </div>
+                `;
+            }
+
+            document.getElementById('businessRulesContent').innerHTML = rulesHtml;
         }
 
-        function generateBusinessRules(columns, validator) {
+        function generateBusinessRulesSections(columns, validator) {
             const colLower = columns.map(c => c.toLowerCase());
-            const rules = [];
+            const sections = {};
 
-            // Account Number Rules
-            if (colLower.some(c => c.includes('account'))) {
-                rules.push({
-                    icon: '💳',
-                    title: 'Account Number Validation',
-                    purpose: 'Account numbers are unique identifiers for bank accounts. They are essential for all financial transactions and customer identification.',
-                    usage: 'Used to link transactions to accounts, verify customer identity, process payments, and track account balances.',
-                    rules: 'Must be 6-16 digits, numeric only, unique per account, no special characters, cannot start with zero.',
-                    tags: [
-                        { name: 'Numeric Only', status: 'pass' },
-                        { name: 'Unique', status: 'pass' },
-                        { name: 'Length 6-16', status: 'pass' }
-                    ]
-                });
-            }
-
-            // Customer ID Rules
-            if (colLower.some(c => c.includes('customer') || c.includes('cust_id'))) {
-                rules.push({
+            // Customer Details
+            if (colLower.some(c => c.includes('customer') || c.includes('name') || c.includes('email') || c.includes('phone'))) {
+                sections['Customer Details'] = {
                     icon: '👤',
-                    title: 'Customer ID Validation',
-                    purpose: 'Customer ID uniquely identifies each customer in the banking system. It links all customer-related data across tables.',
-                    usage: 'Used for KYC verification, account opening, transaction authorization, and compliance reporting.',
-                    rules: 'Must be unique, alphanumeric format (e.g., C001), 3-10 characters, no special characters, required field.',
-                    tags: [
-                        { name: 'Unique', status: 'pass' },
-                        { name: 'Alphanumeric', status: 'pass' },
-                        { name: 'Required', status: 'pass' }
+                    rules: [
+                        'Customer ID must be unique',
+                        'Phone & email must be valid',
+                        'Name must match government ID',
+                        'Required for KYC compliance'
                     ]
-                });
+                };
             }
 
-            // Transaction Rules
-            if (colLower.some(c => c.includes('transaction') || c.includes('txn'))) {
-                rules.push({
-                    icon: '💸',
-                    title: 'Transaction Processing Rules',
-                    purpose: 'Transactions record all financial movements including deposits, withdrawals, and transfers.',
-                    usage: 'Used for balance updates, statement generation, audit trails, and regulatory compliance.',
-                    rules: 'Transaction type must be Debit or Credit, amount must be positive, date must be valid, status required.',
-                    tags: [
-                        { name: 'Valid Type', status: 'pass' },
-                        { name: 'Positive Amount', status: 'pass' },
-                        { name: 'Valid Date', status: 'pass' }
-                    ]
-                });
-            }
-
-            // Balance Rules
-            if (colLower.some(c => c.includes('balance'))) {
-                rules.push({
-                    icon: '💰',
-                    title: 'Balance Tracking Rules',
-                    purpose: 'Balance columns track the current available funds in an account after each transaction.',
-                    usage: 'Used for overdraft checking, interest calculation, minimum balance alerts, and account status.',
-                    rules: 'Must be numeric, updated after each transaction, negative balance triggers overdraft alert.',
-                    tags: [
-                        { name: 'Numeric', status: 'pass' },
-                        { name: 'Updates After Txn', status: 'pass' }
-                    ]
-                });
-            }
-
-            // Loan Rules
-            if (colLower.some(c => c.includes('loan') || c.includes('interest') || c.includes('tenure'))) {
-                rules.push({
+            // Account Details
+            if (colLower.some(c => c.includes('account') || c.includes('balance') || c.includes('ifsc'))) {
+                sections['Account Details'] = {
                     icon: '🏦',
-                    title: 'Loan Management Rules',
-                    purpose: 'Loan data tracks borrowed amounts, interest rates, and repayment schedules for credit products.',
-                    usage: 'Used for EMI calculation, credit scoring, default prediction, and portfolio management.',
-                    rules: 'Loan amount positive, interest rate 0-100%, tenure in months, credit score 300-900.',
-                    tags: [
-                        { name: 'Valid Amount', status: 'pass' },
-                        { name: 'Interest Rate', status: 'pass' },
-                        { name: 'Tenure', status: 'pass' }
+                    rules: [
+                        'Account number must be unique',
+                        'Balance cannot be below minimum',
+                        'Account status must be Active for transactions',
+                        'IFSC code required for transfers'
                     ]
-                });
+                };
             }
 
-            // Card Rules
-            if (colLower.some(c => c.includes('card'))) {
-                rules.push({
-                    icon: '💳',
-                    title: 'Card Management Rules',
-                    purpose: 'Card data manages credit/debit cards including card numbers, limits, and validity.',
-                    usage: 'Used for card issuance, transaction authorization, limit management, and fraud prevention.',
-                    rules: 'Card number 16 digits, expiry date valid, card type (Credit/Debit), status (Active/Blocked).',
-                    tags: [
-                        { name: '16 Digits', status: 'pass' },
-                        { name: 'Valid Expiry', status: 'pass' },
-                        { name: 'Status Active', status: 'pass' }
+            // Transaction Details
+            if (colLower.some(c => c.includes('transaction') || c.includes('txn') || c.includes('debit') || c.includes('credit'))) {
+                sections['Transaction Details'] = {
+                    icon: '💸',
+                    rules: [
+                        'Transaction ID must be unique',
+                        'Amount must be available before transfer',
+                        'Large amounts may trigger alerts',
+                        'Date must be valid and not in future'
                     ]
-                });
+                };
             }
 
-            // Default rule if nothing specific found
-            if (rules.length === 0) {
-                rules.push({
-                    icon: '📋',
-                    title: 'General Banking Data Rules',
-                    purpose: 'Standard validation rules applied to banking datasets for data quality and compliance.',
-                    usage: 'Used for basic data validation, ensuring completeness and format consistency.',
-                    rules: 'No null values in required fields, proper data types, consistent formatting.',
-                    tags: [
-                        { name: 'Data Quality', status: 'pass' },
-                        { name: 'Completeness', status: 'pass' }
-                    ]
-                });
-            }
-
-            return rules;
+            return sections;
         }
     </script>
 </body>

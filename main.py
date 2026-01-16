@@ -249,6 +249,17 @@ async def upload_file(file: UploadFile = File(...)):
             except Exception as e:
                 print(f"Warning: Could not clean up temp files: {e}")
 
+        # 🔥 BANKING BLUEPRINT ANALYSIS (UNIFIED)
+        banking_blueprint = None
+        try:
+            from banking_blueprint_engine import BankingBlueprintEngine
+            blueprint_engine = BankingBlueprintEngine()
+            # Wrap file_path in a list for the multi-file analyzer
+            blueprint_result = blueprint_engine.analyze_multiple_files([file_path])
+            banking_blueprint = blueprint_result
+        except Exception as e:
+            print(f"Warning: Banking blueprint analysis error: {str(e)}")
+
         return JSONResponse(
             content={
                 "message": "File analyzed successfully",
@@ -267,10 +278,14 @@ async def upload_file(file: UploadFile = File(...)):
                 "banking_transaction_type_validation": banking_result.get("transaction_type_validation"),
                 "banking_debit_credit_validation": banking_result.get("debit_credit_validation"),
                 "banking_purpose_detection": banking_result.get("purpose_detection"),
+                "banking_purpose_report": banking_result.get("purpose_detection"), # Standardize key
                 "banking_probability_explanations": banking_result.get("probability_explanations"),
                 "banking_transaction_rules": banking_result.get("banking_transaction_rules"),
                 "banking_column_purpose_report": banking_result.get("column_purpose_report"),
                 "banking_column_mapping": banking_result.get("banking_column_mapping"),
+                
+                # 🔥 BANKING BLUEPRINT (NEW UNIFIED ANALYSIS)
+                "banking_blueprint": banking_blueprint,
                 
                 # 🔥 CORE BANKING ENGINE RESULTS (PRIMARY OUTPUT - KYC REMOVED)
                 "banking_core_analysis": banking_result.get("core_banking_analysis"),
@@ -375,6 +390,7 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     "banking": banking_result,
                     "banking_dataset_validator": banking_validator_result,
                     "core_banking_validator": core_banking_validator_result,
+                    "banking_blueprint": result.get("banking_blueprint"),
                     "domain_detection": result.get("domain_detection"),
                     "primary_keys": result.get("primary_keys"),
                     "foreign_keys": result.get("foreign_keys"),

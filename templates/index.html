@@ -702,6 +702,7 @@
             });
 
             // Multi-file data
+            if (data.banking_blueprint) sessionStorage.setItem('bankingBlueprint', JSON.stringify(data.banking_blueprint));
             if (data.multi_file_mode) {
                 sessionStorage.setItem('multiFileMode', 'true');
                 if (data.relationships) sessionStorage.setItem('multiFileRelationships', JSON.stringify(data.relationships));
