@@ -1707,10 +1707,18 @@
                                         </div>
                                         
                                         <div style="background: #f0f5ff; padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
-                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Meaning</strong>
+                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                📚 Business Meaning
+                                                ${colAnalysis.step5_md_section ? `<span style="margin-left: 8px; font-size: 0.75rem; color: var(--primary); background: white; padding: 2px 8px; border-radius: 12px;">${colAnalysis.step5_md_section}</span>` : ''}
+                                            </strong>
                                             <div style="color: #1f2937; line-height: 1.7; font-size: 0.95rem;">
-                                                ${uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
+                                                ${colAnalysis.step5_md_description || uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
                                             </div>
+                                            ${colAnalysis.step5_md_description && colAnalysis.step5_md_description !== colAnalysis.step5_business_meaning ? `
+                                                <div style="margin-top: 8px; padding: 8px; background: rgba(26, 86, 219, 0.1); border-radius: 4px; font-size: 0.85rem; color: #1e40af;">
+                                                    <strong>📋 Detailed Explanation:</strong> ${colAnalysis.step5_business_meaning || ''}
+                                                </div>
+                                            ` : ''}
                                         </div>
                                         
                                         <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
@@ -1813,12 +1821,20 @@
                                         </div>
                                     </div>
                                     
-                                    <div style="background: #f0f5ff; padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
-                                        <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Meaning</strong>
-                                        <div style="color: #1f2937; line-height: 1.7; font-size: 0.95rem;">
-                                            ${uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
+                                        <div style="background: #f0f5ff; padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
+                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                                📚 Business Meaning
+                                                ${colAnalysis.step5_md_section ? `<span style="margin-left: 8px; font-size: 0.75rem; color: var(--primary); background: white; padding: 2px 8px; border-radius: 12px;">${colAnalysis.step5_md_section}</span>` : ''}
+                                            </strong>
+                                            <div style="color: #1f2937; line-height: 1.7; font-size: 0.95rem;">
+                                                ${colAnalysis.step5_md_description || uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
+                                            </div>
+                                            ${colAnalysis.step5_md_description && colAnalysis.step5_md_description !== colAnalysis.step5_business_meaning ? `
+                                                <div style="margin-top: 8px; padding: 8px; background: rgba(26, 86, 219, 0.1); border-radius: 4px; font-size: 0.85rem; color: #1e40af;">
+                                                    <strong>📋 Detailed Explanation:</strong> ${colAnalysis.step5_business_meaning || ''}
+                                                </div>
+                                            ` : ''}
                                         </div>
-                                    </div>
                                     
                                     <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
                                         <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Rules</strong>

@@ -15,6 +15,7 @@ import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
 import re
 from datetime import datetime
+from column_definitions_parser import get_column_parser, get_column_definition
 
 
 class CoreBankingBusinessRulesEngine:
@@ -778,6 +779,16 @@ class CoreBankingBusinessRulesEngine:
             "step3_confidence": confidence,
             "step4_confidence_score": confidence,
             "step5_business_meaning": business_rules["business_meaning"],
+            "step5_md_description": business_rules.get("md_description", ""),
+            "step5_md_section": business_rules.get("md_section", ""),
+            "step5_business_rules": business_rules["rules"],
+            "step5_why_rule_exists": business_rules["why_rule_exists"],
+            "step5_workflow_role": business_rules["workflow_role"],
+            "ui_ready_format": ui_format
+            "step4_confidence_score": confidence,
+            "step5_business_meaning": business_rules["business_meaning"],
+            "step5_md_description": business_rules.get("md_description", ""),
+            "step5_md_section": business_rules.get("md_section", ""),
             "step5_business_rules": business_rules["rules"],
             "step5_why_rule_exists": business_rules["why_rule_exists"],
             "step5_violation_impact": business_rules["violation_impact"],
@@ -1146,16 +1157,33 @@ class CoreBankingBusinessRulesEngine:
         STEP 5: APPLY REAL BANKING BUSINESS RULES
         
         For each column, generate:
-        - Business Meaning (WHAT)
+        - Business Meaning (WHAT) - Uses .md file definitions
         - Business Rules (Unique / Not Unique, Mandatory / Optional, Format & length, PK / FK, Allowed values)
         - Business Reason (WHY)
         - Violation Impact (BUSINESS / FINANCIAL / COMPLIANCE)
         - Data Workflow Role
         """
+        # Get column name from profile
+        column_name = profile.get("column_name", "")
+        
+        # Try to get definition from .md file
+        md_definition = None
+        try:
+            md_definition = get_column_definition(column_name)
+        except Exception as e:
+            print(f"Warning: Could not load .md definition for {column_name}: {str(e)}")
+        
         if concept_match["concept"] == "unknown":
-            # Generic rules for unknown columns
+            # Use .md definition if available, otherwise generic
+            if md_definition:
+                business_meaning = md_definition.get("description", "")
+            else:
+                business_meaning = f"This column contains data relevant to banking operations. Exact business meaning requires domain expert review."
+            
             return {
-                "business_meaning": f"This column contains data relevant to banking operations. Exact business meaning requires domain expert review.",
+                "business_meaning": business_meaning,
+                "md_description": md_definition.get("description", "") if md_definition else "",
+                "md_section": md_definition.get("section", "") if md_definition else "",
                 "rules": {
                     "unique": "Unknown",
                     "mandatory": "Unknown",
@@ -1165,7 +1193,7 @@ class CoreBankingBusinessRulesEngine:
                     "allowed_values": None
                 },
                 "rules_display": "Business rules require domain expert review for this column.",
-                "why_rule_exists": "Column purpose not clearly identified. Manual review recommended.",
+                "why_rule_exists": "Column purpose not clearly identified. Manual review recommended." if not md_definition else md_definition.get("description", ""),
                 "violation_impact": "Impact cannot be determined without proper identification.",
                 "workflow_role": "Role in banking workflow requires expert review."
             }
@@ -1208,8 +1236,19 @@ class CoreBankingBusinessRulesEngine:
         # Determine workflow role
         workflow_role = self._determine_workflow_role(concept_match["concept"], concept_def)
         
+        # Build business meaning - prioritize .md definition
+        if md_definition and md_definition.get("description"):
+            business_meaning = md_definition["description"]
+            # Add concept context if different
+            if concept_match['concept_display'].lower() not in business_meaning.lower():
+                business_meaning = f"{business_meaning} This column represents {concept_match['concept_display']} in the banking system."
+        else:
+            business_meaning = f"This column represents {concept_match['concept_display']} in the banking system. {business_rules.get('reason', '')}"
+        
         return {
-            "business_meaning": f"This column represents {concept_match['concept_display']} in the banking system. {business_rules.get('reason', '')}",
+            "business_meaning": business_meaning,
+            "md_description": md_definition.get("description", "") if md_definition else "",
+            "md_section": md_definition.get("section", "") if md_definition else "",
             "rules": {
                 **business_rules,
                 "primary_key": is_pk,
