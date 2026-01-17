@@ -1,6 +1,5 @@
-account_number,customer_id,customer_name,account_type,branch,ifsc_code,transaction_id,txn_date,transaction_type,amount
-100000001,CUST001,Karthik,Savings,Main Branch,IFSC001,TXN20260101001,2026-01-01,DEBIT,500
-100000002,CUST002,Anitha,Current,Main Branch,IFSC001,TXN20260101002,2026-01-01,CREDIT,2000
-100000003,CUST003,Mani,Savings,West Branch,IFSC002,TXN20260102003,2026-01-02,DEBIT,1500
-100000004,CUST004,Priya,Current,East Branch,IFSC003,TXN20260102004,2026-01-02,CREDIT,5000
-100000005,CUST005,Suresh,Savings,South Branch,IFSC004,TXN20260103005,2026-01-03,DEBIT,2000
+transaction_id,account_number,transaction_type,total_amount,tax_amount,net_amount,transaction_date
+T001,1001001,CREDIT,15000,0,15000,2024-01-05
+T002,1001001,DEBIT,5000,0,5000,2024-01-10
+T003,1001002,DEBIT,20000,500,19500,2024-01-12
+T004,1001003,DEBIT,9000,0,9000,2024-01-15

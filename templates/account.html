@@ -2260,7 +2260,7 @@
                 // Business Rules Suggestions
                 if (appStructure.business_rules && appStructure.business_rules.length > 0) {
                     html += `
-                        <div class="card">
+                        <div class="card" style="margin-bottom: 24px;">
                             <div class="card-header">
                                 <h3 class="card-title">📋 Suggested Business Rules</h3>
                             </div>
@@ -2268,6 +2268,34 @@
                                 <ul style="margin: 0; padding-left: 20px; list-style: disc;">
                                     ${appStructure.business_rules.map(rule => `<li style="margin-bottom: 8px;">${rule}</li>`).join('')}
                                 </ul>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Corrections Applied
+                if (appStructure.corrections_applied && appStructure.corrections_applied.length > 0) {
+                    html += `
+                        <div class="card" style="margin-bottom: 24px;">
+                            <div class="card-header">
+                                <h3 class="card-title">🔧 Corrections Applied (${appStructure.total_corrections || appStructure.corrections_applied.length})</h3>
+                            </div>
+                            <div style="padding: 24px;">
+                                <div style="background: #f0f5ff; border-left: 4px solid var(--primary); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                                    <strong style="color: var(--primary);">Balance & Correction Engine</strong>
+                                    <p style="margin: 8px 0 0 0; color: var(--text-muted); font-size: 0.9rem;">
+                                        The structure has been automatically corrected and balanced to improve accuracy and remove duplicates.
+                                    </p>
+                                </div>
+                                <div style="max-height: 400px; overflow-y: auto;">
+                                    <ul style="margin: 0; padding-left: 20px; list-style: disc;">
+                                        ${appStructure.corrections_applied.map(correction => `
+                                            <li style="margin-bottom: 8px; color: var(--text-dark);">
+                                                ${correction}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     `;
