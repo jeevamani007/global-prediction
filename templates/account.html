@@ -1590,16 +1590,7 @@
             }
             
             if (columnsToDisplay.length > 0) {
-                // Get workflow explanation
-                let workflowExplanation = null;
-                if (coreBankingRules.multi_file && coreBankingRules.files) {
-                    // For multi-file, get workflow from first file
-                    const firstFileData = Object.values(coreBankingRules.files)[0];
-                    workflowExplanation = firstFileData?.workflow_explanation;
-                } else {
-                    workflowExplanation = coreBankingRules.workflow_explanation;
-                }
-                
+                // Header
                 rulesHtml += `
                     <div style="text-align: center; margin-bottom: 32px;">
                         <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 8px;">🏦 Core Banking Business Rules</h2>
@@ -1616,114 +1607,254 @@
                         ` : ''}
                     </div>
                 `;
-                
-                // Display workflow explanation if available
-                if (workflowExplanation && workflowExplanation.workflow_text) {
-                    rulesHtml += `
-                        <div class="card" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); border-left: 5px solid #0284c7; margin-bottom: 32px;">
-                            <div class="card-header">
-                                <h3 class="card-title">🔄 Banking Data Workflow Explanation</h3>
-                            </div>
-                            <div style="line-height: 1.8; color: #1f2937;">
-                                ${workflowExplanation.workflow_text.split('\n\n').map(para => `<p style="margin-bottom: 12px;">${para}</p>`).join('')}
-                            </div>
-                            ${workflowExplanation.dataset_type ? `
-                                <div style="margin-top: 16px; padding: 12px; background: white; border-radius: 8px;">
-                                    <strong>Dataset Type:</strong> ${workflowExplanation.dataset_type}
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                }
 
-                // Display each column analysis in UI-ready format
-                columnsToDisplay.forEach((colAnalysis, idx) => {
-                    const uiFormat = colAnalysis.ui_ready_format || {};
-                    const confidence = colAnalysis.step4_confidence_score || 0;
-                    const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
-                    
-                    rulesHtml += `
-                        <div class="card" style="margin-bottom: 24px; border-left: 4px solid ${confidenceColor};">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
-                                <div>
-                                    <h4 style="color: var(--primary); font-size: 1.1rem; margin: 0;">
-                                        ${idx + 1}. ${uiFormat['Column Name'] || colAnalysis.column_name}
-                                    </h4>
-                                    ${colAnalysis.source_file ? `
-                                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
-                                            📄 Source: ${colAnalysis.source_file}
+                // ORGANIZE BY FILE - Standard Structure
+                if (coreBankingRules.multi_file && coreBankingRules.files) {
+                    // MULTI-FILE MODE: Show each file separately
+                    Object.entries(coreBankingRules.files).forEach(([fileName, fileData]) => {
+                        if (!fileData || fileData.error || !fileData.columns_analysis) return;
+                        
+                        const fileColumns = fileData.columns_analysis.filter(col => col && col.column_name);
+                        if (fileColumns.length === 0) return;
+                        
+                        // File Header
+                        rulesHtml += `
+                            <div class="card" style="margin-bottom: 32px; border: 2px solid var(--primary); border-radius: 12px; overflow: hidden;">
+                                <div style="background: linear-gradient(135deg, #1a56db 0%, #3b82f6 100%); color: white; padding: 20px 28px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                                        <div>
+                                            <h3 style="margin: 0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
+                                                📄 ${fileName}
+                                            </h3>
+                                            <div style="margin-top: 8px; opacity: 0.9; font-size: 0.95rem;">
+                                                ${fileColumns.length} column(s) analyzed
+                                            </div>
                                         </div>
+                                        <div style="background: rgba(255, 255, 255, 0.2); padding: 8px 16px; border-radius: 8px;">
+                                            <div style="font-size: 1.1rem; font-weight: 600;">
+                                                ${fileColumns.filter(c => c.step3_identified_as && c.step3_identified_as !== 'unknown').length} / ${fileColumns.length} Identified
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="padding: 24px;">
+                        `;
+                        
+                        // Workflow explanation for this file
+                        if (fileData.workflow_explanation && fileData.workflow_explanation.workflow_text) {
+                            rulesHtml += `
+                                <div style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); border-left: 5px solid #0284c7; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                                    <h4 style="color: #0284c7; margin: 0 0 12px 0; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                                        🔄 Workflow Explanation
+                                    </h4>
+                                    <div style="line-height: 1.8; color: #1f2937; font-size: 0.95rem;">
+                                        ${fileData.workflow_explanation.workflow_text.split('\n\n').map(para => `<p style="margin-bottom: 12px;">${para}</p>`).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        
+                        // Display columns for this file
+                        fileColumns.forEach((colAnalysis, idx) => {
+                            const uiFormat = colAnalysis.ui_ready_format || {};
+                            const confidence = colAnalysis.step4_confidence_score || 0;
+                            const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
+                            
+                            rulesHtml += `
+                                <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                                        <div style="flex: 1;">
+                                            <h4 style="color: var(--primary); font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                                <span style="background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600;">
+                                                    ${idx + 1}
+                                                </span>
+                                                ${uiFormat['Column Name'] || colAnalysis.column_name}
+                                            </h4>
+                                        </div>
+                                        <span style="background: ${confidenceColor}; color: white; padding: 6px 14px; border-radius: 16px; font-size: 0.85rem; font-weight: 600; white-space: nowrap;">
+                                            ${(confidence || 0).toFixed(0)}% Confidence
+                                        </span>
+                                    </div>
+                            
+                                    <div style="display: grid; grid-template-columns: 1fr; gap: 16px;">
+                                        <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
+                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Identified As</strong>
+                                            <div style="color: var(--primary); font-weight: 600; font-size: 1rem;">
+                                                ${uiFormat['Identified As'] || (colAnalysis.step3_identified_as ? colAnalysis.step3_identified_as.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown')}
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="background: #f0f5ff; padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
+                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Meaning</strong>
+                                            <div style="color: #1f2937; line-height: 1.7; font-size: 0.95rem;">
+                                                ${uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Rules</strong>
+                                            <div style="color: #1f2937; white-space: pre-line; line-height: 1.8; font-size: 0.95rem;">
+                                                ${uiFormat['Business Rules'] || (colAnalysis.step5_business_rules?.rules_display || 'Standard banking rules apply')}
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 3px solid #d97706;">
+                                            <strong style="color: #92400e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Why This Rule Exists</strong>
+                                            <div style="color: #78350f; line-height: 1.7; font-size: 0.95rem;">
+                                                ${uiFormat['Why This Rule Exists'] || colAnalysis.step5_why_rule_exists || 'Standard banking requirement'}
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="background: #fee2e2; padding: 16px; border-radius: 8px; border-left: 3px solid #dc2626;">
+                                            <strong style="color: #991b1b; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Violation Impact</strong>
+                                            <div style="color: #7f1d1d; line-height: 1.7; font-size: 0.95rem;">
+                                                ${uiFormat['Violation Impact'] || colAnalysis.step5_violation_impact || 'Business, financial, and compliance risks'}
+                                            </div>
+                                        </div>
+                                        
+                                        ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role ? `
+                                        <div style="background: #e0f2fe; padding: 16px; border-radius: 8px; border-left: 3px solid #0284c7;">
+                                            <strong style="color: #0c4a6e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Data Workflow Role</strong>
+                                            <div style="color: #075985; line-height: 1.7; font-size: 0.95rem;">
+                                                ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role || 'Standard workflow role'}
+                                            </div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                    
+                                    ${colAnalysis.step1_profile ? `
+                                        <details style="margin-top: 16px;">
+                                            <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 12px; background: #f8fafc; border-radius: 6px; user-select: none;">
+                                                📊 Column Profile Details (Click to expand)
+                                            </summary>
+                                            <div style="margin-top: 12px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
+                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
+                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
+                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
+                                                </div>
+                                            </div>
+                                        </details>
                                     ` : ''}
                                 </div>
-                                <span style="background: ${confidenceColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
-                                    ${uiFormat['Confidence'] || '0%'}
-                                </span>
+                            `;
+                        });
+                        
+                        // Close file card
+                        rulesHtml += `
+                                </div>
                             </div>
-                            
-                            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
-                                <div style="margin-bottom: 12px;">
-                                    <strong style="color: #374151;">Identified As:</strong>
-                                    <div style="margin-top: 4px; color: var(--primary); font-weight: 600;">
-                                        ${uiFormat['Identified As'] || (colAnalysis.step3_identified_as ? colAnalysis.step3_identified_as.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown')}
-                                    </div>
+                        `;
+                    });
+                } else {
+                    // SINGLE-FILE MODE: Show in standard structure
+                    // Workflow explanation
+                    if (coreBankingRules.workflow_explanation && coreBankingRules.workflow_explanation.workflow_text) {
+                        rulesHtml += `
+                            <div class="card" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); border-left: 5px solid #0284c7; margin-bottom: 32px;">
+                                <div class="card-header">
+                                    <h3 class="card-title">🔄 Banking Data Workflow Explanation</h3>
                                 </div>
-                                
-                                <div style="margin-bottom: 12px;">
-                                    <strong style="color: #374151;">Business Meaning:</strong>
-                                    <div style="margin-top: 4px; color: #1f2937; line-height: 1.6;">
-                                        ${uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
-                                    </div>
+                                <div style="line-height: 1.8; color: #1f2937;">
+                                    ${coreBankingRules.workflow_explanation.workflow_text.split('\n\n').map(para => `<p style="margin-bottom: 12px;">${para}</p>`).join('')}
                                 </div>
-                                
-                                <div style="margin-bottom: 12px;">
-                                    <strong style="color: #374151;">Business Rules:</strong>
-                                    <div style="margin-top: 4px; color: #1f2937; white-space: pre-line; line-height: 1.8;">
-                                        ${uiFormat['Business Rules'] || (colAnalysis.step5_business_rules?.rules_display || 'Standard banking rules apply')}
+                                ${coreBankingRules.workflow_explanation.dataset_type ? `
+                                    <div style="margin-top: 16px; padding: 12px; background: white; border-radius: 8px;">
+                                        <strong>Dataset Type:</strong> ${coreBankingRules.workflow_explanation.dataset_type}
                                     </div>
-                                </div>
-                                
-                                <div style="margin-bottom: 12px;">
-                                    <strong style="color: #374151;">Why This Rule Exists:</strong>
-                                    <div style="margin-top: 4px; color: #1f2937; line-height: 1.6;">
-                                        ${uiFormat['Why This Rule Exists'] || colAnalysis.step5_why_rule_exists || 'Standard banking requirement'}
-                                    </div>
-                                </div>
-                                
-                                <div style="background: #fee2e2; padding: 12px; border-radius: 6px; border-left: 3px solid #dc2626;">
-                                    <strong style="color: #991b1b;">⚠️ Violation Impact:</strong>
-                                    <div style="margin-top: 4px; color: #7f1d1d; line-height: 1.6; font-size: 0.9rem;">
-                                        ${uiFormat['Violation Impact'] || colAnalysis.step5_violation_impact || 'Business, financial, and compliance risks'}
-                                    </div>
-                                </div>
-                                
-                                ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role ? `
-                                <div style="margin-top: 12px; background: #e0f2fe; padding: 12px; border-radius: 6px; border-left: 3px solid #0284c7;">
-                                    <strong style="color: #0c4a6e;">📋 Data Workflow Role:</strong>
-                                    <div style="margin-top: 4px; color: #075985; line-height: 1.6; font-size: 0.9rem;">
-                                        ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role || 'Standard workflow role'}
-                                    </div>
-                                </div>
                                 ` : ''}
                             </div>
-                            
-                            ${colAnalysis.step1_profile ? `
-                                <details style="margin-top: 12px;">
-                                    <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 8px;">
-                                        📊 Column Profile Details
-                                    </summary>
-                                    <div style="margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 0.9rem;">
-                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                                            <div><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
-                                            <div><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
-                                            <div><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
-                                            <div><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
+                        `;
+                    }
+                    
+                    // Display columns
+                    columnsToDisplay.forEach((colAnalysis, idx) => {
+                        const uiFormat = colAnalysis.ui_ready_format || {};
+                        const confidence = colAnalysis.step4_confidence_score || 0;
+                        const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
+                        
+                        rulesHtml += `
+                            <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                                    <div style="flex: 1;">
+                                        <h4 style="color: var(--primary); font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                            <span style="background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600;">
+                                                ${idx + 1}
+                                            </span>
+                                            ${uiFormat['Column Name'] || colAnalysis.column_name}
+                                        </h4>
+                                    </div>
+                                    <span style="background: ${confidenceColor}; color: white; padding: 6px 14px; border-radius: 16px; font-size: 0.85rem; font-weight: 600; white-space: nowrap;">
+                                        ${(confidence || 0).toFixed(0)}% Confidence
+                                    </span>
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr; gap: 16px;">
+                                    <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
+                                        <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Identified As</strong>
+                                        <div style="color: var(--primary); font-weight: 600; font-size: 1rem;">
+                                            ${uiFormat['Identified As'] || (colAnalysis.step3_identified_as ? colAnalysis.step3_identified_as.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown')}
                                         </div>
                                     </div>
-                                </details>
-                            ` : ''}
-                        </div>
-                    `;
-                });
+                                    
+                                    <div style="background: #f0f5ff; padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
+                                        <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Meaning</strong>
+                                        <div style="color: #1f2937; line-height: 1.7; font-size: 0.95rem;">
+                                            ${uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                        <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Rules</strong>
+                                        <div style="color: #1f2937; white-space: pre-line; line-height: 1.8; font-size: 0.95rem;">
+                                            ${uiFormat['Business Rules'] || (colAnalysis.step5_business_rules?.rules_display || 'Standard banking rules apply')}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 3px solid #d97706;">
+                                        <strong style="color: #92400e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Why This Rule Exists</strong>
+                                        <div style="color: #78350f; line-height: 1.7; font-size: 0.95rem;">
+                                            ${uiFormat['Why This Rule Exists'] || colAnalysis.step5_why_rule_exists || 'Standard banking requirement'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="background: #fee2e2; padding: 16px; border-radius: 8px; border-left: 3px solid #dc2626;">
+                                        <strong style="color: #991b1b; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Violation Impact</strong>
+                                        <div style="color: #7f1d1d; line-height: 1.7; font-size: 0.95rem;">
+                                            ${uiFormat['Violation Impact'] || colAnalysis.step5_violation_impact || 'Business, financial, and compliance risks'}
+                                        </div>
+                                    </div>
+                                    
+                                    ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role ? `
+                                    <div style="background: #e0f2fe; padding: 16px; border-radius: 8px; border-left: 3px solid #0284c7;">
+                                        <strong style="color: #0c4a6e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Data Workflow Role</strong>
+                                        <div style="color: #075985; line-height: 1.7; font-size: 0.95rem;">
+                                            ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role || 'Standard workflow role'}
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                
+                                ${colAnalysis.step1_profile ? `
+                                    <details style="margin-top: 16px;">
+                                        <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 12px; background: #f8fafc; border-radius: 6px; user-select: none;">
+                                            📊 Column Profile Details (Click to expand)
+                                        </summary>
+                                        <div style="margin-top: 12px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
+                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
+                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
+                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
+                                            </div>
+                                        </div>
+                                    </details>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                }
                 
                 // Set HTML and return early - Core Banking Rules take priority
                 document.getElementById('businessRulesContent').innerHTML = rulesHtml;
