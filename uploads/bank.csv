@@ -1,11 +1,41 @@
-customer_id,customer_name,phone,email,city
-CUST001,Ravi Kumar,9876543210,ravi@gmail.com,Chennai
-CUST002,Anitha Rao,9876543211,anitha@gmail.com,Bangalore
-CUST003,John Paul,9876543212,john@gmail.com,Coimbatore
-CUST004,Priya Sharma,9876543213,priya@gmail.com,Delhi
-CUST005,Arun Mehta,9876543214,arun@gmail.com,Mumbai
-CUST006,Kavya Iyer,9876543215,kavya@gmail.com,Chennai
-CUST007,Manoj Singh,9876543216,manoj@gmail.com,Patna
-CUST008,Divya Nair,9876543217,divya@gmail.com,Kochi
-CUST009,Suresh Babu,9876543218,suresh@gmail.com,Madurai
-CUST010,Neha Gupta,9876543219,neha@gmail.com,Jaipur
+customer_id,customer_name,gender,dob,phone,email,city,state,country,kyc_status,customer_type,created_date
+C001,Ravi Kumar,M,1990-05-12,9876543210,ravi@gmail.com,Chennai,TN,India,VERIFIED,INDIVIDUAL,2022-01-10
+C002,Anitha Rao,F,1988-08-21,9876543211,anitha@gmail.com,Bangalore,KA,India,VERIFIED,INDIVIDUAL,2022-01-11
+C003,Suresh M,M,1985-02-14,9876543212,suresh@gmail.com,Hyderabad,TS,India,VERIFIED,INDIVIDUAL,2022-01-12
+C004,Priya S,F,1992-11-09,9876543213,priya@gmail.com,Chennai,TN,India,PENDING,INDIVIDUAL,2022-01-13
+C005,Arjun K,M,1987-03-19,9876543214,arjun@gmail.com,Madurai,TN,India,VERIFIED,INDIVIDUAL,2022-01-14
+C006,Kavitha R,F,1991-07-01,9876543215,kavitha@gmail.com,Coimbatore,TN,India,VERIFIED,INDIVIDUAL,2022-01-15
+C007,Manoj P,M,1989-09-09,9876543216,manoj@gmail.com,Pune,MH,India,VERIFIED,INDIVIDUAL,2022-01-16
+C008,Deepa L,F,1993-04-18,9876543217,deepa@gmail.com,Mumbai,MH,India,PENDING,INDIVIDUAL,2022-01-17
+C009,Rahul N,M,1986-06-30,9876543218,rahul@gmail.com,Delhi,DL,India,VERIFIED,INDIVIDUAL,2022-01-18
+C010,Meena V,F,1994-12-25,9876543219,meena@gmail.com,Trichy,TN,India,VERIFIED,INDIVIDUAL,2022-01-19
+C011,Santosh,M,1984-01-11,9876543220,santosh@gmail.com,Nashik,MH,India,VERIFIED,INDIVIDUAL,2022-01-20
+C012,Divya,F,1995-10-03,9876543221,divya@gmail.com,Erode,TN,India,VERIFIED,INDIVIDUAL,2022-01-21
+C013,Karthik,M,1990-02-28,9876543222,karthik@gmail.com,Salem,TN,India,VERIFIED,INDIVIDUAL,2022-01-22
+C014,Revathi,F,1989-08-17,9876543223,revathi@gmail.com,Karur,TN,India,PENDING,INDIVIDUAL,2022-01-23
+C015,Prakash,M,1983-05-05,9876543224,prakash@gmail.com,Tiruppur,TN,India,VERIFIED,INDIVIDUAL,2022-01-24
+C016,Geetha,F,1992-03-14,9876543225,geetha@gmail.com,Vellore,TN,India,VERIFIED,INDIVIDUAL,2022-01-25
+C017,Ajith,M,1987-06-08,9876543226,ajith@gmail.com,Chennai,TN,India,VERIFIED,INDIVIDUAL,2022-01-26
+C018,Pooja,F,1996-09-22,9876543227,pooja@gmail.com,Bangalore,KA,India,PENDING,INDIVIDUAL,2022-01-27
+C019,Naveen,M,1985-12-02,9876543228,naveen@gmail.com,Mysore,KA,India,VERIFIED,INDIVIDUAL,2022-01-28
+C020,Latha,F,1991-01-30,9876543229,latha@gmail.com,Chidambaram,TN,India,VERIFIED,INDIVIDUAL,2022-01-29
+C021,Srikanth,M,1988-04-04,9876543230,srikanth@gmail.com,Kochi,KL,India,VERIFIED,INDIVIDUAL,2022-01-30
+C022,Asha,F,1993-06-16,9876543231,asha@gmail.com,Thrissur,KL,India,VERIFIED,INDIVIDUAL,2022-01-31
+C023,Vijay,M,1982-10-10,9876543232,vijay@gmail.com,Chennai,TN,India,VERIFIED,INDIVIDUAL,2022-02-01
+C024,Uma,F,1994-11-11,9876543233,uma@gmail.com,Kumbakonam,TN,India,PENDING,INDIVIDUAL,2022-02-02
+C025,Ramesh,M,1981-07-07,9876543234,ramesh@gmail.com,Delhi,DL,India,VERIFIED,INDIVIDUAL,2022-02-03
+C026,Sneha,F,1995-02-20,9876543235,sneha@gmail.com,Noida,UP,India,VERIFIED,INDIVIDUAL,2022-02-04
+C027,Harish,M,1986-09-09,9876543236,harish@gmail.com,Coorg,KA,India,VERIFIED,INDIVIDUAL,2022-02-05
+C028,Nithya,F,1992-05-15,9876543237,nithya@gmail.com,Tanjore,TN,India,PENDING,INDIVIDUAL,2022-02-06
+C029,Mohan,M,1984-03-03,9876543238,mohan@gmail.com,Karaikudi,TN,India,VERIFIED,INDIVIDUAL,2022-02-07
+C030,Sindhu,F,1996-08-08,9876543239,sindhu@gmail.com,Pondy,PY,India,VERIFIED,INDIVIDUAL,2022-02-08
+C031,Ganesh,M,1989-12-12,9876543240,ganesh@gmail.com,Trichy,TN,India,VERIFIED,INDIVIDUAL,2022-02-09
+C032,Shalini,F,1993-04-24,9876543241,shalini@gmail.com,Nagercoil,TN,India,PENDING,INDIVIDUAL,2022-02-10
+C033,Kumar,M,1980-01-01,9876543242,kumar@gmail.com,Salem,TN,India,VERIFIED,INDIVIDUAL,2022-02-11
+C034,Mala,F,1991-06-06,9876543243,mala@gmail.com,Erode,TN,India,VERIFIED,INDIVIDUAL,2022-02-12
+C035,Saravanan,M,1987-11-19,9876543244,saravanan@gmail.com,Karur,TN,India,VERIFIED,INDIVIDUAL,2022-02-13
+C036,Janani,F,1995-09-09,9876543245,janani@gmail.com,Tirunelveli,TN,India,PENDING,INDIVIDUAL,2022-02-14
+C037,Selvam,M,1983-02-02,9876543246,selvam@gmail.com,Cuddalore,TN,India,VERIFIED,INDIVIDUAL,2022-02-15
+C038,Pavithra,F,1994-07-07,9876543247,pavi@gmail.com,Mayiladuthurai,TN,India,VERIFIED,INDIVIDUAL,2022-02-16
+C039,Sekar,M,1982-05-25,9876543248,sekar@gmail.com,Thoothukudi,TN,India,VERIFIED,INDIVIDUAL,2022-02-17
+C040,Keerthi,F,1996-03-03,9876543249,keerthi@gmail.com,Ramanathapuram,TN,India,PENDING,INDIVIDUAL,2022-02-18

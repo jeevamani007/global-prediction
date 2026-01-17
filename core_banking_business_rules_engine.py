@@ -1,13 +1,23 @@
 """
-CORE BANKING DOMAIN BUSINESS RULES ENGINE (FIXED)
+CORE BANKING DOMAIN BUSINESS RULES ENGINE
 
-STRICT PROCESS (DO NOT SKIP):
+STRICT EXECUTION FLOW (DO NOT SKIP):
 STEP 1: COLUMN PROFILING (MANDATORY)
-STEP 2: IDENTIFIER ELIGIBILITY CHECK (CRITICAL)
-STEP 3: BANKING CONCEPT IDENTIFICATION
-STEP 4: CONFIDENCE SCORING
-STEP 5: APPLY REAL BANKING BUSINESS RULES
-STEP 6: BANKING DATA WORKFLOW EXPLANATION
+STEP 2: TABLE TYPE DETECTION (CRITICAL)
+STEP 3: IDENTIFIER ELIGIBILITY CHECK (CRITICAL)
+STEP 4: BANKING CONCEPT MAPPING (EXACT)
+STEP 5: TABLE-AWARE KEY RULES (MANDATORY)
+STEP 6: REAL BANKING BUSINESS RULES
+STEP 7: BANKING DATA WORKFLOW (MANDATORY)
+
+STRICTLY AVOID:
+- appears to store
+- may represent
+- guessing
+- generic technical language
+
+ASSUME: This is a REAL CORE BANKING SYSTEM.
+Accuracy is NON-NEGOTIABLE.
 """
 
 import pandas as pd
@@ -506,13 +516,14 @@ class CoreBankingBusinessRulesEngine:
         """
         MAIN ENTRY POINT
         
-        Follows strict 6-step process:
-        1. Column Profiling (Mandatory)
-        2. Identifier Eligibility Check (Critical)
-        3. Banking Concept Identification
-        4. Confidence Scoring
-        5. Apply Real Banking Business Rules
-        6. Banking Data Workflow Explanation
+        Follows STRICT 7-step process:
+        STEP 1: COLUMN PROFILING (MANDATORY)
+        STEP 2: TABLE TYPE DETECTION (CRITICAL)
+        STEP 3: IDENTIFIER ELIGIBILITY CHECK (CRITICAL)
+        STEP 4: BANKING CONCEPT MAPPING (EXACT)
+        STEP 5: TABLE-AWARE KEY RULES (MANDATORY)
+        STEP 6: REAL BANKING BUSINESS RULES
+        STEP 7: BANKING DATA WORKFLOW (MANDATORY)
         """
         try:
             # Load DataFrame if not provided
@@ -530,7 +541,8 @@ class CoreBankingBusinessRulesEngine:
             self.dataset_context = {
                 "detected_tables": [],
                 "primary_keys": {},
-                "foreign_keys": {}
+                "foreign_keys": {},
+                "table_type": None
             }
             
             results = {
@@ -539,16 +551,27 @@ class CoreBankingBusinessRulesEngine:
                 "total_rows": len(df),
                 "columns_analysis": [],
                 "workflow_explanation": {},
-                "summary": {}
+                "summary": {},
+                "table_type": None
             }
             
-            # STEP 1-5: Process each column
+            # STEP 1: Column Profiling (MANDATORY) - Profile all columns first
+            column_profiles = {}
             for column in df.columns:
-                column_result = self._process_column(column, df[column], df)
+                column_profiles[column] = self._step1_column_profiling(column, df[column])
+            
+            # STEP 2: TABLE TYPE DETECTION (CRITICAL)
+            detected_table_type = self._step2_table_type_detection(df, column_profiles)
+            self.dataset_context["table_type"] = detected_table_type
+            results["table_type"] = detected_table_type
+            
+            # STEP 3-6: Process each column with table-aware rules
+            for column in df.columns:
+                column_result = self._process_column(column, df[column], df, column_profiles[column], detected_table_type)
                 results["columns_analysis"].append(column_result)
             
-            # STEP 6: Banking Data Workflow Explanation
-            results["workflow_explanation"] = self._step6_workflow_explanation(results["columns_analysis"], df)
+            # STEP 7: Banking Data Workflow Explanation
+            results["workflow_explanation"] = self._step7_workflow_explanation(results["columns_analysis"], df, detected_table_type)
             
             # Generate summary
             results["summary"] = self._generate_summary(results["columns_analysis"])
@@ -564,52 +587,6 @@ class CoreBankingBusinessRulesEngine:
                 "columns_analysis": []
             }
     
-    def _process_column(self, column_name: str, series: pd.Series, full_df: pd.DataFrame) -> Dict[str, Any]:
-        """
-        Process single column through all 6 steps
-        """
-        # STEP 1: Column Profiling (MANDATORY)
-        profile = self._step1_column_profiling(column_name, series)
-        
-        # STEP 2: Identifier Eligibility Check (CRITICAL)
-        identifier_check = self._step2_identifier_eligibility(column_name, profile, series)
-        
-        # STEP 3: Banking Concept Identification
-        concept_match = self._step3_concept_identification(column_name, profile, series, identifier_check)
-        
-        # STEP 4: Confidence Scoring
-        confidence = self._step4_confidence_scoring(column_name, profile, concept_match, series, full_df, identifier_check)
-        
-        # STEP 5: Apply Real Banking Business Rules
-        business_rules = self._step5_apply_business_rules(concept_match, profile, series, identifier_check)
-        
-        # Build UI-ready format
-        ui_format = {
-            "Column Name": column_name,
-            "Identified As": concept_match["concept_display"],
-            "Confidence": f"{confidence}%",
-            "Business Meaning": business_rules["business_meaning"],
-            "Business Rules": business_rules["rules_display"],
-            "Why This Rule Exists": business_rules["why_rule_exists"],
-            "Violation Impact": business_rules["violation_impact"],
-            "Data Workflow Role": business_rules["workflow_role"]
-        }
-        
-        return {
-            "column_name": column_name,
-            "step1_profile": profile,
-            "step2_identifier_eligible": identifier_check["is_eligible"],
-            "step2_identifier_reason": identifier_check["reason"],
-            "step3_identified_as": concept_match["concept"],
-            "step3_confidence": confidence,
-            "step4_confidence_score": confidence,
-            "step5_business_meaning": business_rules["business_meaning"],
-            "step5_business_rules": business_rules["rules"],
-            "step5_why_rule_exists": business_rules["why_rule_exists"],
-            "step5_violation_impact": business_rules["violation_impact"],
-            "step5_workflow_role": business_rules["workflow_role"],
-            "ui_ready_format": ui_format
-        }
     
     def _step1_column_profiling(self, column_name: str, series: pd.Series) -> Dict[str, Any]:
         """
@@ -966,8 +943,142 @@ class CoreBankingBusinessRulesEngine:
         
         return round(confidence, 1)
     
-    def _step5_apply_business_rules(self, concept_match: Dict, profile: Dict, series: pd.Series,
-                                   identifier_check: Dict) -> Dict[str, Any]:
+    def _step5_table_aware_key_rules(self, column_name: str, concept_match: Dict, 
+                                     identifier_check: Dict, table_type: Optional[str]) -> Dict[str, Any]:
+        """
+        STEP 5: TABLE-AWARE KEY RULES (MANDATORY)
+        
+        STRICT RULES:
+        - customer_id: PRIMARY KEY only in Customer Master; FOREIGN KEY in all other tables
+        - account_number: PRIMARY KEY only in Account Master; FOREIGN KEY in Transaction & Loan tables
+        - transaction_id: PRIMARY KEY ONLY in Transaction table
+        - loan_id: PRIMARY KEY ONLY in Loan table
+        """
+        column_lower = column_name.lower()
+        concept = concept_match.get("concept", "unknown")
+        
+        is_primary_key = False
+        is_foreign_key = False
+        key_role_explanation = ""
+        
+        # Rule 1: customer_id
+        if concept == "customer_id" or "customer_id" in column_lower or "cust_id" in column_lower:
+            if table_type == "Customer Master":
+                is_primary_key = identifier_check["is_eligible"]
+                is_foreign_key = False
+                key_role_explanation = "PRIMARY KEY in Customer Master table. Must be unique and non-null."
+            else:
+                is_primary_key = False
+                is_foreign_key = True
+                key_role_explanation = "FOREIGN KEY referencing Customer Master. Links to customer data. NOT unique in this table."
+        
+        # Rule 2: account_number
+        elif concept == "account_id" or "account_number" in column_lower or "account_id" in column_lower:
+            if table_type == "Account Master":
+                is_primary_key = identifier_check["is_eligible"]
+                is_foreign_key = False
+                key_role_explanation = "PRIMARY KEY in Account Master table. Must be globally unique and non-null."
+            elif table_type in ["Transaction Table", "Loan Table"]:
+                is_primary_key = False
+                is_foreign_key = True
+                key_role_explanation = f"FOREIGN KEY referencing Account Master. Links transactions/loans to accounts. NOT unique in {table_type}."
+            else:
+                is_primary_key = False
+                is_foreign_key = False
+                key_role_explanation = "Account identifier. Role depends on table context."
+        
+        # Rule 3: transaction_id
+        elif concept == "transaction_id" or "transaction_id" in column_lower or "txn_id" in column_lower:
+            if table_type == "Transaction Table":
+                is_primary_key = identifier_check["is_eligible"]
+                is_foreign_key = False
+                key_role_explanation = "PRIMARY KEY ONLY in Transaction table. Must be unique per transaction."
+            else:
+                is_primary_key = False
+                is_foreign_key = False
+                key_role_explanation = "Transaction identifier should only be PRIMARY KEY in Transaction table."
+        
+        # Rule 4: loan_id
+        elif concept == "loan_id" or "loan_id" in column_lower or "loan_number" in column_lower:
+            if table_type == "Loan Table":
+                is_primary_key = identifier_check["is_eligible"]
+                is_foreign_key = False
+                key_role_explanation = "PRIMARY KEY ONLY in Loan table. Must be unique per loan."
+            else:
+                is_primary_key = False
+                is_foreign_key = False
+                key_role_explanation = "Loan identifier should only be PRIMARY KEY in Loan table."
+        
+        # Default: Use concept definition if available
+        else:
+            concept_def = concept_match.get("concept_definition")
+            if concept_def and concept_def.get("is_identifier"):
+                if identifier_check["is_eligible"]:
+                    is_primary_key = True
+                    key_role_explanation = f"PRIMARY KEY candidate. Table type: {table_type}"
+        
+        return {
+            "is_primary_key": is_primary_key,
+            "is_foreign_key": is_foreign_key,
+            "key_role_explanation": key_role_explanation,
+            "table_type": table_type
+        }
+    
+    def _process_column(self, column_name: str, series: pd.Series, full_df: pd.DataFrame, 
+                       profile: Optional[Dict] = None, table_type: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Process single column through steps 3-6 (after table type detection)
+        """
+        # STEP 1: Column Profiling (if not provided)
+        if profile is None:
+            profile = self._step1_column_profiling(column_name, series)
+        
+        # STEP 3: Identifier Eligibility Check (CRITICAL)
+        identifier_check = self._step2_identifier_eligibility(column_name, profile, series)
+        
+        # STEP 4: Banking Concept Mapping (EXACT)
+        concept_match = self._step3_concept_identification(column_name, profile, series, identifier_check)
+        
+        # Confidence Scoring (part of step 4)
+        confidence = self._step4_confidence_scoring(column_name, profile, concept_match, series, full_df, identifier_check)
+        
+        # STEP 5: TABLE-AWARE KEY RULES (MANDATORY)
+        table_aware_rules = self._step5_table_aware_key_rules(column_name, concept_match, identifier_check, table_type)
+        
+        # STEP 6: Apply Real Banking Business Rules
+        business_rules = self._step6_apply_business_rules(concept_match, profile, series, identifier_check, table_aware_rules)
+        
+        # Build UI-ready format (MANDATORY OUTPUT FORMAT)
+        ui_format = {
+            "Column Name": column_name,
+            "Identified As": concept_match["concept_display"],
+            "Confidence": f"{confidence}%",
+            "Business Meaning": business_rules["business_meaning"],
+            "Business Rules": business_rules["rules_display"],
+            "Why This Rule Exists": business_rules["why_rule_exists"],
+            "Violation Impact": business_rules["violation_impact"],
+            "Data Workflow Role": business_rules["workflow_role"]
+        }
+        
+        return {
+            "column_name": column_name,
+            "step1_profile": profile,
+            "step2_identifier_eligible": identifier_check["is_eligible"],
+            "step2_identifier_reason": identifier_check["reason"],
+            "step3_identified_as": concept_match["concept"],
+            "step3_confidence": confidence,
+            "step4_confidence_score": confidence,
+            "step5_table_aware_rules": table_aware_rules,
+            "step5_business_meaning": business_rules["business_meaning"],
+            "step5_business_rules": business_rules["rules"],
+            "step5_why_rule_exists": business_rules["why_rule_exists"],
+            "step5_violation_impact": business_rules["violation_impact"],
+            "step5_workflow_role": business_rules["workflow_role"],
+            "ui_ready_format": ui_format
+        }
+    
+    def _step6_apply_business_rules(self, concept_match: Dict, profile: Dict, series: pd.Series,
+                                   identifier_check: Dict, table_aware_rules: Dict) -> Dict[str, Any]:
         """
         STEP 5: APPLY REAL BANKING BUSINESS RULES
         
@@ -999,9 +1110,14 @@ class CoreBankingBusinessRulesEngine:
         concept_def = concept_match["concept_definition"]
         business_rules = concept_def["business_rules"]
         
-        # Determine PK/FK based on table role and identifier eligibility
-        is_pk = business_rules.get("primary_key", False) and identifier_check["is_eligible"]
-        is_fk = business_rules.get("foreign_key", False)
+        # Determine PK/FK based on TABLE-AWARE rules (STEP 5) - takes precedence
+        is_pk = table_aware_rules.get("is_primary_key", False)
+        is_fk = table_aware_rules.get("is_foreign_key", False)
+        
+        # Fallback to concept definition if table-aware rules don't apply
+        if not is_pk and not is_fk:
+            is_pk = business_rules.get("primary_key", False) and identifier_check["is_eligible"]
+            is_fk = business_rules.get("foreign_key", False)
         
         # Build rules display
         rules_list = []
@@ -1017,8 +1133,12 @@ class CoreBankingBusinessRulesEngine:
         
         if is_pk:
             rules_list.append("✓ PRIMARY KEY")
+            if table_aware_rules.get("key_role_explanation"):
+                rules_list.append(f"  → {table_aware_rules['key_role_explanation']}")
         if is_fk:
             rules_list.append("✓ FOREIGN KEY")
+            if table_aware_rules.get("key_role_explanation"):
+                rules_list.append(f"  → {table_aware_rules['key_role_explanation']}")
         
         if business_rules.get("format"):
             rules_list.append(f"✓ Format: {business_rules['format']}")
@@ -1034,8 +1154,14 @@ class CoreBankingBusinessRulesEngine:
         # Determine workflow role
         workflow_role = self._determine_workflow_role(concept_match["concept"], concept_def)
         
+        # Build business meaning - AVOID vague language
+        if concept_match["concept"] == "unknown":
+            business_meaning = f"This column contains banking data. Exact purpose requires domain expert review."
+        else:
+            business_meaning = f"This column stores {concept_match['concept_display']} data. {business_rules.get('reason', '')}"
+        
         return {
-            "business_meaning": f"This column represents {concept_match['concept_display']} in the banking system. {business_rules.get('reason', '')}",
+            "business_meaning": business_meaning,
             "rules": {
                 **business_rules,
                 "primary_key": is_pk,
@@ -1047,16 +1173,18 @@ class CoreBankingBusinessRulesEngine:
             "workflow_role": workflow_role
         }
     
-    def _step6_workflow_explanation(self, columns_analysis: List[Dict], df: pd.DataFrame) -> Dict[str, Any]:
+    def _step7_workflow_explanation(self, columns_analysis: List[Dict], df: pd.DataFrame, table_type: Optional[str]) -> Dict[str, Any]:
         """
-        STEP 6: BANKING DATA WORKFLOW EXPLANATION
+        STEP 7: BANKING DATA WORKFLOW (MANDATORY)
         
-        For each dataset, explain:
-        - How customer data is created
-        - How it links to account
-        - How loans depend on customer & account
-        - How transactions depend on account / loan
-        - Role of descriptive & contact fields
+        Explain clearly:
+        - Customer onboarding
+        - Account creation linked to customer
+        - Loan linked to customer & account
+        - Transactions linked to account
+        - Status & lifecycle flow
+        
+        STRICTLY AVOID: appears to store, may represent, guessing, generic technical language
         """
         # Identify detected concepts
         detected_concepts = {}
@@ -1075,55 +1203,135 @@ class CoreBankingBusinessRulesEngine:
         
         workflow_parts = []
         
+        # Add table type to workflow
+        if table_type:
+            workflow_parts.append(f"DATASET TYPE: {table_type}")
+            workflow_parts.append("")
+        
         # Customer workflow
         if has_customer:
-            workflow_parts.append("CUSTOMER MANAGEMENT: Customer data is created during onboarding with customer_id as primary key. Customer information includes name, contact details, and address for KYC compliance.")
+            if table_type == "Customer Master":
+                workflow_parts.append("CUSTOMER ONBOARDING WORKFLOW:")
+                workflow_parts.append("1. Customer onboarding creates customer_id (PRIMARY KEY) in Customer Master table.")
+                workflow_parts.append("2. Customer information (name, phone, email, city) is stored for KYC compliance.")
+                workflow_parts.append("3. customer_id is unique and non-null. This identifier is used across all banking operations.")
+            else:
+                workflow_parts.append("CUSTOMER REFERENCE:")
+                workflow_parts.append("This table contains customer_id (FOREIGN KEY) linking to Customer Master. Multiple records can reference the same customer.")
+            workflow_parts.append("")
         
         # Account workflow
         if has_account:
-            if has_customer:
-                workflow_parts.append("ACCOUNT MANAGEMENT: Accounts are created and linked to customers via customer_id (foreign key). Each account_number is globally unique and serves as primary key in account master.")
-            else:
-                workflow_parts.append("ACCOUNT MANAGEMENT: Accounts are managed with account_number as primary key. Account status and type determine transaction eligibility.")
+            if table_type == "Account Master":
+                workflow_parts.append("ACCOUNT CREATION WORKFLOW:")
+                workflow_parts.append("1. Account is created with account_number as PRIMARY KEY in Account Master.")
+                workflow_parts.append("2. account_number is globally unique and links to customer via customer_id (FOREIGN KEY).")
+                workflow_parts.append("3. Account type and status determine transaction eligibility and product features.")
+                workflow_parts.append("4. Balance is maintained and updated through transactions.")
+            elif has_customer:
+                workflow_parts.append("ACCOUNT REFERENCE:")
+                workflow_parts.append("This table contains account_number (FOREIGN KEY) linking to Account Master. account_number is NOT unique in this table.")
+            workflow_parts.append("")
         
         # Loan workflow
         if has_loan:
-            if has_customer and has_account:
-                workflow_parts.append("LOAN MANAGEMENT: Loans are created for customers (via customer_id foreign key) and linked to accounts (via account_number foreign key). Loan_id serves as primary key. EMI amounts are deducted from linked accounts.")
-            elif has_customer:
-                workflow_parts.append("LOAN MANAGEMENT: Loans are created for customers via customer_id. Loan_id is the primary key.")
-            else:
-                workflow_parts.append("LOAN MANAGEMENT: Loans are managed with loan_id as primary key.")
+            if table_type == "Loan Table":
+                workflow_parts.append("LOAN CREATION WORKFLOW:")
+                workflow_parts.append("1. Loan is created with loan_id as PRIMARY KEY in Loan table.")
+                if has_customer:
+                    workflow_parts.append("2. Loan is linked to customer via customer_id (FOREIGN KEY) referencing Customer Master.")
+                if has_account:
+                    workflow_parts.append("3. Loan is linked to account via account_number (FOREIGN KEY) referencing Account Master.")
+                workflow_parts.append("4. EMI amounts are automatically deducted from linked account on due dates.")
+                workflow_parts.append("5. Loan status tracks lifecycle: Active, Closed, Defaulted.")
+            workflow_parts.append("")
         
         # Transaction workflow
         if has_transaction:
-            if has_account:
-                workflow_parts.append("TRANSACTION PROCESSING: Transactions are recorded with transaction_id as primary key. Each transaction links to an account via account_number (foreign key). Debit/Credit columns track money flow, and balance is updated accordingly.")
-            else:
-                workflow_parts.append("TRANSACTION PROCESSING: Transactions are recorded with transaction_id as primary key. Transaction type, amount, and date are captured for audit and reporting.")
+            if table_type == "Transaction Table":
+                workflow_parts.append("TRANSACTION PROCESSING WORKFLOW:")
+                workflow_parts.append("1. Transaction is created with transaction_id as PRIMARY KEY in Transaction table.")
+                if has_account:
+                    workflow_parts.append("2. Transaction is linked to account via account_number (FOREIGN KEY) referencing Account Master.")
+                workflow_parts.append("3. Transaction amount (debit/credit) updates account balance.")
+                workflow_parts.append("4. Transaction date and time record when the transaction occurred.")
+                workflow_parts.append("5. Transaction status tracks processing state: Pending, Completed, Failed, Reversed.")
+            workflow_parts.append("")
         
-        # Descriptive fields
-        descriptive_fields = []
-        for col_analysis in columns_analysis:
-            if col_analysis.get("step2_identifier_eligible", False) == False:
-                concept = col_analysis.get("step3_identified_as", "unknown")
-                if concept not in ["customer_id", "account_number", "loan_id", "transaction_id", "unknown"]:
-                    descriptive_fields.append(col_analysis["column_name"])
-        
-        if descriptive_fields:
-            workflow_parts.append(f"DESCRIPTIVE FIELDS: Columns like {', '.join(descriptive_fields[:5])} provide additional context and metadata but are not identifiers. They support business operations, reporting, and compliance requirements.")
-        
-        workflow_text = "\n\n".join(workflow_parts) if workflow_parts else "Workflow explanation requires identification of core banking columns."
+        # Generate workflow text
+        workflow_text = "\n".join(workflow_parts) if workflow_parts else "General banking data workflow."
         
         return {
             "workflow_text": workflow_text,
-            "detected_concepts": list(detected_concepts.keys()),
-            "dataset_type": self._determine_dataset_type(has_customer, has_account, has_loan, has_transaction),
-            "has_customer": has_customer,
-            "has_account": has_account,
-            "has_loan": has_loan,
-            "has_transaction": has_transaction
+            "dataset_type": table_type or "Unknown",
+            "detected_concepts": list(detected_concepts.keys())
         }
+    
+    def _determine_workflow_role(self, concept: str, concept_def: Optional[Dict]) -> str:
+        """
+        Determine role of column in banking data workflow.
+        """
+        if concept == "customer_id":
+            return "Links all banking products (accounts, loans, cards) to customer. Foundation of customer relationship management."
+        elif concept == "account_number":
+            return "Primary account identifier. Links transactions and balances to specific accounts."
+        elif concept == "transaction_id":
+            return "Unique transaction identifier. Enables transaction tracking, reconciliation, and audit trails."
+        elif concept == "loan_id":
+            return "Primary loan identifier. Links loan details, EMI schedules, and payments to loan accounts."
+        elif concept in ["customer_name", "phone", "email"]:
+            return "Customer contact and identification information. Used for communication and KYC compliance."
+        elif concept == "balance" or "balance" in concept:
+            return "Account balance tracking. Updated through debit and credit transactions."
+        elif concept_def:
+            return f"Role in {concept_def.get('domain', 'banking')} operations."
+        else:
+            return "Standard banking data field."
+    
+    def _extract_keywords(self, column_name: str) -> List[str]:
+        """
+        Extract keywords from column name for pattern matching.
+        """
+        # Split by underscore, hyphen, or camelCase
+        parts = re.split(r'[_\-]|(?=[A-Z])', column_name.lower())
+        return [p for p in parts if p]
+    
+    def _detect_data_type(self, series: pd.Series) -> str:
+        """
+        Detect data type of a pandas Series.
+        Returns: numeric, decimal, text, alphanumeric, date, time, datetime
+        """
+        # Check if numeric
+        try:
+            pd.to_numeric(series.dropna(), errors='raise')
+            # Check for decimal (has decimal point)
+            if series.astype(str).str.contains(r'\.', na=False).any():
+                return "decimal"
+            return "numeric"
+        except (ValueError, TypeError):
+            pass
+        
+        # Check if date/time
+        try:
+            date_series = pd.to_datetime(series.dropna().head(100), errors='raise')
+            if date_series.dt.time.nunique() > 1 or any(str(d).count(':') >= 2 for d in date_series.head(10)):
+                return "datetime"
+            elif date_series.dt.date.nunique() == date_series.nunique():
+                return "date"
+            else:
+                return "datetime"
+        except (ValueError, TypeError):
+            pass
+        
+        # Check if alphanumeric (mix of letters and numbers)
+        sample = series.dropna().head(100).astype(str)
+        has_letters = any(re.search(r'[A-Za-z]', s) for s in sample)
+        has_numbers = any(re.search(r'[0-9]', s) for s in sample)
+        if has_letters and has_numbers:
+            return "alphanumeric"
+        
+        # Default to text
+        return "text"
     
     def _determine_workflow_role(self, concept: str, concept_def: Dict) -> str:
         """Determine the role of this column in banking workflow"""
