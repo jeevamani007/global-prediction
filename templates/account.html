@@ -732,6 +732,36 @@
                         <p>Loading file relationship analysis...</p>
                     </div>
                 </div>
+
+                <h4 style="margin: 32px 0 16px; color: var(--text-dark); border-top: 2px solid var(--border); padding-top: 24px;">
+                    🏦 Banking Domain & Column Relationship Analysis
+                </h4>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">
+                    Identify what kind of banking domain each file belongs to and see how columns relate between files with detailed explanations.
+                </p>
+                
+                <!-- File Banking Domains -->
+                <h5 style="margin: 24px 0 16px; color: var(--primary); font-size: 1.1rem;">📊 File Banking Domains</h5>
+                <div id="fileDomainsContent">
+                    <div class="empty-state">
+                        <div class="icon">📁</div>
+                        <p>Analyzing file banking domains...</p>
+                    </div>
+                </div>
+
+                <!-- Column Relationships -->
+                <h5 style="margin: 32px 0 16px; color: var(--primary); font-size: 1.1rem; border-top: 2px solid var(--border); padding-top: 24px;">
+                    🔗 Column-to-Column Relationships
+                </h5>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">
+                    Detailed explanations of how columns in different files are connected and their banking purpose.
+                </p>
+                <div id="columnRelationshipsContent">
+                    <div class="empty-state">
+                        <div class="icon">🔗</div>
+                        <p>Analyzing column relationships...</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -978,6 +1008,9 @@
             
             // Display file-to-file relationships with detailed explanations
             displayFileRelationships();
+            
+            // Display banking domains and column relationships
+            displayColumnRelationshipAnalysis();
         }
 
         function loadSingleFileData() {
@@ -1160,6 +1193,187 @@
                     <div class="empty-state">
                         <div class="icon">📁</div>
                         <p>No file-to-file relationships detected. Upload multiple files to see connections.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function displayColumnRelationshipAnalysis() {
+            // Get column relationship analysis from sessionStorage
+            const columnAnalysis = JSON.parse(sessionStorage.getItem('columnRelationshipAnalysis') || 'null');
+            
+            if (!columnAnalysis || !columnAnalysis.file_domains) {
+                document.getElementById('fileDomainsContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📊</div>
+                        <p>No banking domain analysis available. Upload multiple files to see domain information.</p>
+                    </div>
+                `;
+                document.getElementById('columnRelationshipsContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">🔗</div>
+                        <p>No column relationship analysis available.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Display File Banking Domains
+            const fileDomains = columnAnalysis.file_domains || [];
+            if (fileDomains.length > 0) {
+                let domainsHtml = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
+                
+                fileDomains.forEach(fileInfo => {
+                    const confidenceColor = fileInfo.domain_confidence >= 70 ? 'var(--success)' : 
+                                          fileInfo.domain_confidence >= 40 ? 'var(--warning)' : 'var(--danger)';
+                    
+                    domainsHtml += `
+                        <div class="card" style="border-left: 5px solid ${confidenceColor};">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                                <span style="font-size: 2rem;">${fileInfo.domain_icon}</span>
+                                <div>
+                                    <h4 style="margin: 0; color: var(--text-dark); font-size: 1.1rem;">${fileInfo.file_name}</h4>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                                        ${fileInfo.total_columns} columns • ${fileInfo.total_rows.toLocaleString()} rows
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <strong style="color: var(--primary);">Primary Domain:</strong>
+                                    <span style="background: ${confidenceColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
+                                        ${fileInfo.domain_confidence.toFixed(0)}%
+                                    </span>
+                                </div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-dark); margin-bottom: 8px;">
+                                    ${fileInfo.primary_domain}
+                                </div>
+                                <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin: 0;">
+                                    ${fileInfo.domain_description}
+                                </p>
+                            </div>
+                            
+                            ${fileInfo.matched_columns && fileInfo.matched_columns.length > 0 ? `
+                                <div style="margin-top: 12px;">
+                                    <strong style="color: var(--text-dark); font-size: 0.9rem; display: block; margin-bottom: 8px;">
+                                        Key Columns (${fileInfo.matched_columns.length}):
+                                    </strong>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                        ${fileInfo.matched_columns.slice(0, 8).map(col => `
+                                            <span style="background: #e0e7ff; color: var(--primary-dark); padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">
+                                                ${col}
+                                            </span>
+                                        `).join('')}
+                                        ${fileInfo.matched_columns.length > 8 ? `<span style="color: var(--text-muted); font-size: 0.8rem;">+${fileInfo.matched_columns.length - 8} more</span>` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                domainsHtml += '</div>';
+                document.getElementById('fileDomainsContent').innerHTML = domainsHtml;
+            }
+            
+            // Display Column Relationships
+            const columnRelationships = columnAnalysis.column_relationships || [];
+            if (columnRelationships.length > 0) {
+                let relationshipsHtml = '';
+                
+                columnRelationships.forEach((rel, index) => {
+                    const strengthColor = rel.connection_strength === 'Strong' ? 'var(--success)' : 
+                                        rel.connection_strength === 'Moderate' ? 'var(--warning)' : 'var(--danger)';
+                    const overlapPercent = rel.overlap_info.overlap_percentage || 0;
+                    
+                    relationshipsHtml += `
+                        <div class="card" style="margin-bottom: 24px; border-left: 5px solid ${strengthColor};">
+                            <div class="card-header">
+                                <h4 style="margin: 0; color: var(--text-dark); font-size: 1.1rem;">
+                                    🔗 Relationship ${index + 1}: ${rel.file1_column} ↔ ${rel.file2_column}
+                                </h4>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span class="badge" style="background: ${strengthColor}; color: white;">
+                                        ${rel.connection_strength}
+                                    </span>
+                                    <span class="badge badge-primary">
+                                        ${overlapPercent}% Match
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 16px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                    <div style="background: white; padding: 16px; border-radius: 8px; border: 2px solid var(--primary);">
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">File 1</div>
+                                        <div style="font-weight: 600; color: var(--primary); margin-bottom: 4px;">${rel.file1}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
+                                            ${rel.file1_domain}
+                                        </div>
+                                        <div style="font-size: 1rem; font-weight: 600; color: var(--text-dark);">
+                                            Column: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${rel.file1_column}</code>
+                                        </div>
+                                    </div>
+                                    <div style="background: white; padding: 16px; border-radius: 8px; border: 2px solid var(--success);">
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">File 2</div>
+                                        <div style="font-weight: 600; color: var(--success); margin-bottom: 4px;">${rel.file2}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
+                                            ${rel.file2_domain}
+                                        </div>
+                                        <div style="font-size: 1rem; font-weight: 600; color: var(--text-dark);">
+                                            Column: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${rel.file2_column}</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="background: white; padding: 16px; border-radius: 8px; border-left: 4px solid var(--primary); margin-bottom: 16px;">
+                                    <strong style="color: var(--primary); display: block; margin-bottom: 8px;">Relationship Type:</strong>
+                                    <div style="font-size: 1rem; font-weight: 600; color: var(--text-dark);">
+                                        ${rel.relationship_type}
+                                    </div>
+                                </div>
+                                
+                                <div style="background: linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%); padding: 20px; border-radius: 8px; border: 1px solid #c7d2fe; margin-bottom: 16px;">
+                                    <h5 style="color: var(--primary); margin-bottom: 12px; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                                        💡 Explanation
+                                    </h5>
+                                    <p style="color: #1f2937; line-height: 1.8; font-size: 0.95rem; margin-bottom: 12px;">
+                                        ${rel.explanation}
+                                    </p>
+                                    <div style="background: #e0f2fe; padding: 12px; border-radius: 6px; border-left: 3px solid #0284c7; margin-top: 12px;">
+                                        <strong style="color: #0c4a6e; display: block; margin-bottom: 4px;">Business Value:</strong>
+                                        <p style="color: #075985; line-height: 1.6; font-size: 0.9rem; margin: 0;">
+                                            ${rel.business_value}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                                    <div style="background: white; padding: 12px; border-radius: 8px; text-align: center;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${rel.overlap_info.overlap_count}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Matching Values</div>
+                                    </div>
+                                    <div style="background: white; padding: 12px; border-radius: 8px; text-align: center;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${rel.overlap_info.total_unique_file1}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Unique in ${rel.file1}</div>
+                                    </div>
+                                    <div style="background: white; padding: 12px; border-radius: 8px; text-align: center;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${rel.overlap_info.total_unique_file2}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Unique in ${rel.file2}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('columnRelationshipsContent').innerHTML = relationshipsHtml;
+            } else {
+                document.getElementById('columnRelationshipsContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">🔗</div>
+                        <p>No column relationships detected between the uploaded files.</p>
                     </div>
                 `;
             }

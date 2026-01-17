@@ -23,6 +23,7 @@ from enhanced_business_rules_engine import EnhancedBusinessRulesEngine
 from column_predictor import ColumnPredictor
 from banking_blueprint_engine import BankingBlueprintEngine
 from file_relationship_analyzer import FileRelationshipAnalyzer
+from column_relationship_analyzer import ColumnRelationshipAnalyzer
 
 
 class MultiFileProcessor:
@@ -36,6 +37,7 @@ class MultiFileProcessor:
         self.column_predictor = ColumnPredictor()
         self.blueprint_engine = BankingBlueprintEngine()
         self.relationship_analyzer = FileRelationshipAnalyzer()
+        self.column_relationship_analyzer = ColumnRelationshipAnalyzer()
     
     def _format_validator_result(self, validator_result: Dict) -> Dict:
         """Format validator result to match UI expected format (same as single-file endpoint)"""
@@ -140,6 +142,9 @@ class MultiFileProcessor:
         # STEP 5.5: Analyze file-to-file relationships with detailed explanations
         file_relationships = self.relationship_analyzer.analyze_file_relationships(table_dataframes)
         
+        # STEP 5.6: Analyze column relationships and banking domains
+        column_relationship_analysis = self.column_relationship_analyzer.analyze_column_relationships(table_dataframes)
+        
         # STEP 6: Apply business rules (already done in single-file processing)
         
         # STEP 7: Unified Banking Blueprint Analysis (New)
@@ -150,7 +155,8 @@ class MultiFileProcessor:
             
         # STEP 8: Consolidate results
         consolidated_result = self._consolidate_results(
-            table_results, domain_results, primary_keys, foreign_keys, relationships, banking_blueprint, file_relationships
+            table_results, domain_results, primary_keys, foreign_keys, relationships, banking_blueprint, 
+            file_relationships, column_relationship_analysis
         )
         
         return consolidated_result
@@ -494,7 +500,8 @@ class MultiFileProcessor:
     def _consolidate_results(self, table_results: List[Dict], domain_results: Dict,
                             primary_keys: Dict, foreign_keys: List[Dict],
                             relationships: List[Dict], banking_blueprint: Dict,
-                            file_relationships: List[Dict] = None) -> Dict[str, Any]:
+                            file_relationships: List[Dict] = None,
+                            column_relationship_analysis: Dict = None) -> Dict[str, Any]:
         """Consolidate all results into final format"""
         
         # Calculate overall system verdict
@@ -543,6 +550,7 @@ class MultiFileProcessor:
             "foreign_keys": foreign_keys,
             "relationships": relationships,
             "file_relationships": file_relationships or [],  # New: Detailed file-to-file relationships
+            "column_relationship_analysis": column_relationship_analysis or {},  # New: Column relationships and domains
             "overall_verdict": overall_verdict,
             "overall_confidence": round(overall_confidence, 2),
             "banking_blueprint": banking_blueprint,
