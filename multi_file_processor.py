@@ -152,11 +152,21 @@ class MultiFileProcessor:
             banking_blueprint = self.blueprint_engine.analyze_multiple_files(table_dataframes)
         except Exception as e:
             banking_blueprint = {"error": f"Blueprint analysis failed: {str(e)}"}
+        
+        # STEP 7.5: Application Structure Generator (New Feature)
+        application_structure = None
+        try:
+            from application_structure import BankingApplicationStructureGenerator
+            structure_generator = BankingApplicationStructureGenerator()
+            application_structure = structure_generator.generate_structure(file_paths)
+        except Exception as e:
+            print(f"Warning: Application structure generation error: {str(e)}")
+            application_structure = {"error": str(e)}
             
         # STEP 8: Consolidate results
         consolidated_result = self._consolidate_results(
             table_results, domain_results, primary_keys, foreign_keys, relationships, banking_blueprint, 
-            file_relationships, column_relationship_analysis
+            file_relationships, column_relationship_analysis, application_structure
         )
         
         return consolidated_result
@@ -501,7 +511,8 @@ class MultiFileProcessor:
                             primary_keys: Dict, foreign_keys: List[Dict],
                             relationships: List[Dict], banking_blueprint: Dict,
                             file_relationships: List[Dict] = None,
-                            column_relationship_analysis: Dict = None) -> Dict[str, Any]:
+                            column_relationship_analysis: Dict = None,
+                            application_structure: Dict = None) -> Dict[str, Any]:
         """Consolidate all results into final format"""
         
         # Calculate overall system verdict
@@ -554,6 +565,7 @@ class MultiFileProcessor:
             "overall_verdict": overall_verdict,
             "overall_confidence": round(overall_confidence, 2),
             "banking_blueprint": banking_blueprint,
+            "application_structure": application_structure,  # New: Application structure generator
             "business_explanation": self._generate_business_explanation(
                 table_results, domain_results, relationships, primary_keys
             )

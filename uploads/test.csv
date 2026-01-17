@@ -1,0 +1,21 @@
+transaction_id,account_number,customer_id,transaction_type,transaction_amount,transaction_date,transaction_time,transaction_status,balance_after_txn,currency,channel,remarks
+TXN00001,ACC10001,CUST001,Deposit,5000,2026-01-01,09:15:00,Completed,15000,INR,Online,Initial deposit
+TXN00002,ACC10002,CUST002,Withdrawal,2000,2026-01-01,10:00:00,Completed,8000,INR,ATM,ATM cash withdrawal
+TXN00003,ACC10003,CUST003,Deposit,7000,2026-01-02,11:20:00,Completed,17000,INR,Branch,Salary credited
+TXN00004,ACC10004,CUST004,Transfer,3000,2026-01-02,12:10:00,Completed,12000,INR,Online,Fund transfer
+TXN00005,ACC10005,CUST005,Payment,1500,2026-01-03,14:30:00,Completed,13500,INR,Online,Electricity bill
+TXN00006,ACC10006,CUST006,Deposit,10000,2026-01-03,15:45:00,Completed,25000,INR,Branch,FD deposit
+TXN00007,ACC10007,CUST007,Withdrawal,500,2026-01-04,09:00:00,Completed,4500,INR,ATM,ATM withdrawal
+TXN00008,ACC10008,CUST008,Transfer,2500,2026-01-04,10:25:00,Completed,9500,INR,Online,Transfer to friend
+TXN00009,ACC10009,CUST009,Deposit,8000,2026-01-05,11:55:00,Completed,18000,INR,Branch,Salary credited
+TXN00010,ACC10010,CUST010,Withdrawal,1200,2026-01-05,12:40:00,Completed,8800,INR,ATM,ATM withdrawal
+TXN00011,ACC10011,CUST011,Deposit,4000,2026-01-06,09:10:00,Completed,14000,INR,Branch,Initial deposit
+TXN00012,ACC10012,CUST012,Transfer,3500,2026-01-06,10:50:00,Completed,11500,INR,Online,Transfer to savings
+TXN00013,ACC10013,CUST013,Payment,1800,2026-01-07,11:05:00,Completed,12200,INR,Online,Mobile recharge
+TXN00014,ACC10014,CUST014,Deposit,6000,2026-01-07,13:20:00,Completed,16000,INR,Branch,Salary credited
+TXN00015,ACC10015,CUST015,Withdrawal,700,2026-01-08,09:35:00,Completed,4300,INR,ATM,ATM withdrawal
+TXN00016,ACC10016,CUST016,Transfer,4000,2026-01-08,10:45:00,Completed,13000,INR,Online,Funds to family
+TXN00017,ACC10017,CUST017,Deposit,9000,2026-01-09,12:10:00,Completed,21000,INR,Branch,Salary credited
+TXN00018,ACC10018,CUST018,Withdrawal,600,2026-01-09,13:30:00,Completed,7400,INR,ATM,ATM withdrawal
+TXN00019,ACC10019,CUST019,Payment,2500,2026-01-10,14:15:00,Completed,12500,INR,Online,Insurance premium
+TXN00020,ACC10020,CUST020,Deposit,3000,2026-01-10,15:05:00,Completed,9000,INR,Branch,Initial deposit

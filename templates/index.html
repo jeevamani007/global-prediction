@@ -707,6 +707,7 @@
 
             // Multi-file data
             if (data.banking_blueprint) sessionStorage.setItem('bankingBlueprint', JSON.stringify(data.banking_blueprint));
+            if (data.application_structure) sessionStorage.setItem('applicationStructure', JSON.stringify(data.application_structure));
             if (data.multi_file_mode) {
                 sessionStorage.setItem('multiFileMode', 'true');
                 // Store Core Banking Business Rules for multi-file (per-file results)
@@ -722,6 +723,7 @@
                 if (data.relationships) sessionStorage.setItem('multiFileRelationships', JSON.stringify(data.relationships));
                 if (data.file_relationships) sessionStorage.setItem('fileRelationships', JSON.stringify(data.file_relationships));
                 if (data.column_relationship_analysis) sessionStorage.setItem('columnRelationshipAnalysis', JSON.stringify(data.column_relationship_analysis));
+                if (data.application_structure) sessionStorage.setItem('applicationStructure', JSON.stringify(data.application_structure));
                 if (data.primary_keys) sessionStorage.setItem('multiFilePrimaryKeys', JSON.stringify(data.primary_keys));
                 if (data.foreign_keys) sessionStorage.setItem('multiFileForeignKeys', JSON.stringify(data.foreign_keys));
                 if (data.domain_detection) sessionStorage.setItem('multiFileDomainDetection', JSON.stringify(data.domain_detection));

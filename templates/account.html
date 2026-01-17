@@ -642,6 +642,7 @@
             <button class="tab-btn" onclick="switchTab('final-decision')">✅ Final Decision</button>
             <button class="tab-btn" onclick="switchTab('business-rules')">📋 Business Rules</button>
             <button class="tab-btn" onclick="switchTab('column-details')">📊 Column Details</button>
+            <button class="tab-btn" onclick="switchTab('app-structure')">🏗️ Application Structure</button>
         </div>
 
         <!-- Tab: File Analysis (STEP 1 & 2) -->
@@ -866,6 +867,24 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tab: Application Structure -->
+        <div id="app-structure" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">🏗️ Banking Application Structure</h3>
+                </div>
+                <p style="color: var(--text-muted); margin-bottom: 24px;">
+                    Dynamically generated banking application structure based on uploaded files. Shows modules, columns, relationships, and business rules.
+                </p>
+                <div id="applicationStructureContent">
+                    <div class="empty-state">
+                        <div class="icon">🏗️</div>
+                        <p>Loading application structure...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -906,6 +925,9 @@
 
             // Load dynamic business rules
             loadBusinessRules();
+
+            // Load application structure
+            loadApplicationStructure();
         }
 
         function loadApplicationType() {
@@ -2013,6 +2035,261 @@
             }
 
             document.getElementById('businessRulesContent').innerHTML = rulesHtml;
+        }
+
+        function loadApplicationStructure() {
+            try {
+                // Try to get application structure from sessionStorage
+                const appStructureStr = sessionStorage.getItem('applicationStructure');
+                let appStructure = null;
+
+                if (appStructureStr) {
+                    appStructure = JSON.parse(appStructureStr);
+                } else {
+                    // Fallback: try to get from result objects
+                    const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
+                    if (isMultiFile) {
+                        // For multi-file, structure should be in sessionStorage directly
+                        const result = JSON.parse(sessionStorage.getItem('multiFileResult') || '{}');
+                        appStructure = result.application_structure;
+                    } else {
+                        const result = JSON.parse(sessionStorage.getItem('uploadResult') || '{}');
+                        appStructure = result.application_structure;
+                    }
+                }
+
+                const structureContent = document.getElementById('applicationStructureContent');
+
+                if (!appStructure || appStructure.error) {
+                    structureContent.innerHTML = `
+                        <div class="empty-state" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                            <div style="font-size: 3rem; margin-bottom: 16px;">🏗️</div>
+                            <h3 style="color: var(--primary); margin-bottom: 8px;">Application Structure Not Available</h3>
+                            <p style="font-size: 1rem; margin-bottom: 8px;">${appStructure && appStructure.error ? appStructure.error : 'Upload banking data files to generate application structure.'}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+
+                // Application Type
+                if (appStructure.application_type) {
+                    const appType = appStructure.application_type;
+                    html += `
+                        <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <div style="padding: 24px;">
+                                <h3 style="margin-bottom: 12px; font-size: 1.5rem;">${appType.application_type || 'Banking Application'}</h3>
+                                <p style="opacity: 0.9; margin-bottom: 8px;">${appType.description || 'Banking application structure'}</p>
+                                <div style="display: flex; gap: 16px; margin-top: 16px;">
+                                    <div>
+                                        <div style="font-size: 0.85rem; opacity: 0.8;">Confidence</div>
+                                        <div style="font-size: 1.5rem; font-weight: 700;">${appType.confidence || 0}%</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 0.85rem; opacity: 0.8;">Modules Detected</div>
+                                        <div style="font-size: 1.5rem; font-weight: 700;">${(appType.detected_modules || []).length}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Structure Tree
+                if (appStructure.structure_tree) {
+                    const tree = appStructure.structure_tree;
+                    html += `
+                        <div class="card" style="margin-bottom: 24px;">
+                            <div class="card-header">
+                                <h3 class="card-title">📊 Application Structure Tree</h3>
+                            </div>
+                            <div style="padding: 24px;">
+                                <div style="font-family: 'Courier New', monospace; font-size: 1rem; line-height: 2;">
+                                    <div style="font-weight: 700; color: var(--primary); margin-bottom: 16px; font-size: 1.2rem;">
+                                        ${tree.application_type || 'Banking Application'}
+                                    </div>
+                    `;
+
+                    // Render modules
+                    if (tree.modules && tree.modules.length > 0) {
+                        tree.modules.forEach((module, idx) => {
+                            const isLast = idx === tree.modules.length - 1;
+                            const connector = isLast ? '└──' : '├──';
+                            const subConnector = isLast ? '    ' : '│   ';
+
+                            const statusColor = module.status === 'COMPLETE' ? 'var(--success)' : 
+                                              module.status === 'PARTIAL' ? 'var(--warning)' : 'var(--danger)';
+                            const statusIcon = module.status === 'COMPLETE' ? '✅' : 
+                                             module.status === 'PARTIAL' ? '⚠️' : '❌';
+
+                            html += `
+                                <div style="margin-bottom: 12px;">
+                                    <div style="color: var(--text-dark); font-weight: 600;">
+                                        ${connector} ${module.name} 
+                                        <span style="color: ${statusColor}; margin-left: 8px;">
+                                            ${statusIcon} ${module.confidence}%
+                                        </span>
+                                    </div>
+                            `;
+
+                            // Render columns
+                            if (module.columns && module.columns.length > 0) {
+                                module.columns.forEach((col, colIdx) => {
+                                    const isLastCol = colIdx === module.columns.length - 1;
+                                    const colConnector = isLastCol ? '└──' : '├──';
+                                    html += `
+                                        <div style="color: var(--text-muted); margin-left: 20px; margin-top: 4px;">
+                                            ${subConnector}${colConnector} ${col.name}
+                                            <span style="color: var(--primary); font-size: 0.85rem; margin-left: 8px;">
+                                                (${col.feature})
+                                            </span>
+                                        </div>
+                                    `;
+                                });
+                            }
+
+                            html += `</div>`;
+                        });
+                    }
+
+                    html += `
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Modules with Details
+                if (appStructure.modules) {
+                    html += `
+                        <div class="card" style="margin-bottom: 24px;">
+                            <div class="card-header">
+                                <h3 class="card-title">📦 Modules & Confidence Scores</h3>
+                            </div>
+                            <div style="padding: 24px;">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    `;
+
+                    for (const [moduleName, moduleInfo] of Object.entries(appStructure.modules)) {
+                        if (moduleInfo.confidence >= 30) {
+                            const statusColor = moduleInfo.status === 'COMPLETE' ? 'var(--success)' : 
+                                              moduleInfo.status === 'PARTIAL' ? 'var(--warning)' : 'var(--danger)';
+                            
+                            html += `
+                                <div class="business-rule-card">
+                                    <div class="rule-header">
+                                        <span class="rule-icon">📦</span>
+                                        <span class="rule-title">${moduleName}</span>
+                                    </div>
+                                    <div class="rule-content">
+                                        <div style="margin-bottom: 12px;">
+                                            <strong>Confidence:</strong> 
+                                            <span style="color: ${statusColor}; font-weight: 700;">${moduleInfo.confidence}%</span>
+                                        </div>
+                                        <div style="margin-bottom: 12px;">
+                                            <strong>Status:</strong> ${moduleInfo.status}
+                                        </div>
+                                        <div style="margin-bottom: 12px;">
+                                            <strong>Required Columns Found:</strong> ${moduleInfo.required_columns_found || 0}
+                                        </div>
+                                        <div style="margin-bottom: 12px;">
+                                            <strong>Optional Columns Found:</strong> ${moduleInfo.optional_columns_found || 0}
+                                        </div>
+                                        ${moduleInfo.matched_columns && moduleInfo.matched_columns.length > 0 ? `
+                                            <div>
+                                                <strong>Matched Columns:</strong>
+                                                <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                                                    ${moduleInfo.matched_columns.slice(0, 5).map(col => {
+                                                        const colName = col.includes('.') ? col.split('.').pop() : col;
+                                                        return `<span class="rule-tag">${colName}</span>`;
+                                                    }).join('')}
+                                                    ${moduleInfo.matched_columns.length > 5 ? `<span class="rule-tag">+${moduleInfo.matched_columns.length - 5} more</span>` : ''}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    html += `
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Relationships
+                if (appStructure.relationships && appStructure.relationships.length > 0) {
+                    html += `
+                        <div class="card" style="margin-bottom: 24px;">
+                            <div class="card-header">
+                                <h3 class="card-title">🔗 File Relationships</h3>
+                            </div>
+                            <div style="padding: 24px;">
+                                <div style="display: grid; gap: 16px;">
+                    `;
+
+                    appStructure.relationships.forEach(rel => {
+                        html += `
+                            <div class="business-rule-card">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <strong>${rel.file1} ↔ ${rel.file2}</strong>
+                                    <span class="rule-tag ${rel.overlap_ratio > 50 ? 'pass' : ''}">
+                                        ${rel.overlap_ratio}% overlap
+                                    </span>
+                                </div>
+                                <div style="color: var(--text-muted);">
+                                    <strong>Common Column:</strong> ${rel.common_column}<br>
+                                    <strong>Relationship Type:</strong> ${rel.relationship_type}<br>
+                                    <strong>Explanation:</strong> ${rel.explanation}
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Business Rules Suggestions
+                if (appStructure.business_rules && appStructure.business_rules.length > 0) {
+                    html += `
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📋 Suggested Business Rules</h3>
+                            </div>
+                            <div style="padding: 24px;">
+                                <ul style="margin: 0; padding-left: 20px; list-style: disc;">
+                                    ${appStructure.business_rules.map(rule => `<li style="margin-bottom: 8px;">${rule}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                structureContent.innerHTML = html || `
+                    <div class="empty-state" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                        <div style="font-size: 3rem; margin-bottom: 16px;">🏗️</div>
+                        <h3 style="color: var(--primary); margin-bottom: 8px;">No Structure Data Available</h3>
+                        <p>Application structure data is not available for this analysis.</p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading application structure:', error);
+                document.getElementById('applicationStructureContent').innerHTML = `
+                    <div class="empty-state" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                        <div style="font-size: 3rem; margin-bottom: 16px;">⚠️</div>
+                        <h3 style="color: var(--danger); margin-bottom: 8px;">Error Loading Structure</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
         }
 
         function generateBusinessRulesSections(columns, validator) {

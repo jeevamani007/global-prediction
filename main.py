@@ -21,6 +21,7 @@ from file_converter import FileConverter
 from data_validation_engine import DataValidationEngine
 from complete_banking_validator import CompleteBankingValidator
 from multi_file_processor import MultiFileProcessor
+from application_structure import BankingApplicationStructureGenerator
 
 
 app = FastAPI(title="Domain Detection API")
@@ -315,6 +316,17 @@ async def upload_file(file: UploadFile = File(...)):
                     "error": f"Blueprint analysis failed: {str(fallback_e)}"
                 }
 
+        # 🔥 APPLICATION STRUCTURE GENERATOR (NEW FEATURE)
+        application_structure = None
+        try:
+            structure_generator = BankingApplicationStructureGenerator()
+            application_structure = structure_generator.generate_structure([file_path])
+        except Exception as e:
+            print(f"Warning: Application structure generation error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            application_structure = {"error": str(e)}
+
         return JSONResponse(
             content={
                 "message": "File analyzed successfully",
@@ -344,6 +356,9 @@ async def upload_file(file: UploadFile = File(...)):
                 
                 # 🔥 BANKING BLUEPRINT (NEW UNIFIED ANALYSIS)
                 "banking_blueprint": banking_blueprint,
+                
+                # 🔥 APPLICATION STRUCTURE GENERATOR (NEW FEATURE)
+                "application_structure": application_structure,
                 
                 # 🔥 CORE BANKING ENGINE RESULTS (PRIMARY OUTPUT - KYC REMOVED)
                 "banking_core_analysis": banking_result.get("core_banking_analysis"),
@@ -470,6 +485,7 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     "banking_dataset_validator": banking_validator_result,
                     "core_banking_validator": core_banking_validator_result,
                     "banking_blueprint": result.get("banking_blueprint"),
+                    "application_structure": result.get("application_structure"),  # New: Application structure
                     "domain_detection": result.get("domain_detection"),
                     "primary_keys": result.get("primary_keys"),
                     "foreign_keys": result.get("foreign_keys"),
@@ -520,7 +536,7 @@ async def root(request: Request):
 
 @app.get("/account", response_class=HTMLResponse)
 async def account_page(request: Request):
-    """Return the account.html page for account number detection results"""
+    """Return the account.html page for account number detection results and application structure"""
     return templates.TemplateResponse("account.html", {"request": request})
 
 @app.get("/account.html", response_class=HTMLResponse)
