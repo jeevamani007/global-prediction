@@ -171,6 +171,93 @@ class CoreBankingBusinessRulesEngine:
                     "violation_impact": "BUSINESS: Cannot assign branch. COMPLIANCE: Geographic reporting incomplete."
                 }
             },
+            "dob": {
+                "domain": "Customer",
+                "name_patterns": ["dob", "date_of_birth", "birth_date", "birthdate"],
+                "data_patterns": {
+                    "type": ["date"],
+                    "uniqueness": "low",
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Valid date (YYYY-MM-DD or DD/MM/YYYY), must be in the past",
+                    "allowed_values": None,
+                    "reason": "Customer date of birth required for age verification, KYC compliance, and age-based product eligibility.",
+                    "violation_impact": "BUSINESS: Cannot verify customer age. COMPLIANCE: KYC documentation incomplete. FINANCIAL: Age-based product violations."
+                }
+            },
+            "state": {
+                "domain": "Customer",
+                "name_patterns": ["state", "state_name", "province"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "low",
+                    "length": {"min": 2, "max": 50},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Alphabetic characters and spaces",
+                    "allowed_values": None,
+                    "reason": "Customer state required for geographic reporting, regulatory compliance, and state-specific banking regulations.",
+                    "violation_impact": "BUSINESS: Geographic reporting incomplete. COMPLIANCE: State-specific regulatory violations. FINANCIAL: Tax reporting errors."
+                }
+            },
+            "country": {
+                "domain": "Customer",
+                "name_patterns": ["country", "country_name", "nation"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "very_low",
+                    "length": {"min": 2, "max": 50},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Country name or ISO code (e.g., India, USA, IN, US)",
+                    "allowed_values": None,
+                    "reason": "Customer country required for international compliance, KYC verification, and cross-border transaction regulations.",
+                    "violation_impact": "BUSINESS: International compliance failures. COMPLIANCE: KYC/AML violations. FINANCIAL: Cross-border transaction restrictions."
+                }
+            },
+            "customer_type": {
+                "domain": "Customer",
+                "name_patterns": ["customer_type", "cust_type", "client_type", "customer_category", "customer_segment"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "very_low",
+                    "cardinality": {"max": 10},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Predefined values: Regular, VIP, Premium, Corporate, Individual, Business",
+                    "allowed_values": ["Regular", "VIP", "Premium", "Corporate", "Individual", "Business", "Student", "Senior"],
+                    "reason": "Customer category determines service levels, fee structures, transaction limits, and product eligibility.",
+                    "violation_impact": "BUSINESS: Incorrect service levels applied. FINANCIAL: Fee calculation errors. COMPLIANCE: Customer segmentation violations."
+                }
+            },
             
             # ACCOUNT DOMAIN
             "account_number": {
@@ -280,6 +367,72 @@ class CoreBankingBusinessRulesEngine:
                     "allowed_values": None,
                     "reason": "Links account to physical branch for operations, reporting, and customer service.",
                     "violation_impact": "BUSINESS: Cannot route branch operations. FINANCIAL: Incorrect branch reporting. COMPLIANCE: Branch-level audit failures."
+                }
+            },
+            "created_date": {
+                "domain": "Account",
+                "name_patterns": ["created_date", "account_created_date", "open_date", "opening_date", "account_open_date"],
+                "data_patterns": {
+                    "type": ["date", "datetime"],
+                    "uniqueness": "low",
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Account Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Valid date, cannot be future date",
+                    "allowed_values": None,
+                    "reason": "Account creation date required for account age calculation, product maturity tracking, and regulatory reporting.",
+                    "violation_impact": "BUSINESS: Cannot calculate account age. FINANCIAL: Interest calculation errors. COMPLIANCE: Account lifecycle reporting incomplete."
+                }
+            },
+            "currency": {
+                "domain": "Transaction",
+                "name_patterns": ["currency", "currency_type", "curr", "currency_code"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "very_low",
+                    "cardinality": {"max": 50},
+                    "length": {"min": 3, "max": 3},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Transaction": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "ISO 4217 currency code (3 letters: INR, USD, EUR, GBP, etc.)",
+                    "allowed_values": ["INR", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "CNY", "SGD"],
+                    "reason": "Currency type required for multi-currency accounts, foreign exchange operations, and international transaction processing.",
+                    "violation_impact": "BUSINESS: Currency conversion failures. FINANCIAL: Incorrect exchange rates applied. COMPLIANCE: Multi-currency reporting violations."
+                }
+            },
+            "channel": {
+                "domain": "Transaction",
+                "name_patterns": ["channel", "transaction_channel", "channel_type", "txn_channel"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "very_low",
+                    "cardinality": {"max": 10},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Transaction": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Predefined values: ATM, Online, Branch, Mobile, Phone Banking, UPI, NEFT, RTGS",
+                    "allowed_values": ["ATM", "Online", "Branch", "Mobile", "Phone Banking", "UPI", "NEFT", "RTGS", "Cheque", "Card"],
+                    "reason": "Transaction channel required for channel-wise reporting, fee calculation, fraud detection, and customer behavior analysis.",
+                    "violation_impact": "BUSINESS: Channel-specific fee calculation errors. FINANCIAL: Incorrect channel reporting. COMPLIANCE: Channel-wise audit trail incomplete."
                 }
             },
             
@@ -396,7 +549,7 @@ class CoreBankingBusinessRulesEngine:
             },
             "transaction_date": {
                 "domain": "Transaction",
-                "name_patterns": ["transaction_date", "txn_date", "date", "transaction_time", "value_date"],
+                "name_patterns": ["transaction_date", "txn_date", "value_date"],
                 "data_patterns": {
                     "type": ["date", "datetime"],
                     "uniqueness": "low",
@@ -413,6 +566,27 @@ class CoreBankingBusinessRulesEngine:
                     "allowed_values": None,
                     "reason": "Critical for interest calculation, statement generation, and chronological ordering.",
                     "violation_impact": "BUSINESS: Incorrect statement periods. FINANCIAL: Interest calculation errors. COMPLIANCE: Reporting period violations."
+                }
+            },
+            "transaction_time": {
+                "domain": "Transaction",
+                "name_patterns": ["transaction_time", "txn_time", "time"],
+                "data_patterns": {
+                    "type": ["text", "time"],
+                    "uniqueness": "low",
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Transaction": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Time format (HH:MM:SS) for accurate transaction ordering",
+                    "allowed_values": None,
+                    "reason": "Critical for accurate transaction ordering within the same day. Enables chronological sorting and fraud detection based on timing patterns.",
+                    "violation_impact": "BUSINESS: Incorrect transaction ordering. FINANCIAL: Dispute resolution failures. COMPLIANCE: Audit trail incomplete."
                 }
             },
             "transaction_amount": {
