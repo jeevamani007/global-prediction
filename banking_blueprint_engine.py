@@ -189,7 +189,13 @@ class BankingBlueprintEngine:
     # ========== STEP 2: Column Scan ==========
     def extract_column_names(self, df: pd.DataFrame) -> List[str]:
         """Extract and normalize column names"""
-        return [col.lower().strip().replace(" ", "_") for col in df.columns]
+        normalized_cols = []
+        for col in df.columns:
+            # Convert camelCase to snake_case
+            s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', str(col))
+            s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+            normalized_cols.append(s2.lower().strip().replace(" ", "_").replace("-", "_"))
+        return normalized_cols
     
     def scan_banking_signals(self, columns: List[str]) -> Dict[str, Any]:
         """

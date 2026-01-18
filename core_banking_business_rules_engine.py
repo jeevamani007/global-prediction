@@ -42,7 +42,7 @@ class CoreBankingBusinessRulesEngine:
             # CUSTOMER DOMAIN
             "customer_id": {
                 "domain": "Customer",
-                "name_patterns": ["customer_id", "cust_id", "client_id", "c_id", "customer_number"],
+                "name_patterns": ["customer_id", "cust_id", "client_id", "c_id", "customer_number","CustomerId"],
                 "data_patterns": {
                     "type": ["numeric", "alphanumeric"],
                     "uniqueness": "high",  # ≥95%
@@ -674,6 +674,272 @@ class CoreBankingBusinessRulesEngine:
                     "reason": "Categorizes transactions for reporting, fraud detection, and customer statements.",
                     "violation_impact": "BUSINESS: Incorrect transaction categorization. FINANCIAL: Reporting errors. COMPLIANCE: Transaction type misclassification."
                 }
+            },
+            
+            # ============================================
+            # CHURN PREDICTION / CUSTOMER RETENTION DOMAIN
+            # ============================================
+            "row_number": {
+                "domain": "General",
+                "name_patterns": ["rownumber", "row_number", "row_num", "record_number", "serial_number"],
+                "data_patterns": {
+                    "type": ["numeric"],
+                    "uniqueness": "very_high",  # Sequential numbering
+                    "nullable": False
+                },
+                "is_identifier": False,  # Technical ID, not business identifier
+                "table_role": {"General": "technical"},
+                "business_rules": {
+                    "unique": True,
+                    "mandatory": False,  # Not mandatory for business logic
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Sequential integer starting from 1",
+                    "allowed_values": None,
+                    "reason": "Technical row identifier for data ordering and reference. Not used in business calculations or customer operations.",
+                    "violation_impact": "BUSINESS: No direct business impact. TECHNICAL: Data ordering issues in reports or exports."
+                }
+            },
+            "surname": {
+                "domain": "Customer",
+                "name_patterns": ["surname", "last_name", "lastname", "family_name"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "low",  # Surnames can repeat
+                    "length": {"min": 2, "max": 50},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Alphabetic characters, spaces, hyphens allowed (e.g., Smith, O'Brien, Lee-Jones)",
+                    "allowed_values": None,
+                    "reason": "Customer surname required for KYC compliance, legal documentation, and customer identification. Must match government-issued ID.",
+                    "violation_impact": "BUSINESS: Cannot verify customer identity. COMPLIANCE: KYC/AML documentation incomplete. LEGAL: Contract validity issues."
+                }
+            },
+            "credit_score": {
+                "domain": "Risk",
+                "name_patterns": ["creditscore", "credit_score", "credit_rating", "fico_score", "cibil_score"],
+                "data_patterns": {
+                    "type": ["numeric"],
+                    "uniqueness": "low",  # Scores can repeat
+                    "range": {"min": 300, "max": 850},  # Standard credit score range
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Risk": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Numeric, 300-850 range. 750+ = Excellent, 700-749 = Good, 650-699 = Fair, 600-649 = Poor, <600 = Very Poor",
+                    "allowed_values": None,
+                    "reason": "Credit score determines loan eligibility, interest rates, credit limits, and product approval. Higher scores indicate lower default risk and enable better terms.",
+                    "violation_impact": "BUSINESS: Incorrect loan approvals or rejections. FINANCIAL: Wrong interest rates applied, increased default risk. COMPLIANCE: Fair lending violations."
+                }
+            },
+            "geography": {
+                "domain": "Customer",
+                "name_patterns": ["geography", "country", "region", "location", "geo"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "very_low",  # Limited number of countries/regions
+                    "cardinality": {"max": 50},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Country or region name (e.g., France, Spain, Germany, USA, India)",
+                    "allowed_values": None,  # Depends on bank's operational geography
+                    "reason": "Geography determines regulatory compliance requirements, product availability, tax reporting, currency options, and regional marketing strategies. Different countries have different banking regulations.",
+                    "violation_impact": "BUSINESS: Wrong product offerings for region. COMPLIANCE: Regulatory violations, incorrect tax reporting. FINANCIAL: Foreign exchange errors."
+                }
+            },
+            "gender": {
+                "domain": "Customer",
+                "name_patterns": ["gender", "sex", "customer_gender"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "very_low",  # Limited values
+                    "cardinality": {"max": 5},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Predefined values: Male, Female, Other, Prefer not to say",
+                    "allowed_values": ["Male", "Female", "M", "F", "Other", "Prefer not to say"],
+                    "reason": "Gender used for demographic analysis, customer segmentation, personalized marketing, and regulatory reporting. Required for KYC compliance in many jurisdictions.",
+                    "violation_impact": "BUSINESS: Inaccurate demographic analysis. COMPLIANCE: KYC documentation incomplete. FINANCIAL: Marketing campaign targeting errors."
+                }
+            },
+            "age": {
+                "domain": "Customer",
+                "name_patterns": ["age", "customer_age", "years"],
+                "data_patterns": {
+                    "type": ["numeric"],
+                    "uniqueness": "low",  # Ages repeat
+                    "range": {"min": 18, "max": 100},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Integer, 18-100 years. Customers must be 18+ for most banking products (legal age requirement)",
+                    "allowed_values": None,
+                    "reason": "Age determines product eligibility (student accounts for 18-24, senior citizen benefits for 60+, retirement products for 50+), interest rates, insurance premiums, and loan tenure. Legal requirement for age verification.",
+                    "violation_impact": "BUSINESS: Wrong product offerings, age-based benefit errors. COMPLIANCE: Underage account opening violations. FINANCIAL: Incorrect interest rates for senior citizens."
+                }
+            },
+            "tenure": {
+                "domain": "Customer",
+                "name_patterns": ["tenure", "customer_tenure", "years_with_bank", "relationship_years"],
+                "data_patterns": {
+                    "type": ["numeric"],
+                    "uniqueness": "low",
+                    "range": {"min": 0, "max": 50},  # Years with bank
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Relationship": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Non-negative integer representing years as customer (0 = new customer, 10+ = loyal customer)",
+                    "allowed_values": None,
+                    "reason": "Tenure measures customer loyalty and relationship strength. Longer tenure customers receive loyalty rewards, preferential interest rates, fee waivers, and priority service. Key metric for churn prediction.",
+                    "violation_impact": "BUSINESS: Incorrect loyalty program benefits. FINANCIAL: Wrong interest rates or fee structures. RISK: Churn prediction model errors."
+                }
+            },
+            "num_of_products": {
+                "domain": "Product",
+                "name_patterns": ["numofproducts", "num_of_products", "product_count", "number_of_products", "products_held"],
+                "data_patterns": {
+                    "type": ["numeric"],
+                    "uniqueness": "very_low",  # Limited range (typically 0-6)
+                    "range": {"min": 0, "max": 10},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Product Management": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Non-negative integer (0 = no products, 1 = single product, 2+ = multiple products). Typical products: Savings Account, Current Account, Credit Card, Loan, Fixed Deposit, Insurance",
+                    "allowed_values": None,
+                    "reason": "Number of products indicates cross-sell success and customer engagement. Customers with multiple products have lower churn rates and higher lifetime value. Used for upsell/cross-sell targeting.",
+                    "violation_impact": "BUSINESS: Incorrect cross-sell opportunities. FINANCIAL: Revenue calculation errors. RISK: Churn prediction inaccuracies."
+                }
+            },
+            "has_cr_card": {
+                "domain": "Product",
+                "name_patterns": ["hascrcard", "has_cr_card", "credit_card", "has_credit_card", "cc_flag"],
+                "data_patterns": {
+                    "type": ["numeric", "boolean"],
+                    "uniqueness": "very_low",  # Binary
+                    "cardinality": {"max": 2},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Product Management": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Binary: 0 = No Credit Card, 1 = Has Credit Card. Alternative formats: Yes/No, True/False",
+                    "allowed_values": [0, 1, "0", "1", "Yes", "No", "Y", "N", True, False],
+                    "reason": "Credit card ownership indicates customer engagement with premium products. Credit card holders typically have higher revenue contribution (interest, fees, merchant charges) and lower churn rates.",
+                    "violation_impact": "BUSINESS: Incorrect product portfolio analysis. FINANCIAL: Revenue miscalculation. RISK: Churn model inaccuracies."
+                }
+            },
+            "is_active_member": {
+                "domain": "Customer",
+                "name_patterns": ["isactivemember", "is_active_member", "active_status", "active_flag", "customer_active"],
+                "data_patterns": {
+                    "type": ["numeric", "boolean"],
+                    "uniqueness": "very_low",  # Binary
+                    "cardinality": {"max": 2},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Relationship": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Binary: 0 = Inactive Member, 1 = Active Member. Active means recent transactions, logins, or product usage within past 3-6 months",
+                    "allowed_values": [0, 1, "0", "1", "Yes", "No", "Y", "N", True, False],
+                    "reason": "Active membership indicates customer engagement and usage patterns. Inactive customers have significantly higher churn risk. Used to trigger retention campaigns, reactivation offers, and account dormancy procedures.",
+                    "violation_impact": "BUSINESS: Missed retention opportunities. FINANCIAL: Dormant account compliance violations. RISK: High churn risk for inactive members."
+                }
+            },
+            "estimated_salary": {
+                "domain": "Customer",
+                "name_patterns": ["estimatedsalary", "estimated_salary", "annual_income", "salary", "income"],
+                "data_patterns": {
+                    "type": ["numeric", "decimal"],
+                    "uniqueness": "low",  # Many different values
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Customer Master": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Positive numeric value representing annual salary (e.g., 50000, 100000, 150000). Currency depends on Geography",
+                    "allowed_values": None,
+                    "reason": "Estimated salary determines creditworthiness, loan eligibility, loan amount limits, credit card limits, and product recommendations. Higher salary enables larger loans and premium products.",
+                    "violation_impact": "BUSINESS: Wrong product offerings, incorrect credit limits. FINANCIAL: Overlending risk, revenue loss. COMPLIANCE: Responsible lending violations."
+                }
+            },
+            "exited": {
+                "domain": "Risk",
+                "name_patterns": ["exited", "churned", "churn", "left_bank", "customer_exit"],
+                "data_patterns": {
+                    "type": ["numeric", "boolean"],
+                    "uniqueness": "very_low",  # Binary
+                    "cardinality": {"max": 2},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Risk Management": "outcome"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Binary: 0 = Customer Retained (Active), 1 = Customer Exited (Churned). Churned means customer closed all accounts and left the bank",
+                    "allowed_values": [0, 1, "0", "1", "Yes", "No", "Y", "N", True, False],
+                    "reason": "Exited (churn) status is the TARGET OUTCOME for customer retention analysis. Indicates whether customer left the bank. Business goal is to predict and prevent churn. High churn rate impacts revenue, market share, and customer acquisition costs.",
+                    "violation_impact": "BUSINESS: Loss of customers and revenue. FINANCIAL: Acquisition cost wasted, lifetime value loss. STRATEGIC: Market share reduction, competitive disadvantage."
+                }
             }
         }
     
@@ -783,14 +1049,6 @@ class CoreBankingBusinessRulesEngine:
             "step5_md_section": business_rules.get("md_section", ""),
             "step5_business_rules": business_rules["rules"],
             "step5_why_rule_exists": business_rules["why_rule_exists"],
-            "step5_workflow_role": business_rules["workflow_role"],
-            "ui_ready_format": ui_format
-            "step4_confidence_score": confidence,
-            "step5_business_meaning": business_rules["business_meaning"],
-            "step5_md_description": business_rules.get("md_description", ""),
-            "step5_md_section": business_rules.get("md_section", ""),
-            "step5_business_rules": business_rules["rules"],
-            "step5_why_rule_exists": business_rules["why_rule_exists"],
             "step5_violation_impact": business_rules["violation_impact"],
             "step5_workflow_role": business_rules["workflow_role"],
             "ui_ready_format": ui_format
@@ -867,7 +1125,12 @@ class CoreBankingBusinessRulesEngine:
             unique_ratio = profile["uniqueness_percentage"]
             if unique_ratio < 20:
                 profile["patterns"]["low_cardinality"] = True
-                profile["patterns"]["distinct_values"] = list(non_null_series.unique()[:10])
+                # Convert numpy types to python native types for JSON serialization
+                unique_vals = non_null_series.unique()[:10]
+                profile["patterns"]["distinct_values"] = [
+                    val.item() if hasattr(val, 'item') else val 
+                    for val in unique_vals
+                ]
                 profile["patterns"]["distinct_count"] = int(non_null_series.nunique())
             else:
                 profile["patterns"]["low_cardinality"] = False
@@ -956,6 +1219,19 @@ class CoreBankingBusinessRulesEngine:
             "is_contact": is_contact
         }
     
+    def _normalize_column_name(self, column_name: str) -> str:
+        """
+        Normalize column names to handle different naming conventions:
+        - CustomerId → customer_id
+        - CreditScore → credit_score
+        - NumOfProducts → num_of_products
+        """
+        import re
+        # Convert camelCase to snake_case
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', column_name)
+        s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+        return s2.lower().strip()
+    
     def _step3_concept_identification(self, column_name: str, profile: Dict, series: pd.Series, 
                                      identifier_check: Dict) -> Dict[str, Any]:
         """
@@ -970,6 +1246,8 @@ class CoreBankingBusinessRulesEngine:
         - loan_id → Unique, primary key in Loan table
         - Contact fields (phone, email) → Never PK, optional uniqueness
         """
+        # Normalize column name (CustomerId → customer_id, CreditScore → credit_score)
+        column_normalized = self._normalize_column_name(column_name)
         column_lower = column_name.lower().strip()
         best_match = None
         best_score = 0
@@ -979,15 +1257,17 @@ class CoreBankingBusinessRulesEngine:
             score = 0
             
             # 1. Name pattern matching (40% weight) - Enhanced with exact match bonus
+            # Use normalized name for better matching (CustomerId → customer_id)
             name_match = False
             exact_match = False
             for pattern in concept_def["name_patterns"]:
-                if pattern == column_lower:
+                # Check both normalized and original lowercase for flexibility
+                if pattern == column_normalized or pattern == column_lower:
                     exact_match = True
                     name_match = True
                     score += 50  # Bonus for exact match
                     break
-                elif pattern in column_lower:
+                elif pattern in column_normalized or pattern in column_lower:
                     name_match = True
                     score += 40
                     break
@@ -1227,7 +1507,9 @@ class CoreBankingBusinessRulesEngine:
         
         if business_rules.get("allowed_values"):
             allowed_vals = business_rules["allowed_values"][:5]
-            rules_list.append(f"✓ Allowed values: {', '.join(allowed_vals)}")
+            # Convert all values to strings to avoid type errors in join()
+            allowed_vals_str = [str(v) for v in allowed_vals]
+            rules_list.append(f"✓ Allowed values: {', '.join(allowed_vals_str)}")
             if len(business_rules["allowed_values"]) > 5:
                 rules_list.append(f"  (and {len(business_rules['allowed_values']) - 5} more)")
         

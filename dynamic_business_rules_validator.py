@@ -42,7 +42,7 @@ class DynamicBusinessRulesValidator:
     # Column name variations mapping
     COLUMN_VARIATIONS = {
         "account_number": ["account_number", "account_no", "acc_no", "accno", "account"],
-        "customer_id": ["customer_id", "cust_id", "customerid", "custid", "client_id"],
+        "customer_id": ["customer_id", "cust_id", "customerid", "custid", "client_id","C"],
         "customer_name": ["customer_name", "cust_name", "customername", "name"],
         "account_type": ["account_type", "acct_type", "accounttype", "type"],
         "account_status": ["account_status", "acc_status", "status", "account_state", "state"],
@@ -83,7 +83,10 @@ class DynamicBusinessRulesValidator:
     
     def normalize_column_name(self, col_name: str) -> str:
         """Normalize column name for matching."""
-        return str(col_name).lower().strip().replace(" ", "_").replace("-", "_")
+        # Handle CamelCase to snake_case conversion (e.g. CustomerId -> customer_id)
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', str(col_name))
+        s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+        return s2.lower().strip().replace(" ", "_").replace("-", "_")
     
     def identify_column_role(self, col_name: str) -> Optional[str]:
         """

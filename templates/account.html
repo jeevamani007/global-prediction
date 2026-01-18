@@ -1778,11 +1778,19 @@
 
             // Debug: Log if no data found
             if (!coreBankingRules) {
-                console.log('No Core Banking Rules data found in sessionStorage');
+                console.log('❌ No Core Banking Rules data found in sessionStorage');
+                console.log('⚠️ Will use fallback validator (blueprint or dynamic rules)');
             } else if (coreBankingRules.error) {
-                console.warn('Core Banking Rules Error:', coreBankingRules.error);
+                console.warn('❌ Core Banking Rules Error:', coreBankingRules.error);
+                console.log('⚠️ Will use fallback validator');
             } else if (columnsToDisplay.length === 0) {
+                console.warn('❌ Core Banking Rules has no columns to display');
                 console.warn('Core Banking Rules data structure:', JSON.stringify(coreBankingRules, null, 2));
+                console.log('⚠️ Will use fallback validator');
+            } else {
+                console.log('✅ USING CORE BANKING BUSINESS RULES ENGINE');
+                console.log(`   Total columns: ${columnsToDisplay.length}`);
+                console.log(`   Identified: ${columnsToDisplay.filter(c => c.step3_identified_as && c.step3_identified_as !== 'unknown').length}`);
             }
 
             if (columnsToDisplay.length > 0) {
