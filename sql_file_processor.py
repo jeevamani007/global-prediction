@@ -78,12 +78,26 @@ class SQLFileProcessor:
                 elif statement_upper.startswith('SELECT'):
                     select_statements.append(statement)
             
-            # If we have SELECT statements, use them
+            # If we have SELECT statements, parse columns from them (avoid DB execution)
             if select_statements:
-                df = self._execute_select(select_statements[0])
-                if df is not None and not df.empty:
+                # First, try to parse column names from SELECT statement
+                parsed_columns = self._parse_select_columns(select_statements[0])
+                if parsed_columns:
+                    # Create schema-based DataFrame from parsed columns
+                    df = pd.DataFrame(columns=parsed_columns)
+                    df.loc[0] = [''] * len(parsed_columns)  # Add one empty row
                     temp_csv_path = self._create_temp_csv(df, sql_file_path)
                     return temp_csv_path
+                else:
+                    # Fallback: Try to execute SELECT if parsing failed (e.g., SELECT *)
+                    try:
+                        df = self._execute_select(select_statements[0])
+                        if df is not None and not df.empty:
+                            temp_csv_path = self._create_temp_csv(df, sql_file_path)
+                            return temp_csv_path
+                    except Exception as e:
+                        print(f"Warning: Could not execute SELECT statement: {e}")
+                        # Continue to CREATE TABLE processing if SELECT fails
             
             # Try to execute CREATE TABLE and INSERT statements
             # Handle foreign key dependencies by temporarily disabling constraints
@@ -357,6 +371,104 @@ class SQLFileProcessor:
         
         return relationships
     
+    def _parse_select_columns(self, select_statement: str) -> List[str]:
+        """
+        Parse SELECT statement to extract column names without executing against DB.
+        This is safer for domain detection as it doesn't require tables to exist.
+        
+        Handles:
+        - Simple columns: SELECT customer_id, first_name
+        - Table aliases: SELECT c.customer_id, c.first_name
+        - AS aliases: SELECT c.first_name AS fname
+        - Returns empty list for SELECT * (needs DB execution)
+        """
+        try:
+            # Remove comments and normalize whitespace
+            clean_stmt = self._remove_comments(select_statement)
+            clean_stmt = ' '.join(clean_stmt.split())
+            
+            # Extract the SELECT clause (between SELECT and FROM)
+            select_match = re.search(r'SELECT\s+(.*?)\s+FROM\s+', clean_stmt, re.IGNORECASE | re.DOTALL)
+            if not select_match:
+                return []
+            
+            select_clause = select_match.group(1).strip()
+            
+            # Check for SELECT * (return empty to trigger DB execution fallback)
+            if select_clause.strip() == '*' or re.match(r'^\w+\.\*$', select_clause.strip()):
+                return []
+            
+            # Split by commas (handling nested parentheses for functions)
+            columns = []
+            current_col = ""
+            paren_depth = 0
+            
+            for char in select_clause:
+                if char == '(':
+                    paren_depth += 1
+                    current_col += char
+                elif char == ')':
+                    paren_depth -= 1
+                    current_col += char
+                elif char == ',' and paren_depth == 0:
+                    if current_col.strip():
+                        columns.append(current_col.strip())
+                    current_col = ""
+                else:
+                    current_col += char
+            
+            # Don't forget the last column
+            if current_col.strip():
+                columns.append(current_col.strip())
+            
+            # Extract actual column names from each column expression
+            parsed_columns = []
+            for col_expr in columns:
+                col_name = self._extract_column_name(col_expr)
+                if col_name:
+                    parsed_columns.append(col_name)
+            
+            return parsed_columns
+            
+        except Exception as e:
+            print(f"Warning: Could not parse SELECT columns: {e}")
+            return []
+    
+    def _extract_column_name(self, col_expr: str) -> Optional[str]:
+        """
+        Extract the column name from a column expression.
+        
+        Examples:
+        - 'customer_id' -> 'customer_id'
+        - 'c.customer_id' -> 'customer_id'
+        - 'c.first_name AS fname' -> 'first_name'
+        - 'COUNT(*)' -> None (skip aggregates without alias)
+        - 'COUNT(*) AS total' -> 'total'
+        """
+        col_expr = col_expr.strip()
+        
+        # Check for AS alias: use the alias name
+        as_match = re.search(r'\s+AS\s+(\w+)\s*$', col_expr, re.IGNORECASE)
+        if as_match:
+            return as_match.group(1)
+        
+        # Check for table.column pattern: extract column name
+        table_col_match = re.match(r'^(\w+)\.(\w+)\s*$', col_expr)
+        if table_col_match:
+            return table_col_match.group(2)
+        
+        # Check for simple column name
+        simple_match = re.match(r'^(\w+)\s*$', col_expr)
+        if simple_match:
+            return simple_match.group(1)
+        
+        # For functions/expressions without AS, try to extract a meaningful name
+        # Skip if it looks like an aggregate function without alias
+        if '(' in col_expr:
+            return None
+        
+        return None
+    
     def _extract_table_name(self, create_statement: str) -> str:
         """Extract table name from CREATE TABLE statement"""
         match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)', 
@@ -377,6 +489,14 @@ class SQLFileProcessor:
         """Execute CREATE TABLE statements, handling foreign key dependencies"""
         # First pass: Create tables without foreign key constraints
         for stmt in create_statements:
+            # Extract table name and drop it first to ensure fresh schema
+            try:
+                table_name = self._extract_table_name(stmt)
+                if table_name:
+                    self._execute_drop_table(table_name)
+            except Exception as e:
+                print(f"Warning: Could not drop table explicitly: {e}")
+
             # Remove foreign key constraints temporarily
             stmt_modified = re.sub(r',\s*FOREIGN\s+KEY\s+\([^)]+\)\s+REFERENCES\s+[^,)]+', '', stmt, flags=re.IGNORECASE)
             stmt_modified = re.sub(r'FOREIGN\s+KEY\s+\([^)]+\)\s+REFERENCES\s+[^,)]+', '', stmt_modified, flags=re.IGNORECASE)
@@ -388,6 +508,14 @@ class SQLFileProcessor:
                     self._execute_statement(stmt)
                 except Exception as e2:
                     print(f"Warning: Could not create table: {e2}")
+    
+    def _execute_drop_table(self, table_name: str):
+        """Drop table if exists to ensure clean schema"""
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
+        except Exception as e:
+            print(f"Warning: Could not drop table {table_name}: {e}")
     
     def _create_df_from_schema(self, table_schemas: Dict) -> pd.DataFrame:
         """Create DataFrame from schema information when no data is available"""
