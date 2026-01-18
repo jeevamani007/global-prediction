@@ -30,7 +30,7 @@ class SQLFileProcessor:
         
         Supports:
         - CREATE TABLE + INSERT statements
-        - SELECT statements
+        - SELECT statements+
         - Multiple tables in one file
         - Schema-only files (CREATE TABLE without data)
         - Foreign key dependencies
@@ -82,6 +82,16 @@ class SQLFileProcessor:
             if select_statements:
                 # First, try to parse column names from SELECT statement
                 parsed_columns = self._parse_select_columns(select_statements[0])
+                
+                # Also parse relationships from JOIN clauses
+                select_relationships = self._parse_select_relationships(select_statements[0])
+                if select_relationships:
+                    # Store extracted relationships
+                    self.extracted_foreign_keys.extend(select_relationships)
+                    # Build relationship explanations
+                    for rel in select_relationships:
+                        self.extracted_relationships.append(rel)
+                
                 if parsed_columns:
                     # Create schema-based DataFrame from parsed columns
                     df = pd.DataFrame(columns=parsed_columns)
@@ -349,13 +359,26 @@ class SQLFileProcessor:
         }
     
     def _build_relationship_explanations(self) -> List[Dict]:
-        """Build human-readable relationship explanations from foreign keys"""
+        """Build human-readable relationship explanations from foreign keys and JOINs"""
         relationships = []
         for fk in self.extracted_foreign_keys:
             child_table = fk.get('child_table', '')
             child_col = fk.get('child_column', '')
             parent_table = fk.get('parent_table', '')
             parent_col = fk.get('parent_column', '')
+            rel_type = fk.get('relationship_type', 'FOREIGN_KEY')
+            
+            # Determine explanation based on relationship type
+            if rel_type == 'JOIN':
+                type_label = 'JOIN'
+                explanation = (f"The '{child_col}' column in '{child_table}' is joined with '{parent_col}' in '{parent_table}'. "
+                              f"This JOIN relationship links records between these tables for combined queries.")
+                business_rule = f"Queries joining {child_table} and {parent_table} use {child_col} = {parent_col} as the connection point."
+            else:
+                type_label = 'FOREIGN_KEY'
+                explanation = (f"The '{child_col}' column in '{child_table}' references '{parent_col}' in '{parent_table}'. "
+                              f"This indicates that each record in '{child_table}' is linked to a record in '{parent_table}'.")
+                business_rule = f"Every {child_table} must have a valid {parent_table} reference through {child_col}."
             
             relationships.append({
                 'relationship': f"{child_table}.{child_col} -> {parent_table}.{parent_col}",
@@ -363,10 +386,9 @@ class SQLFileProcessor:
                 'child_column': child_col,
                 'parent_table': parent_table,
                 'parent_column': parent_col,
-                'type': 'FOREIGN_KEY',
-                'explanation': f"The '{child_col}' column in '{child_table}' references '{parent_col}' in '{parent_table}'. "
-                              f"This indicates that each record in '{child_table}' is linked to a record in '{parent_table}'.",
-                'business_rule': f"Every {child_table} must have a valid {parent_table} reference through {child_col}."
+                'type': type_label,
+                'explanation': explanation,
+                'business_rule': business_rule
             })
         
         return relationships
@@ -468,6 +490,113 @@ class SQLFileProcessor:
             return None
         
         return None
+    
+    def _parse_select_relationships(self, select_statement: str) -> List[Dict]:
+        """
+        Parse SELECT statement to extract table relationships from JOIN clauses.
+        
+        Input: SELECT ... FROM table1 t1 JOIN table2 t2 ON t1.col = t2.col
+        Output: [{'child_table': 'table2', 'child_column': 'col', 
+                  'parent_table': 'table1', 'parent_column': 'col',
+                  'relationship_type': 'JOIN'}]
+        """
+        relationships = []
+        
+        try:
+            # Remove comments and normalize whitespace
+            clean_stmt = self._remove_comments(select_statement)
+            clean_stmt = ' '.join(clean_stmt.split())
+            
+            # Parse table aliases from FROM and JOIN clauses
+            table_aliases = self._parse_table_aliases(clean_stmt)
+            
+            # Find all JOIN ... ON patterns
+            # Matches: JOIN table alias ON alias1.col1 = alias2.col2
+            join_pattern = r'JOIN\s+(\w+)(?:\s+(\w+))?\s+ON\s+(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)'
+            join_matches = re.findall(join_pattern, clean_stmt, re.IGNORECASE)
+            
+            for match in join_matches:
+                joined_table = match[0]  # The table being joined
+                joined_alias = match[1] if match[1] else joined_table
+                left_alias = match[2]
+                left_col = match[3]
+                right_alias = match[4]
+                right_col = match[5]
+                
+                # Resolve aliases to actual table names
+                left_table = table_aliases.get(left_alias.lower(), left_alias)
+                right_table = table_aliases.get(right_alias.lower(), right_alias)
+                
+                # Determine parent/child (the joined table is typically the child)
+                # The table in FROM clause is typically the parent
+                if right_table.lower() == joined_table.lower() or right_alias.lower() == joined_alias.lower():
+                    parent_table = left_table
+                    parent_col = left_col
+                    child_table = right_table
+                    child_col = right_col
+                else:
+                    parent_table = right_table
+                    parent_col = right_col
+                    child_table = left_table
+                    child_col = left_col
+                
+                relationship = {
+                    'child_table': child_table,
+                    'child_column': child_col,
+                    'parent_table': parent_table,
+                    'parent_column': parent_col,
+                    'relationship_type': 'JOIN'
+                }
+                relationships.append(relationship)
+                
+                # Also store in extracted_tables if not already there
+                for tbl in [parent_table, child_table]:
+                    if tbl not in self.extracted_tables:
+                        self.extracted_tables[tbl] = {
+                            'name': tbl,
+                            'columns': [],
+                            'primary_key': None,
+                            'foreign_keys': []
+                        }
+            
+            return relationships
+            
+        except Exception as e:
+            print(f"Warning: Could not parse SELECT relationships: {e}")
+            return []
+    
+    def _parse_table_aliases(self, select_statement: str) -> Dict[str, str]:
+        """
+        Parse FROM and JOIN clauses to extract table name to alias mappings.
+        
+        Input: SELECT ... FROM customers c JOIN accounts a ON ...
+        Output: {'c': 'customers', 'a': 'accounts', 'customers': 'customers', 'accounts': 'accounts'}
+        """
+        aliases = {}
+        
+        try:
+            # Find FROM clause table: FROM table_name alias
+            from_pattern = r'FROM\s+(\w+)(?:\s+(\w+))?'
+            from_match = re.search(from_pattern, select_statement, re.IGNORECASE)
+            if from_match:
+                table_name = from_match.group(1)
+                alias = from_match.group(2) if from_match.group(2) else table_name
+                aliases[alias.lower()] = table_name
+                aliases[table_name.lower()] = table_name
+            
+            # Find JOIN clause tables: JOIN table_name alias
+            join_pattern = r'JOIN\s+(\w+)(?:\s+(\w+))?\s+ON'
+            join_matches = re.findall(join_pattern, select_statement, re.IGNORECASE)
+            for match in join_matches:
+                table_name = match[0]
+                alias = match[1] if match[1] else table_name
+                aliases[alias.lower()] = table_name
+                aliases[table_name.lower()] = table_name
+            
+        except Exception as e:
+            print(f"Warning: Could not parse table aliases: {e}")
+        
+        return aliases
     
     def _extract_table_name(self, create_statement: str) -> str:
         """Extract table name from CREATE TABLE statement"""
