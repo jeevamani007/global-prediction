@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Detailed banking dataset analysis with business rules and application detection">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
     <style>
         :root {
             --primary: #1a56db;
@@ -362,12 +362,7 @@
             font-size: 1.5rem;
         }
 
-        /* ER Diagram */
-        #erDiagram {
-            width: 100%;
-            height: 400px;
-            margin: 20px 0;
-        }
+
 
         /* Decision Box */
         .decision-box {
@@ -606,10 +601,6 @@
                 flex-direction: column;
                 text-align: center;
             }
-
-            #erDiagram {
-                height: 300px;
-            }
         }
     </style>
 </head>
@@ -710,8 +701,7 @@
                     </div>
                 </div>
 
-                <h4 style="margin-bottom: 16px; color: var(--text-dark);">📊 Entity Relationship Diagram</h4>
-                <div id="erDiagram"></div>
+
 
                 <h4 style="margin: 24px 0 16px; color: var(--text-dark);">🔗 Detected Relationships</h4>
                 <div id="relationshipsContent">
@@ -721,11 +711,13 @@
                     </div>
                 </div>
 
-                <h4 style="margin: 32px 0 16px; color: var(--text-dark); border-top: 2px solid var(--border); padding-top: 24px;">
+                <h4
+                    style="margin: 32px 0 16px; color: var(--text-dark); border-top: 2px solid var(--border); padding-top: 24px;">
                     📋 File-to-File Connections with Detailed Explanations
                 </h4>
                 <p style="color: var(--text-muted); margin-bottom: 20px;">
-                    Detailed analysis of how your uploaded files are connected, why they are linked, and their business purpose.
+                    Detailed analysis of how your uploaded files are connected, why they are linked, and their business
+                    purpose.
                 </p>
                 <div id="fileRelationshipsContent">
                     <div class="empty-state">
@@ -734,13 +726,15 @@
                     </div>
                 </div>
 
-                <h4 style="margin: 32px 0 16px; color: var(--text-dark); border-top: 2px solid var(--border); padding-top: 24px;">
+                <h4
+                    style="margin: 32px 0 16px; color: var(--text-dark); border-top: 2px solid var(--border); padding-top: 24px;">
                     🏦 Banking Domain & Column Relationship Analysis
                 </h4>
                 <p style="color: var(--text-muted); margin-bottom: 20px;">
-                    Identify what kind of banking domain each file belongs to and see how columns relate between files with detailed explanations.
+                    Identify what kind of banking domain each file belongs to and see how columns relate between files
+                    with detailed explanations.
                 </p>
-                
+
                 <!-- File Banking Domains -->
                 <h5 style="margin: 24px 0 16px; color: var(--primary); font-size: 1.1rem;">📊 File Banking Domains</h5>
                 <div id="fileDomainsContent">
@@ -751,7 +745,8 @@
                 </div>
 
                 <!-- Column Relationships -->
-                <h5 style="margin: 32px 0 16px; color: var(--primary); font-size: 1.1rem; border-top: 2px solid var(--border); padding-top: 24px;">
+                <h5
+                    style="margin: 32px 0 16px; color: var(--primary); font-size: 1.1rem; border-top: 2px solid var(--border); padding-top: 24px;">
                     🔗 Column-to-Column Relationships
                 </h5>
                 <p style="color: var(--text-muted); margin-bottom: 20px;">
@@ -875,7 +870,8 @@
                     <h3 class="card-title">🏗️ Banking Application Structure</h3>
                 </div>
                 <p style="color: var(--text-muted); margin-bottom: 24px;">
-                    Dynamically generated banking application structure based on uploaded files. Shows modules, columns, relationships, and business rules.
+                    Dynamically generated banking application structure based on uploaded files. Shows modules, columns,
+                    relationships, and business rules.
                 </p>
                 <div id="applicationStructureContent">
                     <div class="empty-state">
@@ -888,7 +884,7 @@
     </div>
 
     <script>
-        let erChart = null;
+
 
         // Tab switching
         function switchTab(tabId) {
@@ -938,13 +934,13 @@
             const bankingResult = JSON.parse(sessionStorage.getItem('bankingResult') || 'null');
 
             const banner = document.getElementById('appTypeBanner');
-            
+
             // Priority 1: Dynamic Business Rules Validator Application Type Prediction (NEW)
             if (appTypePrediction && appTypePrediction.application_type && appTypePrediction.application_type !== 'Unknown') {
                 banner.style.display = 'flex';
                 document.getElementById('appName').textContent = appTypePrediction.application_type;
                 document.getElementById('appConfidence').textContent = `${appTypePrediction.confidence || 0}%`;
-                
+
                 // Add reasoning tooltip if available
                 if (appTypePrediction.reasoning) {
                     banner.title = appTypePrediction.reasoning;
@@ -952,7 +948,7 @@
                 }
                 return;
             }
-            
+
             // Priority 2: Banking Blueprint
             if (blueprint && blueprint.application) {
                 banner.style.display = 'flex';
@@ -960,7 +956,7 @@
                 document.getElementById('appConfidence').textContent = `${blueprint.application_confidence || 0}%`;
                 return;
             }
-            
+
             // Priority 3: Banking Application Type
             if (appType && appType.predicted_application) {
                 banner.style.display = 'flex';
@@ -968,7 +964,7 @@
                 document.getElementById('appConfidence').textContent = `${appType.confidence || 0}%`;
                 return;
             }
-            
+
             // Priority 4: Banking Result
             if (bankingResult && bankingResult.banking_application_type) {
                 const at = bankingResult.banking_application_type;
@@ -1046,16 +1042,15 @@
                 document.getElementById('totalColumns').textContent = totalCols;
                 document.getElementById('totalRows').textContent = totalRows.toLocaleString();
 
-                // Draw ER Diagram
-                drawERDiagram(tableResults, primaryKeys, foreignKeys);
+
             }
 
             // Display relationships
             displayRelationships(relationships, foreignKeys);
-            
+
             // Display file-to-file relationships with detailed explanations
             displayFileRelationships();
-            
+
             // Display banking domains and column relationships
             displayColumnRelationshipAnalysis();
         }
@@ -1136,12 +1131,12 @@
         function displayRelationships(relationships, foreignKeys) {
             // 🔥 NEW: Try comprehensive analysis first, fallback to legacy
             const comprehensiveAnalysis = JSON.parse(sessionStorage.getItem('comprehensiveAnalysis') || 'null');
-            
+
             if (comprehensiveAnalysis && comprehensiveAnalysis.step7_final_relationships) {
                 displayComprehensiveRelationships(comprehensiveAnalysis);
                 return;
             }
-            
+
             // Legacy display
             const rels = relationships.length > 0 ? relationships : foreignKeys;
 
@@ -1165,23 +1160,23 @@
                 document.getElementById('relationshipsContent').innerHTML = html;
             }
         }
-        
+
         function displayComprehensiveRelationships(comprehensiveAnalysis) {
             const finalRelationships = comprehensiveAnalysis.step7_final_relationships || [];
             const errorReport = comprehensiveAnalysis.step9_error_report || {};
             const rejectedRelations = errorReport.rejected_relationships || [];
-            
+
             let html = '';
-            
+
             // Display valid relationships
             if (finalRelationships.length > 0) {
                 html += '<h4 style="margin-bottom: 16px; color: var(--primary);">✅ Valid Banking Relationships</h4>';
-                
+
                 finalRelationships.forEach((rel, index) => {
-                    const confidenceColor = rel.confidence_level === 'STRONG' ? 'var(--success)' : 
-                                          rel.confidence_level === 'WEAK' ? 'var(--warning)' : 'var(--danger)';
+                    const confidenceColor = rel.confidence_level === 'STRONG' ? 'var(--success)' :
+                        rel.confidence_level === 'WEAK' ? 'var(--warning)' : 'var(--danger)';
                     const matchRate = (rel.match_rate || 0) * 100;
-                    
+
                     html += `
                         <div class="card" style="margin-bottom: 20px; border-left: 5px solid ${confidenceColor};">
                             <div class="card-header">
@@ -1245,11 +1240,11 @@
             } else {
                 html += '<div class="empty-state"><div class="icon">🔗</div><p>No valid relationships detected.</p></div>';
             }
-            
+
             // Display rejected relationships
             if (rejectedRelations.length > 0) {
                 html += '<h4 style="margin: 32px 0 16px; color: var(--danger); border-top: 2px solid var(--border); padding-top: 24px;">❌ Rejected Relationships (Invalid)</h4>';
-                
+
                 rejectedRelations.forEach((rel, index) => {
                     html += `
                         <div class="card" style="margin-bottom: 16px; border-left: 5px solid var(--danger); background: #fef2f2;">
@@ -1266,23 +1261,23 @@
                     `;
                 });
             }
-            
+
             document.getElementById('relationshipsContent').innerHTML = html;
         }
 
         function displayFileRelationships() {
             // Get file relationships from sessionStorage or from the API response
             const fileRelationships = JSON.parse(sessionStorage.getItem('fileRelationships') || '[]');
-            
+
             console.log('File Relationships from sessionStorage:', fileRelationships);
-            
+
             if (fileRelationships && fileRelationships.length > 0) {
                 let html = '';
-                
+
                 fileRelationships.forEach((rel, index) => {
                     const overlapPercent = (rel.overlap_info?.overlap_ratio || 0) * 100;
                     const overlapColor = overlapPercent >= 70 ? 'var(--success)' : overlapPercent >= 40 ? 'var(--warning)' : 'var(--danger)';
-                    
+
                     html += `
                         <div class="card" style="margin-bottom: 24px; border-left: 5px solid ${overlapColor};">
                             <div class="card-header">
@@ -1346,7 +1341,7 @@
                         </div>
                     `;
                 });
-                
+
                 document.getElementById('fileRelationshipsContent').innerHTML = html;
             } else {
                 document.getElementById('fileRelationshipsContent').innerHTML = `
@@ -1361,7 +1356,7 @@
         function displayColumnRelationshipAnalysis() {
             // Get column relationship analysis from sessionStorage
             const columnAnalysis = JSON.parse(sessionStorage.getItem('columnRelationshipAnalysis') || 'null');
-            
+
             if (!columnAnalysis || !columnAnalysis.file_domains) {
                 document.getElementById('fileDomainsContent').innerHTML = `
                     <div class="empty-state">
@@ -1377,16 +1372,16 @@
                 `;
                 return;
             }
-            
+
             // Display File Banking Domains
             const fileDomains = columnAnalysis.file_domains || [];
             if (fileDomains.length > 0) {
                 let domainsHtml = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
-                
+
                 fileDomains.forEach(fileInfo => {
-                    const confidenceColor = fileInfo.domain_confidence >= 70 ? 'var(--success)' : 
-                                          fileInfo.domain_confidence >= 40 ? 'var(--warning)' : 'var(--danger)';
-                    
+                    const confidenceColor = fileInfo.domain_confidence >= 70 ? 'var(--success)' :
+                        fileInfo.domain_confidence >= 40 ? 'var(--warning)' : 'var(--danger)';
+
                     domainsHtml += `
                         <div class="card" style="border-left: 5px solid ${confidenceColor};">
                             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
@@ -1432,21 +1427,21 @@
                         </div>
                     `;
                 });
-                
+
                 domainsHtml += '</div>';
                 document.getElementById('fileDomainsContent').innerHTML = domainsHtml;
             }
-            
+
             // Display Column Relationships
             const columnRelationships = columnAnalysis.column_relationships || [];
             if (columnRelationships.length > 0) {
                 let relationshipsHtml = '';
-                
+
                 columnRelationships.forEach((rel, index) => {
-                    const strengthColor = rel.connection_strength === 'Strong' ? 'var(--success)' : 
-                                        rel.connection_strength === 'Moderate' ? 'var(--warning)' : 'var(--danger)';
+                    const strengthColor = rel.connection_strength === 'Strong' ? 'var(--success)' :
+                        rel.connection_strength === 'Moderate' ? 'var(--warning)' : 'var(--danger)';
                     const overlapPercent = rel.overlap_info.overlap_percentage || 0;
-                    
+
                     relationshipsHtml += `
                         <div class="card" style="margin-bottom: 24px; border-left: 5px solid ${strengthColor};">
                             <div class="card-header">
@@ -1527,7 +1522,7 @@
                         </div>
                     `;
                 });
-                
+
                 document.getElementById('columnRelationshipsContent').innerHTML = relationshipsHtml;
             } else {
                 document.getElementById('columnRelationshipsContent').innerHTML = `
@@ -1539,63 +1534,7 @@
             }
         }
 
-        function drawERDiagram(tables, primaryKeys, foreignKeys) {
-            if (tables.length === 0) return;
 
-            if (erChart) erChart.dispose();
-            erChart = echarts.init(document.getElementById('erDiagram'));
-
-            const nodes = tables.map((t, i) => ({
-                id: t.table_name || `Table${i}`,
-                name: `📋 ${t.table_name || `Table ${i + 1}`}\n(${(t.columns || []).length} cols)`,
-                symbolSize: 60 + (t.columns || []).length * 2,
-                category: primaryKeys[t.table_name] ? 0 : 1
-            }));
-
-            const links = foreignKeys.map(fk => ({
-                source: fk.parent_table,
-                target: fk.child_table,
-                label: { show: true, formatter: fk.parent_column }
-            }));
-
-            const option = {
-                tooltip: {},
-                legend: {
-                    data: ['Parent Table', 'Child Table'],
-                    top: 10
-                },
-                series: [{
-                    type: 'graph',
-                    layout: 'force',
-                    data: nodes,
-                    links: links,
-                    categories: [
-                        { name: 'Parent Table', itemStyle: { color: '#4CAF50' } },
-                        { name: 'Child Table', itemStyle: { color: '#2196F3' } }
-                    ],
-                    roam: true,
-                    label: {
-                        show: true,
-                        fontSize: 11
-                    },
-                    force: {
-                        repulsion: 300,
-                        edgeLength: 150
-                    },
-                    lineStyle: {
-                        color: '#1976D2',
-                        width: 2,
-                        curveness: 0.2
-                    },
-                    emphasis: {
-                        focus: 'adjacency'
-                    }
-                }]
-            };
-
-            erChart.setOption(option);
-            window.addEventListener('resize', () => erChart && erChart.resize());
-        }
 
         function loadValidationData() {
             const validator = JSON.parse(sessionStorage.getItem('bankingDatasetValidator') || 'null');
@@ -1702,7 +1641,7 @@
             const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
 
             let rulesHtml = '';
-            
+
             // Add Application Type Prediction Section at the top
             if (appTypePrediction && appTypePrediction.application_type && appTypePrediction.application_type !== 'Unknown') {
                 rulesHtml += `
@@ -1803,7 +1742,7 @@
             // Handle both single-file and multi-file results
             let columnsToDisplay = [];
             let summaryToDisplay = null;
-            
+
             if (coreBankingRules && !coreBankingRules.error) {
                 if (coreBankingRules.multi_file && coreBankingRules.files) {
                     // Multi-file: combine all columns from all files
@@ -1836,7 +1775,7 @@
                     summaryToDisplay = coreBankingRules.summary;
                 }
             }
-            
+
             // Debug: Log if no data found
             if (!coreBankingRules) {
                 console.log('No Core Banking Rules data found in sessionStorage');
@@ -1845,7 +1784,7 @@
             } else if (columnsToDisplay.length === 0) {
                 console.warn('Core Banking Rules data structure:', JSON.stringify(coreBankingRules, null, 2));
             }
-            
+
             if (columnsToDisplay.length > 0) {
                 // Header
                 rulesHtml += `
@@ -1870,10 +1809,10 @@
                     // MULTI-FILE MODE: Show each file separately
                     Object.entries(coreBankingRules.files).forEach(([fileName, fileData]) => {
                         if (!fileData || fileData.error || !fileData.columns_analysis) return;
-                        
+
                         const fileColumns = fileData.columns_analysis.filter(col => col && col.column_name);
                         if (fileColumns.length === 0) return;
-                        
+
                         // File Header
                         rulesHtml += `
                             <div class="card" style="margin-bottom: 32px; border: 2px solid var(--primary); border-radius: 12px; overflow: hidden;">
@@ -1896,7 +1835,7 @@
                                 </div>
                                 <div style="padding: 24px;">
                         `;
-                        
+
                         // Workflow explanation for this file
                         if (fileData.workflow_explanation && fileData.workflow_explanation.workflow_text) {
                             rulesHtml += `
@@ -1910,13 +1849,13 @@
                                 </div>
                             `;
                         }
-                        
+
                         // Display columns for this file
                         fileColumns.forEach((colAnalysis, idx) => {
                             const uiFormat = colAnalysis.ui_ready_format || {};
                             const confidence = colAnalysis.step4_confidence_score || 0;
                             const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
-                            
+
                             rulesHtml += `
                                 <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
                                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
@@ -1998,7 +1937,7 @@
                                 </div>
                             `;
                         });
-                        
+
                         // Close file card
                         rulesHtml += `
                                 </div>
@@ -2025,13 +1964,13 @@
                             </div>
                         `;
                     }
-                    
+
                     // Display columns
                     columnsToDisplay.forEach((colAnalysis, idx) => {
                         const uiFormat = colAnalysis.ui_ready_format || {};
                         const confidence = colAnalysis.step4_confidence_score || 0;
                         const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
-                        
+
                         rulesHtml += `
                             <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
@@ -2114,7 +2053,7 @@
                         `;
                     });
                 }
-                
+
                 // Set HTML and return early - Core Banking Rules take priority
                 document.getElementById('businessRulesContent').innerHTML = rulesHtml;
                 return;
@@ -2369,10 +2308,10 @@
                             const connector = isLast ? '└──' : '├──';
                             const subConnector = isLast ? '    ' : '│   ';
 
-                            const statusColor = module.status === 'COMPLETE' ? 'var(--success)' : 
-                                              module.status === 'PARTIAL' ? 'var(--warning)' : 'var(--danger)';
-                            const statusIcon = module.status === 'COMPLETE' ? '✅' : 
-                                             module.status === 'PARTIAL' ? '⚠️' : '❌';
+                            const statusColor = module.status === 'COMPLETE' ? 'var(--success)' :
+                                module.status === 'PARTIAL' ? 'var(--warning)' : 'var(--danger)';
+                            const statusIcon = module.status === 'COMPLETE' ? '✅' :
+                                module.status === 'PARTIAL' ? '⚠️' : '❌';
 
                             html += `
                                 <div style="margin-bottom: 12px;">
@@ -2424,9 +2363,9 @@
 
                     for (const [moduleName, moduleInfo] of Object.entries(appStructure.modules)) {
                         if (moduleInfo.confidence >= 30) {
-                            const statusColor = moduleInfo.status === 'COMPLETE' ? 'var(--success)' : 
-                                              moduleInfo.status === 'PARTIAL' ? 'var(--warning)' : 'var(--danger)';
-                            
+                            const statusColor = moduleInfo.status === 'COMPLETE' ? 'var(--success)' :
+                                moduleInfo.status === 'PARTIAL' ? 'var(--warning)' : 'var(--danger)';
+
                             html += `
                                 <div class="business-rule-card">
                                     <div class="rule-header">
@@ -2452,9 +2391,9 @@
                                                 <strong>Matched Columns:</strong>
                                                 <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
                                                     ${moduleInfo.matched_columns.slice(0, 5).map(col => {
-                                                        const colName = col.includes('.') ? col.split('.').pop() : col;
-                                                        return `<span class="rule-tag">${colName}</span>`;
-                                                    }).join('')}
+                                const colName = col.includes('.') ? col.split('.').pop() : col;
+                                return `<span class="rule-tag">${colName}</span>`;
+                            }).join('')}
                                                     ${moduleInfo.matched_columns.length > 5 ? `<span class="rule-tag">+${moduleInfo.matched_columns.length - 5} more</span>` : ''}
                                                 </div>
                                             </div>
