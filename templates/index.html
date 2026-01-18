@@ -520,7 +520,7 @@
         <div class="upload-zone" id="uploadZone">
             <div class="icon">📁</div>
             <h3>Click or Drag & Drop Files</h3>
-            <p>Upload up to 5 files for multi-file relationship analysis</p>
+            <p>Upload multiple files for multi-file relationship analysis</p>
             <div class="file-types">
                 <span class="file-type-badge">.CSV</span>
                 <span class="file-type-badge">.XLSX</span>
@@ -603,7 +603,8 @@
         function handleFiles(files) {
             if (!files || files.length === 0) return;
 
-            selectedFiles = Array.from(files).slice(0, 5);
+            // Allow all files - no limit
+            selectedFiles = Array.from(files);
 
             fileItems.innerHTML = selectedFiles.map(f => `
                 <div class="file-item">

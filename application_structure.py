@@ -413,9 +413,252 @@ class BankingApplicationStructureGenerator:
         
         return best_match
     
+    def _analyze_file_patterns(self, file_dataframes: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
+        """
+        NEW: Analyze actual file patterns and content to understand structure
+        
+        Returns file-level insights including:
+        - File naming patterns
+        - Row/column statistics
+        - Data distribution patterns
+        - Business domain hints from file names
+        """
+        file_insights = {}
+        
+        for file_name, df in file_dataframes.items():
+            norm_file_name = file_name.lower()
+            
+            # Analyze file name for domain hints
+            domain_hints = []
+            if any(term in norm_file_name for term in ['customer', 'client', 'user', 'kyc']):
+                domain_hints.append('Customer')
+            if any(term in norm_file_name for term in ['account', 'acc', 'product']):
+                domain_hints.append('Account')
+            if any(term in norm_file_name for term in ['transaction', 'txn', 'payment', 'transfer']):
+                domain_hints.append('Transaction')
+            if any(term in norm_file_name for term in ['loan', 'emi', 'credit']):
+                domain_hints.append('Loan')
+            if any(term in norm_file_name for term in ['card', 'debit_card', 'credit_card']):
+                domain_hints.append('Card')
+            
+            # Analyze column patterns in actual data
+            column_stats = {}
+            for col in df.columns:
+                norm_col = self.normalize_column_name(col)
+                sample_values = df[col].dropna().head(100).tolist()
+                
+                # Value pattern analysis
+                unique_ratio = len(set(sample_values)) / len(sample_values) if sample_values else 0
+                null_ratio = df[col].isna().sum() / len(df) if len(df) > 0 else 0
+                
+                # Detect if column looks like ID (high uniqueness, numeric pattern)
+                is_likely_id = False
+                if unique_ratio > 0.9 and sample_values:
+                    try:
+                        first_val = str(sample_values[0])
+                        if first_val.isdigit() or (len(first_val) >= 6 and first_val.replace('-', '').replace('_', '').isdigit()):
+                            is_likely_id = True
+                    except:
+                        pass
+                
+                # Detect if column looks like amount/balance (numeric with decimal)
+                is_likely_amount = False
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    sample_vals = df[col].dropna().head(10)
+                    if len(sample_vals) > 0:
+                        try:
+                            vals = sample_vals.astype(float)
+                            if (vals >= 0).all() and (vals <= 1e10).all():
+                                is_likely_amount = True
+                        except:
+                            pass
+                
+                column_stats[col] = {
+                    "unique_ratio": unique_ratio,
+                    "null_ratio": null_ratio,
+                    "is_likely_id": is_likely_id,
+                    "is_likely_amount": is_likely_amount,
+                    "data_type": str(df[col].dtype),
+                    "total_rows": len(df)
+                }
+            
+            file_insights[file_name] = {
+                "domain_hints": domain_hints,
+                "row_count": len(df),
+                "column_count": len(df.columns),
+                "column_stats": column_stats,
+                "columns": list(df.columns)
+            }
+        
+        return file_insights
+    
+    def _enhance_pattern_matching_with_data(self, file_dataframes: Dict[str, pd.DataFrame], 
+                                           columns_by_feature: Dict[str, List[str]]) -> Dict[str, List[str]]:
+        """
+        NEW: Enhance pattern matching using actual data analysis
+        
+        Uses value patterns, distributions, and relationships to improve classification
+        """
+        enhanced_columns_by_feature = defaultdict(list)
+        
+        # Start with existing classifications
+        for feature, cols in columns_by_feature.items():
+            enhanced_columns_by_feature[feature].extend(cols)
+        
+        # Analyze each file's columns with actual data
+        for file_name, df in file_dataframes.items():
+            for col in df.columns:
+                col_path = f"{file_name}.{col}"
+                norm_col = self.normalize_column_name(col)
+                sample_values = df[col].dropna().head(50).tolist()
+                
+                # Skip if already classified
+                already_classified = any(col_path in cols for cols in enhanced_columns_by_feature.values())
+                if already_classified:
+                    continue
+                
+                # Enhanced pattern matching using actual data
+                best_feature = None
+                best_score = 0
+                
+                for feature_name, feature_info in self.feature_patterns.items():
+                    score = 0
+                    
+                    # Check column name patterns
+                    for keyword in feature_info["keywords"]:
+                        if keyword in norm_col:
+                            score += 15
+                    
+                    # Check value patterns in actual data
+                    if sample_values:
+                        sample_str = ' '.join([str(v).lower() for v in sample_values[:20]])
+                        
+                        # ID pattern detection (high uniqueness, numeric)
+                        if len(set(sample_values)) / len(sample_values) > 0.85:
+                            try:
+                                first_val = str(sample_values[0])
+                                if first_val.replace('-', '').replace('_', '').isdigit():
+                                    if "id" in norm_col or "number" in norm_col:
+                                        if feature_name == "Customer Information" and "customer" in norm_col:
+                                            score += 25
+                                        elif feature_name == "Account / Product Information" and "account" in norm_col:
+                                            score += 25
+                                        elif feature_name == "Transaction Information" and "transaction" in norm_col:
+                                            score += 25
+                            except:
+                                pass
+                        
+                        # Amount/balance pattern detection
+                        if pd.api.types.is_numeric_dtype(df[col]):
+                            try:
+                                vals = df[col].dropna().head(100).astype(float)
+                                if (vals >= 0).all() and (vals.max() < 1e12):
+                                    if "amount" in norm_col or "balance" in norm_col or "price" in norm_col:
+                                        if feature_name == "Transaction Information" and ("transaction" in norm_col or "amount" in norm_col):
+                                            score += 30
+                                        elif feature_name == "Account / Product Information" and "balance" in norm_col:
+                                            score += 30
+                            except:
+                                pass
+                        
+                        # Date pattern detection
+                        try:
+                            pd.to_datetime(df[col].dropna().head(10), errors='raise')
+                            if "date" in norm_col or "time" in norm_col:
+                                score += 20
+                        except:
+                            pass
+                        
+                        # Status/type pattern detection (categorical)
+                        unique_count = len(set(sample_values))
+                        if unique_count < 20 and len(sample_values) > 10:
+                            if any(keyword in norm_col for keyword in ['status', 'type', 'category', 'flag']):
+                                score += 15
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_feature = feature_name
+                
+                # Add to best matching feature if score is significant
+                if best_feature and best_score >= 20:
+                    enhanced_columns_by_feature[best_feature].append(col_path)
+        
+        return dict(enhanced_columns_by_feature)
+    
+    def _enhance_application_type_determination(self, file_insights: Dict[str, Any], 
+                                               module_scores: Dict[str, Dict[str, Any]],
+                                               file_dataframes: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
+        """
+        NEW: Enhanced application type determination using file patterns and actual data
+        
+        Uses:
+        - File naming patterns
+        - Column distributions
+        - Module confidence scores
+        - Data relationships
+        """
+        # Start with base determination
+        base_result = self.determine_application_type(module_scores)
+        
+        # Analyze file patterns to refine application type
+        file_domains = []
+        for file_name, insights in file_insights.items():
+            file_domains.extend(insights.get("domain_hints", []))
+        
+        file_domain_counts = {domain: file_domains.count(domain) for domain in set(file_domains)}
+        
+        # Refine based on file patterns
+        detected_modules = base_result.get("detected_modules", [])
+        file_based_modules = []
+        
+        # Map file domain hints to modules
+        if file_domain_counts.get("Customer", 0) > 0:
+            file_based_modules.append("Customer Module")
+        if file_domain_counts.get("Account", 0) > 0:
+            file_based_modules.append("Account / Product Module")
+        if file_domain_counts.get("Transaction", 0) > 0:
+            file_based_modules.append("Transaction Module")
+        
+        # Determine application type based on combination
+        module_combination = set(detected_modules) | set(file_based_modules)
+        
+        # Core Banking System: Customer + Account modules present
+        if "Customer Module" in module_combination and "Account / Product Module" in module_combination:
+            if "Transaction Module" in module_combination:
+                app_type = "Hybrid Banking System"
+                confidence = min(base_result.get("confidence", 0) + 10, 100)
+            else:
+                app_type = "Core Banking System"
+                confidence = min(base_result.get("confidence", 0) + 5, 95)
+        # Transaction Processing System: Primarily transactions
+        elif "Transaction Module" in module_combination and len(module_combination) == 1:
+            app_type = "Transaction Processing System"
+            confidence = min(base_result.get("confidence", 0) + 5, 90)
+        # Use base result but adjust confidence
+        else:
+            app_type = base_result.get("application_type", "Generic Banking Application")
+            confidence = base_result.get("confidence", 50)
+        
+        # Add reasoning based on file analysis
+        reasoning = []
+        if file_domain_counts:
+            reasoning.append(f"File analysis: Found {len(set(file_domains))} domain types across {len(file_insights)} files")
+        if file_based_modules:
+            reasoning.append(f"File-naming suggests: {', '.join(file_based_modules)}")
+        
+        return {
+            **base_result,
+            "application_type": app_type,
+            "confidence": round(confidence, 2),
+            "file_based_reasoning": reasoning,
+            "file_domain_hints": file_domain_counts,
+            "module_combination": list(module_combination)
+        }
+    
     def generate_structure(self, file_paths: List[str]) -> Dict[str, Any]:
         """
         Main method to generate banking application structure
+        ENHANCED with file-based pattern analysis
         
         Args:
             file_paths: List of file paths (CSV, SQL, etc.)
@@ -452,6 +695,9 @@ class BankingApplicationStructureGenerator:
         if not file_dataframes:
             return {"error": "No valid files could be loaded"}
         
+        # 🔥 NEW STEP 0: Analyze file-level patterns
+        file_insights = self._analyze_file_patterns(file_dataframes)
+        
         # Step 1: Analyze columns and infer meanings
         all_columns_analysis = {}
         for file_name, df in file_dataframes.items():
@@ -460,7 +706,7 @@ class BankingApplicationStructureGenerator:
                 analysis = self.infer_column_meaning(col, sample_values)
                 all_columns_analysis[f"{file_name}.{col}"] = analysis
         
-        # Step 2: Classify columns into features
+        # Step 2: Classify columns into features (initial classification)
         columns_by_feature = defaultdict(list)
         column_classifications = {}
         
@@ -473,6 +719,10 @@ class BankingApplicationStructureGenerator:
                     primary_feature = classifications[0]["feature"]
                     columns_by_feature[primary_feature].append(f"{file_name}.{col}")
                     column_classifications[f"{file_name}.{col}"] = classifications
+        
+        # 🔥 NEW STEP 2.5: Enhance pattern matching with actual data analysis
+        enhanced_columns_by_feature = self._enhance_pattern_matching_with_data(file_dataframes, columns_by_feature)
+        columns_by_feature = enhanced_columns_by_feature
         
         # Step 3: Detect relationships
         relationships = self.detect_relationships(file_dataframes)
@@ -496,8 +746,10 @@ class BankingApplicationStructureGenerator:
         
         module_scores = self.assign_module_confidence(updated_columns_by_feature if updated_columns_by_feature else columns_by_feature)
         
-        # Step 5: Determine application type
-        application_type = self.determine_application_type(module_scores)
+        # 🔥 ENHANCED Step 5: Determine application type with file-based reasoning
+        application_type = self._enhance_application_type_determination(
+            file_insights, module_scores, file_dataframes
+        )
         
         # Step 6: Generate business rules (separate from modules)
         business_rules_result = self._generate_business_rules(columns_by_feature, module_scores)
@@ -520,7 +772,15 @@ class BankingApplicationStructureGenerator:
             "structure_tree": structure_tree,
             "problems": problems,
             "total_files": len(file_dataframes),
-            "total_columns": sum(len(df.columns) for df in file_dataframes.values())
+            "total_columns": sum(len(df.columns) for df in file_dataframes.values()),
+            # 🔥 NEW: File-based insights
+            "file_insights": file_insights,
+            "prediction_reasoning": {
+                "file_analysis": f"Analyzed {len(file_dataframes)} file(s) with {sum(len(df) for df in file_dataframes.values())} total rows",
+                "domain_hints_from_files": application_type.get("file_domain_hints", {}),
+                "file_based_reasoning": application_type.get("file_based_reasoning", []),
+                "module_detection_method": "Combined column pattern matching + file-level analysis + data value patterns"
+            }
         }
         
         # Step 8: Apply Balance & Correction Engine
@@ -645,11 +905,45 @@ class BankingApplicationStructureGenerator:
         }
         
         # Add modules with their columns (aligned with structure pattern)
+        # Use ALL modules from module_scores (not just the predefined order)
+        # Also check module_definitions to ensure all modules are considered
+        all_module_names = set(list(module_scores.keys()) + list(self.modules.keys()))
         module_order = ["Customer Module", "Account / Product Module", "Transaction Module"]
         
+        # Add any additional modules not in the predefined order
+        for module_name in all_module_names:
+            if module_name not in module_order:
+                module_order.append(module_name)
+        
         for module_name in module_order:
-            if module_name in module_scores and module_scores[module_name]["confidence"] >= 30:
-                module_info = module_scores[module_name]
+            # Include module if it exists in module_scores OR if it has matching columns
+            module_has_scores = module_name in module_scores
+            module_has_confidence = module_has_scores and module_scores[module_name]["confidence"] >= 20  # Lowered threshold to 20
+            
+            # Also check if module has any columns from columns_by_feature
+            module_def = self.modules.get(module_name, {})
+            module_has_columns = False
+            if module_def:
+                for feature in module_def.get("features", []):
+                    if feature in columns_by_feature and len(columns_by_feature[feature]) > 0:
+                        module_has_columns = True
+                        break
+            
+            # Show module if it has confidence >= 20 OR has matching columns
+            if module_has_confidence or (module_has_columns and module_name in self.modules):
+                # Get module info from scores, or create default if missing
+                if module_name in module_scores:
+                    module_info = module_scores[module_name]
+                else:
+                    # Create default module info for modules with columns but no scores
+                    module_info = {
+                        "confidence": 25,  # Minimum confidence for detected columns
+                        "status": "PARTIAL",
+                        "matched_columns": [],
+                        "required_columns_found": 0,
+                        "optional_columns_found": 0
+                    }
+                
                 module_def = self.modules.get(module_name, {})
                 
                 module_node = {
@@ -660,7 +954,7 @@ class BankingApplicationStructureGenerator:
                     "columns": []
                 }
                 
-                # Add columns for this module
+                # Add columns for this module - use BOTH columns_by_feature AND direct column matching
                 for feature in module_def.get("features", []):
                     if feature in columns_by_feature:
                         for col_path in columns_by_feature[feature]:
@@ -677,42 +971,56 @@ class BankingApplicationStructureGenerator:
                             
                             # Check required/optional columns
                             for req_col in module_def.get("required_columns", []):
-                                if req_col in norm_col or fuzz.ratio(req_col, norm_col) > 85:
+                                if req_col in norm_col or fuzz.ratio(req_col, norm_col) > 80:  # Lowered threshold to 80
                                     belongs_to_module = True
                                     break
                             
                             if not belongs_to_module:
                                 for opt_col in module_def.get("optional_columns", []):
-                                    if opt_col in norm_col or fuzz.ratio(opt_col, norm_col) > 85:
+                                    if opt_col in norm_col or fuzz.ratio(opt_col, norm_col) > 80:  # Lowered threshold to 80
                                         belongs_to_module = True
                                         break
                             
+                            # Also check if column name contains feature keywords
+                            if not belongs_to_module:
+                                for keyword in module_def.get("features", []):
+                                    # Check feature keywords
+                                    if keyword in self.feature_patterns:
+                                        feature_keywords = self.feature_patterns[keyword].get("keywords", [])
+                                        if any(kw in norm_col for kw in feature_keywords):
+                                            belongs_to_module = True
+                                            break
+                            
                             if belongs_to_module:
-                                module_node["columns"].append({
-                                    "name": col_name,
-                                    "feature": feature,
-                                    "file": file_name,
-                                    "is_required": any(req_col in norm_col for req_col in module_def.get("required_columns", [])),
-                                    "is_mandatory": any(mandatory in norm_col for mandatory in module_def.get("mandatory_fields", []))
-                                })
+                                # Avoid duplicates
+                                if not any(c.get("name", "").lower() == col_name.lower() for c in module_node["columns"]):
+                                    module_node["columns"].append({
+                                        "name": col_name,
+                                        "feature": feature,
+                                        "file": file_name,
+                                        "is_required": any(req_col in norm_col for req_col in module_def.get("required_columns", [])),
+                                        "is_mandatory": any(mandatory in norm_col for mandatory in module_def.get("mandatory_fields", []))
+                                    })
                 
-                # Check for missing mandatory fields
-                missing_mandatory = []
-                for mandatory_field in module_def.get("mandatory_fields", []):
-                    found = any(mandatory_field in self.normalize_column_name(c["name"]) for c in module_node["columns"])
-                    if not found:
-                        missing_mandatory.append(mandatory_field)
-                
-                if missing_mandatory:
-                    module_node["missing_mandatory"] = missing_mandatory
-                    tree["problems"].append({
-                        "type": "missing_mandatory",
-                        "module": module_name,
-                        "fields": missing_mandatory,
-                        "severity": "HIGH"
-                    })
-                
-                tree["modules"].append(module_node)
+                # Only add module to tree if it has at least one column OR has confidence > 0
+                if len(module_node["columns"]) > 0 or module_info["confidence"] > 0:
+                    # Check for missing mandatory fields
+                    missing_mandatory = []
+                    for mandatory_field in module_def.get("mandatory_fields", []):
+                        found = any(mandatory_field in self.normalize_column_name(c["name"]) for c in module_node["columns"])
+                        if not found:
+                            missing_mandatory.append(mandatory_field)
+                    
+                    if missing_mandatory:
+                        module_node["missing_mandatory"] = missing_mandatory
+                        tree["problems"].append({
+                            "type": "missing_mandatory",
+                            "module": module_name,
+                            "fields": missing_mandatory,
+                            "severity": "HIGH"
+                        })
+                    
+                    tree["modules"].append(module_node)
         
         # Detect relationships
         all_cols = {}
@@ -977,16 +1285,21 @@ class ApplicationStructureBalanceCorrectionEngine:
             
             # Check if column matches any semantic pattern for this module
             for pattern in semantic_patterns:
-                if pattern in self.column_semantics:
-                    variants = self.column_semantics[pattern]
-                    if any(variant in norm_col for variant in variants):
-                        score += 30
-                        break
-                    # Check fuzzy match with variants
-                    for variant in variants:
-                        if fuzz.ratio(norm_col, variant) > 80:
-                            score += 20
+                # Use true_aliases for pattern matching
+                for canonical, variants in self.true_aliases.items():
+                    if pattern in canonical or any(pattern in v for v in variants):
+                        if canonical in norm_col or any(variant in norm_col for variant in variants):
+                            score += 30
                             break
+                        # Check fuzzy match with variants
+                        for variant in variants:
+                            if fuzz.ratio(norm_col, variant) > 80:
+                                score += 20
+                                break
+                    if score > 0:
+                        break
+                if score > 0:
+                    break
             
             # Check module's required/optional columns
             if module_name in all_modules:
