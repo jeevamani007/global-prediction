@@ -59,6 +59,7 @@ class BankingApplicationStructureGenerator:
             "Transaction Information": {
                 "keywords": ["transaction", "txn", "trans", "amount", "date", "type", "debit", "credit"],
                 "patterns": {
+
                     "transaction_id": r"transaction.*id|txn.*id|trans.*id|transaction.*number",
                     "transaction_type": r"transaction.*type|txn.*type|trans.*type",
                     "amount": r"amount|amt|transaction.*amount",
@@ -69,6 +70,19 @@ class BankingApplicationStructureGenerator:
                     "debit": r"debit|dr|debit.*amount",
                     "credit": r"credit|cr|credit.*amount"
                 }
+            },
+            "Analytics / Prediction Information": {
+                "keywords": ["exited", "target", "churn", "prediction", "label", "analytics"],
+                "patterns": {
+                    "exited": r"exited|churn|target|is_churned|churn_flag",
+                    "prediction_score": r"score|prob|prediction",
+                }
+            },
+            "System / Technical Information": {
+                "keywords": ["row", "index", "system", "id", "technical"],
+                "patterns": {
+                    "rownumber": r"row.*number|row.*index|record.*id|surrogate.*key",
+                }
             }
         }
         
@@ -77,16 +91,16 @@ class BankingApplicationStructureGenerator:
             "Customer Module": {
                 "description": "Identity and personal information",
                 "features": ["Customer Information"],
-                "required_columns": ["customer_id", "customer_name"],
-                "optional_columns": ["dob", "phone", "email"],
+                "required_columns": ["customer_id", "surname"],
+                "optional_columns": ["dob", "phone", "email", "gender", "age", "geography"],
                 "mandatory_fields": ["customer_id"]  # Critical for relationships
             },
             "Account / Product Module": {
                 "description": "Banking product information",
                 "features": ["Account / Product Information"],
-                "required_columns": ["account_number", "balance"],
-                "optional_columns": ["account_type", "product_name", "account_status"],
-                "mandatory_fields": ["account_number", "balance"]  # Critical for transactions
+                "required_columns": ["creditscore", "balance"],
+                "optional_columns": ["account_type", "product_name", "account_status", "tenure", "numofproducts", "hascrcard", "isactivemember", "estimatedsalary"],
+                "mandatory_fields": ["balance"]  # Critical for transactions
             },
             "Transaction Module": {
                 "description": "Transaction details",
@@ -94,6 +108,20 @@ class BankingApplicationStructureGenerator:
                 "required_columns": ["transaction_id", "amount"],
                 "optional_columns": ["transaction_type", "total_amount", "tax_amount", "net_amount", "transaction_date", "debit", "credit"],
                 "mandatory_fields": ["transaction_id", "amount", "transaction_date"]
+            },
+            "Analytics / Prediction Module": {
+                "description": "Customer churn prediction and analytics",
+                "features": ["Analytics / Prediction Information"],
+                "required_columns": ["exited"],
+                "optional_columns": ["prediction_score"],
+                "mandatory_fields": ["exited"]
+            },
+            "System / Technical Module": {
+                "description": "Technical system columns",
+                "features": ["System / Technical Information"],
+                "required_columns": ["rownumber"],
+                "optional_columns": [],
+                "mandatory_fields": ["rownumber"]
             }
         }
         
@@ -148,6 +176,11 @@ class BankingApplicationStructureGenerator:
                 "required_modules": ["Customer Module", "Account / Product Module", "Transaction Module"],
                 "optional_modules": [],
                 "description": "Comprehensive banking system with all three core modules"
+            },
+            "Banking Application (Customer Analytics / Churn System)": {
+                "required_modules": ["Customer Module", "Account / Product Module", "Analytics / Prediction Module"],
+                "optional_modules": ["System / Technical Module"],
+                "description": "Specialized banking system for customer analytics and churn prediction"
             }
         }
     
