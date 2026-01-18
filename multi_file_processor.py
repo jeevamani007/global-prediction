@@ -145,6 +145,18 @@ class MultiFileProcessor:
         # STEP 5.6: Analyze column relationships and banking domains
         column_relationship_analysis = self.column_relationship_analyzer.analyze_column_relationships(table_dataframes)
         
+        # STEP 5.7: Comprehensive Banking Domain Analysis (NEW - All 9 Steps)
+        comprehensive_analysis = None
+        try:
+            from comprehensive_banking_analyzer import ComprehensiveBankingAnalyzer
+            comprehensive_analyzer = ComprehensiveBankingAnalyzer()
+            comprehensive_analysis = comprehensive_analyzer.analyze(file_paths)
+        except Exception as e:
+            print(f"Warning: Comprehensive banking analysis error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            comprehensive_analysis = {"error": str(e)}
+        
         # STEP 6: Apply business rules (already done in single-file processing)
         
         # STEP 7: Unified Banking Blueprint Analysis (New)
@@ -166,7 +178,7 @@ class MultiFileProcessor:
         # STEP 8: Consolidate results
         consolidated_result = self._consolidate_results(
             table_results, domain_results, primary_keys, foreign_keys, relationships, banking_blueprint, 
-            file_relationships, column_relationship_analysis, application_structure
+            file_relationships, column_relationship_analysis, application_structure, comprehensive_analysis
         )
         
         return consolidated_result
@@ -512,7 +524,8 @@ class MultiFileProcessor:
                             relationships: List[Dict], banking_blueprint: Dict,
                             file_relationships: List[Dict] = None,
                             column_relationship_analysis: Dict = None,
-                            application_structure: Dict = None) -> Dict[str, Any]:
+                            application_structure: Dict = None,
+                            comprehensive_analysis: Dict = None) -> Dict[str, Any]:
         """Consolidate all results into final format"""
         
         # Calculate overall system verdict
@@ -568,7 +581,8 @@ class MultiFileProcessor:
             "application_structure": application_structure,  # New: Application structure generator
             "business_explanation": self._generate_business_explanation(
                 table_results, domain_results, relationships, primary_keys
-            )
+            ),
+            "comprehensive_analysis": comprehensive_analysis  # New: Comprehensive 9-step analysis
         }
         
         # For backward compatibility, include first table's banking result as primary

@@ -1109,6 +1109,15 @@
         }
 
         function displayRelationships(relationships, foreignKeys) {
+            // 🔥 NEW: Try comprehensive analysis first, fallback to legacy
+            const comprehensiveAnalysis = JSON.parse(sessionStorage.getItem('comprehensiveAnalysis') || 'null');
+            
+            if (comprehensiveAnalysis && comprehensiveAnalysis.step7_final_relationships) {
+                displayComprehensiveRelationships(comprehensiveAnalysis);
+                return;
+            }
+            
+            // Legacy display
             const rels = relationships.length > 0 ? relationships : foreignKeys;
 
             if (rels.length > 0) {
@@ -1117,9 +1126,9 @@
                     html += `
                         <div class="relationship-box">
                             <div class="relationship-arrow">
-                                <span class="table-box">📋 ${rel.parent_table}</span>
+                                <span class="table-box">📋 ${rel.parent_table || rel.parent_file}</span>
                                 <span class="arrow">→</span>
-                                <span class="table-box">📋 ${rel.child_table}</span>
+                                <span class="table-box">📋 ${rel.child_table || rel.child_file}</span>
                             </div>
                             <p style="margin-top: 12px; color: var(--text-muted);">
                                 <strong>Link:</strong> ${rel.parent_column || 'PK'} → ${rel.child_column || 'FK'}
@@ -1130,6 +1139,110 @@
                 });
                 document.getElementById('relationshipsContent').innerHTML = html;
             }
+        }
+        
+        function displayComprehensiveRelationships(comprehensiveAnalysis) {
+            const finalRelationships = comprehensiveAnalysis.step7_final_relationships || [];
+            const errorReport = comprehensiveAnalysis.step9_error_report || {};
+            const rejectedRelations = errorReport.rejected_relationships || [];
+            
+            let html = '';
+            
+            // Display valid relationships
+            if (finalRelationships.length > 0) {
+                html += '<h4 style="margin-bottom: 16px; color: var(--primary);">✅ Valid Banking Relationships</h4>';
+                
+                finalRelationships.forEach((rel, index) => {
+                    const confidenceColor = rel.confidence_level === 'STRONG' ? 'var(--success)' : 
+                                          rel.confidence_level === 'WEAK' ? 'var(--warning)' : 'var(--danger)';
+                    const matchRate = (rel.match_rate || 0) * 100;
+                    
+                    html += `
+                        <div class="card" style="margin-bottom: 20px; border-left: 5px solid ${confidenceColor};">
+                            <div class="card-header">
+                                <h4 style="margin: 0; color: var(--text-dark); font-size: 1.1rem;">
+                                    🔗 Relationship ${index + 1}: ${rel.parent_file} → ${rel.child_file}
+                                </h4>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span class="badge" style="background: ${confidenceColor}; color: white;">
+                                        ${rel.confidence_level}
+                                    </span>
+                                    <span class="badge badge-primary">
+                                        ${matchRate.toFixed(1)}% Match
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-top: 16px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                    <div style="background: white; padding: 16px; border-radius: 8px; border: 2px solid var(--primary);">
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Parent File</div>
+                                        <div style="font-weight: 600; color: var(--primary); margin-bottom: 4px;">${rel.parent_file}</div>
+                                        <div style="font-size: 1rem; font-weight: 600; color: var(--text-dark); margin-top: 8px;">
+                                            PK: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${rel.parent_column}</code>
+                                        </div>
+                                    </div>
+                                    <div style="background: white; padding: 16px; border-radius: 8px; border: 2px solid var(--success);">
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Child File</div>
+                                        <div style="font-weight: 600; color: var(--success); margin-bottom: 4px;">${rel.child_file}</div>
+                                        <div style="font-size: 1rem; font-weight: 600; color: var(--text-dark); margin-top: 8px;">
+                                            FK: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${rel.child_column}</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="background: white; padding: 16px; border-radius: 8px; border-left: 4px solid var(--primary); margin-bottom: 16px;">
+                                    <strong style="color: var(--primary); display: block; margin-bottom: 8px;">Relationship Type:</strong>
+                                    <div style="font-size: 1rem; font-weight: 600; color: var(--text-dark);">
+                                        ${rel.relationship_type}
+                                    </div>
+                                </div>
+                                
+                                <div style="background: linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%); padding: 20px; border-radius: 8px; border: 1px solid #c7d2fe;">
+                                    <h5 style="color: var(--primary); margin-bottom: 12px; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                                        💡 Banking Justification
+                                    </h5>
+                                    <p style="color: #1f2937; line-height: 1.8; font-size: 0.95rem; margin: 0;">
+                                        ${rel.banking_justification}
+                                    </p>
+                                </div>
+                                
+                                <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                                    <div style="background: white; padding: 12px; border-radius: 8px; text-align: center;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${rel.overlap_count || 0}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Matching Values</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                html += '<div class="empty-state"><div class="icon">🔗</div><p>No valid relationships detected.</p></div>';
+            }
+            
+            // Display rejected relationships
+            if (rejectedRelations.length > 0) {
+                html += '<h4 style="margin: 32px 0 16px; color: var(--danger); border-top: 2px solid var(--border); padding-top: 24px;">❌ Rejected Relationships (Invalid)</h4>';
+                
+                rejectedRelations.forEach((rel, index) => {
+                    html += `
+                        <div class="card" style="margin-bottom: 16px; border-left: 5px solid var(--danger); background: #fef2f2;">
+                            <div style="padding: 16px;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                                    <strong style="color: var(--danger);">Rejected: ${rel.parent_file}.${rel.parent_column} → ${rel.child_file}.${rel.child_column}</strong>
+                                    <span class="badge badge-danger">INVALID</span>
+                                </div>
+                                <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem;">
+                                    <strong>Reason:</strong> ${rel.rejection_reason || 'Invalid relationship'}
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('relationshipsContent').innerHTML = html;
         }
 
         function displayFileRelationships() {

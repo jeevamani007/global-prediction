@@ -56,13 +56,26 @@ class DynamicBusinessRulesValidator:
         "credit": ["credit", "cr_amount", "credit_amount", "deposit"],
         "opening_balance": ["opening_balance", "open_balance", "balance_before", "initial_balance", "op_bal"],
         "closing_balance": ["closing_balance", "closing", "balance_after", "final_balance", "current_balance", "cl_bal"],
-        "phone": ["phone", "mobile", "contact", "telephone", "phone_number", "mobile_number"]
+        "phone": ["phone", "mobile", "contact", "telephone", "phone_number", "mobile_number"],
+        # Additional columns - NOT unique identifiers
+        "dob": ["dob", "date_of_birth", "birth_date", "birthdate"],
+        "address": ["address", "street_address", "residential_address", "address_line1", "address_line2"],
+        "city": ["city", "city_name"],
+        "rate_percentage": ["rate_percentage", "interest_rate", "rate", "roi", "annual_rate", "percentage"],
+        "kyc_status": ["kyc_status", "kyc", "verification_status"],
+        "employee_status": ["employee_status", "emp_status", "staff_status"],
+        "loan_account_no": ["loan_account_no", "loan_account", "loan_account_number"],
+        # Generic transaction amount (NOT EMI-specific)
+        "amount": ["amount", "transaction_amount", "txn_amount", "amt", "value"]
     }
     
     # Allowed values for enumerated columns
     ALLOWED_ACCOUNT_TYPES = ["Savings", "Current", "Salary", "Student", "Pension"]
-    ALLOWED_ACCOUNT_STATUSES = ["Active", "Deactive"]
+    ALLOWED_ACCOUNT_STATUSES = ["Active", "Frozen", "Closed"]  # Account-specific statuses (NOT KYC or Employee)
     ALLOWED_TRANSACTION_TYPES = ["Debit", "Credit"]
+    # Separate status values for different entities
+    ALLOWED_KYC_STATUSES = ["Pending", "Verified", "Rejected"]  # KYC-specific statuses (NOT account status)
+    ALLOWED_EMPLOYEE_STATUSES = ["Active", "Resigned", "Suspended"]  # Employee-specific statuses (NOT account status)
     
     def __init__(self):
         """Initialize the validator."""
@@ -76,8 +89,17 @@ class DynamicBusinessRulesValidator:
         """
         Identify the role of a column based on name matching.
         Returns the matched column role or None.
+        
+        CRITICAL: account_number in transactions.csv is ALWAYS a Foreign Key, NEVER an amount field.
         """
         normalized = self.normalize_column_name(col_name)
+        
+        # CRITICAL PRIORITY: account_number should NEVER be treated as amount
+        # Check account_number patterns BEFORE generic amount patterns
+        if "account" in normalized and ("number" in normalized or "no" in normalized or "num" in normalized):
+            for variation in self.COLUMN_VARIATIONS["account_number"]:
+                if variation in normalized or normalized == variation:
+                    return "account_number"  # Always FK, never amount
         
         # Priority order: Check most specific matches first
         # 1. Transaction type (before account type to avoid confusion)
@@ -99,7 +121,24 @@ class DynamicBusinessRulesValidator:
                 if variation in normalized or normalized == variation:
                     return "account_type"
         
-        # 4. Check all other columns (exact matches first, then contains)
+        # 4. Status fields - must be specific to avoid confusion
+        if "kyc" in normalized and "status" in normalized:
+            for variation in self.COLUMN_VARIATIONS["kyc_status"]:
+                if variation in normalized or normalized == variation:
+                    return "kyc_status"
+        
+        if ("employee" in normalized or "emp" in normalized or "staff" in normalized) and "status" in normalized:
+            for variation in self.COLUMN_VARIATIONS["employee_status"]:
+                if variation in normalized or normalized == variation:
+                    return "employee_status"
+        
+        # 5. Loan account number (specific pattern)
+        if "loan" in normalized and "account" in normalized:
+            for variation in self.COLUMN_VARIATIONS["loan_account_no"]:
+                if variation in normalized or normalized == variation:
+                    return "loan_account_no"
+        
+        # 6. Check all other columns (exact matches first, then contains)
         # Sort by specificity (longer variations first)
         sorted_roles = sorted(
             self.COLUMN_VARIATIONS.items(),
@@ -109,11 +148,14 @@ class DynamicBusinessRulesValidator:
         
         for role, variations in sorted_roles:
             # Skip if already handled above
-            if role in ["transaction_type", "transaction_date", "account_type"]:
+            if role in ["transaction_type", "transaction_date", "account_type", "account_number", "kyc_status", "employee_status", "loan_account_no"]:
                 continue
             
             # Exact match first
             if normalized in variations:
+                # CRITICAL: Ensure account_number is never treated as amount
+                if role == "amount" and "account" in normalized:
+                    continue
                 return role
             
             # Contains match
@@ -128,6 +170,12 @@ class DynamicBusinessRulesValidator:
                         continue
                     # PAN should only match when 'pan' is present in the name
                     if role == "pan" and "pan" not in normalized:
+                        continue
+                    # CRITICAL: account_number should NEVER be treated as amount
+                    if role == "amount" and "account" in normalized:
+                        continue
+                    # CRITICAL: Ensure status fields don't match incorrectly
+                    if role == "account_status" and ("kyc" in normalized or "employee" in normalized or "emp" in normalized):
                         continue
                     return role
         
@@ -253,6 +301,59 @@ class DynamicBusinessRulesValidator:
                 length_ratio = (cleaned.str.len() == 10).mean()
                 return numeric_ratio >= 0.8 and length_ratio >= 0.8
             
+            elif role == "dob":
+                # Must be parseable as date
+                date_parsed = pd.to_datetime(non_null_str, errors="coerce")
+                valid_date_ratio = date_parsed.notna().mean()
+                return valid_date_ratio >= 0.8
+            
+            elif role == "address":
+                # Free text, alphanumeric with spaces and special chars, min 10 chars
+                min_length_ratio = (non_null_str.str.len() >= 10).mean()
+                return min_length_ratio >= 0.8  # Address can repeat, NOT unique
+            
+            elif role == "city":
+                # Text, letters and spaces, min 2 chars
+                letter_space_ratio = non_null_str.str.fullmatch(r"[A-Za-z\s]+").mean()
+                min_length_ratio = (non_null_str.str.len() >= 2).mean()
+                return letter_space_ratio >= 0.8 and min_length_ratio >= 0.8  # City can repeat, NOT unique
+            
+            elif role == "rate_percentage":
+                # Numeric, typically 0-100 (percentage)
+                numeric_series = pd.to_numeric(non_null_str, errors="coerce")
+                numeric_ratio = numeric_series.notna().mean()
+                if numeric_ratio < 0.8:
+                    return False
+                return True  # Rate can repeat, NOT unique (many products share same rate)
+            
+            elif role == "kyc_status":
+                # Must be from allowed KYC statuses
+                normalized = non_null_str.str.title().str.strip()
+                valid_ratio = normalized.isin(self.ALLOWED_KYC_STATUSES).mean()
+                return valid_ratio >= 0.8
+            
+            elif role == "employee_status":
+                # Must be from allowed employee statuses
+                normalized = non_null_str.str.title().str.strip()
+                valid_ratio = normalized.isin(self.ALLOWED_EMPLOYEE_STATUSES).mean()
+                return valid_ratio >= 0.8
+            
+            elif role == "loan_account_no":
+                # Alphanumeric or numeric, typically 6-20 chars
+                alphanumeric_ratio = non_null_str.str.fullmatch(r"[A-Za-z0-9]+").mean()
+                length_ratio = non_null_str.str.len().between(6, 20).mean()
+                return alphanumeric_ratio >= 0.8 and length_ratio >= 0.8
+            
+            elif role == "amount":
+                # Generic transaction amount - numeric >= 0
+                # CRITICAL: This is NOT EMI-specific, applies to all transaction amounts
+                numeric_series = pd.to_numeric(non_null_str, errors="coerce")
+                numeric_ratio = numeric_series.notna().mean()
+                if numeric_ratio < 0.8:
+                    return False
+                non_negative_ratio = (numeric_series.dropna() >= 0).mean()
+                return non_negative_ratio >= 0.8
+            
             return False  # Unknown role
         except Exception:
             return False
@@ -276,7 +377,13 @@ class DynamicBusinessRulesValidator:
     # ==================== BUSINESS RULES VALIDATION ====================
     
     def validate_account_number(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: Account number must be digits, 6-18 chars, can repeat."""
+        """
+        Business Rule: Account number must be digits, 6-18 chars.
+        
+        CRITICAL: In transactions.csv, account_number is ALWAYS a Foreign Key (FK).
+        It links transaction → account. NEVER used in calculations.
+        It can repeat (same account can have multiple transactions).
+        """
         violations = []
         non_null = series.dropna().astype(str)
         
@@ -293,10 +400,14 @@ class DynamicBusinessRulesValidator:
         if length_ok_ratio < 0.95:
             violations.append(f"Invalid length values: {(1-length_ok_ratio)*100:.1f}%")
         
+        # NOTE: account_number can repeat (duplicates allowed) - same account can have multiple transactions
+        # This is NOT a uniqueness violation - it's a Foreign Key, not a Primary Key
+        
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",
             "violations": violations,
-            "rule_name": "Account Number Business Rule"
+            "rule_name": "Account Number Business Rule (Foreign Key in Transactions)",
+            "note": "In transactions table, account_number is a Foreign Key linking to accounts. Duplicates are expected and valid."
         }
     
     def validate_customer_id(self, series: pd.Series) -> Dict[str, Any]:
@@ -365,7 +476,7 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_account_status(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: Account status must be from allowed values (Active or Deactive only)."""
+        """Business Rule: Account status must be from allowed values (Active, Frozen, Closed only)."""
         violations = []
         non_null = series.dropna().astype(str).str.strip()
         
@@ -375,20 +486,22 @@ class DynamicBusinessRulesValidator:
         # Normalize to title case for comparison (case-insensitive)
         normalized = non_null.str.title()
         # Map common variations to correct values
-        normalized = normalized.replace('Inactive', 'Deactive')
-        normalized = normalized.replace('De-Active', 'Deactive')
-        normalized = normalized.replace('De Active', 'Deactive')
+        normalized = normalized.replace('Inactive', 'Frozen')  # Map Inactive to Frozen
+        normalized = normalized.replace('Deactive', 'Frozen')  # Map Deactive to Frozen
+        normalized = normalized.replace('De-Active', 'Frozen')
+        normalized = normalized.replace('De Active', 'Frozen')
         
-        # Rule: Must be from allowed statuses
+        # Rule: Must be from allowed account statuses (Active, Frozen, Closed)
         valid_ratio = normalized.isin(self.ALLOWED_ACCOUNT_STATUSES).mean()
         if valid_ratio < 0.95:
             invalid_values = non_null[~normalized.isin(self.ALLOWED_ACCOUNT_STATUSES)].unique().tolist()[:5]
-            violations.append(f"Invalid account statuses: {invalid_values}. Only 'Active' or 'Deactive' are allowed.")
+            violations.append(f"Invalid account statuses: {invalid_values}. Allowed: {', '.join(self.ALLOWED_ACCOUNT_STATUSES)} (NOT KYC or Employee statuses)")
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",
             "violations": violations,
-            "rule_name": "Account Status Business Rule"
+            "rule_name": "Account Status Business Rule (Separate from KYC/Employee Status)",
+            "note": "Account status values: Active, Frozen, Closed. This is different from KYC status (Pending/Verified/Rejected) and Employee status (Active/Resigned/Suspended)."
         }
     
     def validate_branch_code(self, series: pd.Series) -> Dict[str, Any]:
@@ -684,6 +797,228 @@ class DynamicBusinessRulesValidator:
             "rule_name": "PAN Business Rule"
         }
     
+    def validate_dob(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Date of birth must be valid date, NOT unique (many people share same DOB)."""
+        violations = []
+        non_null = series.dropna().astype(str)
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Rule: Must be parseable as date
+        date_parsed = pd.to_datetime(non_null, errors="coerce")
+        valid_date_ratio = date_parsed.notna().mean()
+        if valid_date_ratio < 0.95:
+            violations.append(f"Invalid date format: {(1-valid_date_ratio)*100:.1f}%")
+        
+        # NOTE: DOB can repeat (NOT unique) - many people share same date of birth
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Date of Birth Business Rule (NOT Unique)",
+            "note": "DOB can repeat - many people share same date of birth. This is NOT an identifier."
+        }
+    
+    def validate_address(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Address is free text, can repeat, NOT a key, NOT referenceable."""
+        violations = []
+        non_null = series.dropna().astype(str)
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Rule 1: Minimum length 10 characters
+        min_length_ratio = (non_null.str.len() >= 10).mean()
+        if min_length_ratio < 0.95:
+            violations.append(f"Short addresses (<10 chars): {(1-min_length_ratio)*100:.1f}%")
+        
+        # NOTE: Address can repeat (NOT unique) - multiple customers can have same address
+        # Address is free text, NOT a key, NOT an identifier, NOT referenceable
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Address Business Rule (NOT Unique, NOT Identifier)",
+            "note": "Address is free text, can repeat, NOT a key, NOT an identifier. Multiple customers can share same address."
+        }
+    
+    def validate_city(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: City is text, can repeat, NOT unique, NOT an identifier."""
+        violations = []
+        non_null = series.dropna().astype(str)
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Rule 1: Letters and spaces only
+        letter_space_ratio = non_null.str.fullmatch(r"[A-Za-z\s]+").mean()
+        if letter_space_ratio < 0.95:
+            violations.append(f"Invalid characters: {(1-letter_space_ratio)*100:.1f}%")
+        
+        # Rule 2: Minimum 2 characters
+        min_length_ratio = (non_null.str.len() >= 2).mean()
+        if min_length_ratio < 0.95:
+            violations.append(f"Short city names (<2 chars): {(1-min_length_ratio)*100:.1f}%")
+        
+        # NOTE: City can repeat (NOT unique) - many customers can be in same city
+        # City is descriptive, NOT an identifier, NOT a key
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "City Business Rule (NOT Unique, NOT Identifier)",
+            "note": "City can repeat - many customers can be in same city. This is descriptive, NOT an identifier."
+        }
+    
+    def validate_rate_percentage(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Rate percentage is numeric, can repeat, NOT unique (many products share same rate)."""
+        violations = []
+        numeric_series = pd.to_numeric(series, errors="coerce")
+        non_null = numeric_series.dropna()
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Rule 1: Must be numeric
+        numeric_ratio = numeric_series.notna().mean()
+        if numeric_ratio < 0.95:
+            violations.append(f"Non-numeric values: {(1-numeric_ratio)*100:.1f}%")
+        
+        # Rule 2: Typically 0-100 (percentage)
+        # Allow wider range for flexibility (0-1000)
+        valid_range_ratio = ((non_null >= 0) & (non_null <= 1000)).mean()
+        if valid_range_ratio < 0.95:
+            violations.append(f"Out of range values (expected 0-1000): {(1-valid_range_ratio)*100:.1f}%")
+        
+        # NOTE: Rate percentage can repeat (NOT unique)
+        # Many products can share same interest rate
+        # Rates change over time
+        # Logical uniqueness is (product_code + effective_date), NOT rate_percentage alone
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Rate Percentage Business Rule (NOT Unique)",
+            "note": "Rate percentage can repeat - many products can share same rate. Rates change over time. Logical uniqueness is (product_code + effective_date), NOT rate_percentage alone."
+        }
+    
+    def validate_kyc_status(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: KYC status must be from allowed values (Pending/Verified/Rejected), NOT account status."""
+        violations = []
+        non_null = series.dropna().astype(str).str.strip()
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
+        
+        # Rule: Must be from allowed KYC statuses (NOT account statuses)
+        valid_ratio = normalized.isin(self.ALLOWED_KYC_STATUSES).mean()
+        if valid_ratio < 0.95:
+            invalid_values = non_null[~normalized.isin(self.ALLOWED_KYC_STATUSES)].unique().tolist()[:5]
+            violations.append(f"Invalid KYC status values: {invalid_values}. Allowed: {', '.join(self.ALLOWED_KYC_STATUSES)} (NOT account statuses)")
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "KYC Status Business Rule (Separate from Account Status)",
+            "note": "KYC status has different values than account status. KYC: Pending/Verified/Rejected. Account: Active/Frozen/Closed."
+        }
+    
+    def validate_employee_status(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Employee status must be from allowed values (Active/Resigned/Suspended), NOT account status."""
+        violations = []
+        non_null = series.dropna().astype(str).str.strip()
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Normalize to title case for comparison (case-insensitive)
+        normalized = non_null.str.title()
+        
+        # Rule: Must be from allowed employee statuses (NOT account statuses)
+        valid_ratio = normalized.isin(self.ALLOWED_EMPLOYEE_STATUSES).mean()
+        if valid_ratio < 0.95:
+            invalid_values = non_null[~normalized.isin(self.ALLOWED_EMPLOYEE_STATUSES)].unique().tolist()[:5]
+            violations.append(f"Invalid employee status values: {invalid_values}. Allowed: {', '.join(self.ALLOWED_EMPLOYEE_STATUSES)} (NOT account statuses)")
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Employee Status Business Rule (Separate from Account Status)",
+            "note": "Employee status has different values than account status. Employee: Active/Resigned/Suspended. Account: Active/Frozen/Closed."
+        }
+    
+    def validate_loan_account_no(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Loan account number must be alphanumeric, 6-20 chars. Can be marked unique in Loan table only."""
+        violations = []
+        non_null = series.dropna().astype(str)
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Rule 1: Alphanumeric
+        alphanumeric_ratio = non_null.str.fullmatch(r"[A-Za-z0-9]+").mean()
+        if alphanumeric_ratio < 0.95:
+            violations.append(f"Non-alphanumeric values: {(1-alphanumeric_ratio)*100:.1f}%")
+        
+        # Rule 2: Length 6-20
+        length_ok_ratio = non_null.str.len().between(6, 20).mean()
+        if length_ok_ratio < 0.95:
+            violations.append(f"Invalid length values: {(1-length_ok_ratio)*100:.1f}% (Expected: 6-20 characters)")
+        
+        # NOTE: loan_account_no should be unique ONLY in Loan Master table
+        # If it appears in multiple tables (e.g., collaterals, transactions), it's a FK, not unique there
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Loan Account Number Business Rule",
+            "note": "loan_account_no should be unique only in Loan Master table. In other tables, it's a Foreign Key (duplicates allowed)."
+        }
+    
+    def validate_amount(self, series: pd.Series) -> Dict[str, Any]:
+        """
+        Business Rule: Generic transaction amount - numeric, >= 0.
+        
+        CRITICAL: This is NOT EMI-specific. Transactions table contains:
+        - deposits
+        - withdrawals
+        - transfers
+        - EMI (only if it's a loan-specific transaction)
+        
+        EMI rules only apply to loan-specific EMI fields, NOT generic transaction amounts.
+        """
+        violations = []
+        numeric_series = pd.to_numeric(series, errors="coerce")
+        non_null = numeric_series.dropna()
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Rule 1: Must be numeric
+        numeric_ratio = numeric_series.notna().mean()
+        if numeric_ratio < 0.95:
+            violations.append(f"Non-numeric values: {(1-numeric_ratio)*100:.1f}%")
+        
+        # Rule 2: Must be >= 0
+        non_negative_ratio = (non_null >= 0).mean()
+        if non_negative_ratio < 0.95:
+            violations.append(f"Negative values found: {(1-non_negative_ratio)*100:.1f}%")
+        
+        # NOTE: This is a generic transaction amount field
+        # EMI rules (fixed monthly payment, calculated from loan amount/rate/tenure) do NOT apply here
+        # EMI rules only apply to loan-specific EMI fields (emi_amount, emi, monthly_payment in loan tables)
+        
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Transaction Amount Business Rule (NOT EMI-Specific)",
+            "note": "This is a generic transaction amount field for deposits, withdrawals, transfers, etc. EMI rules do NOT apply to generic transaction amounts - EMI is loan-specific."
+        }
+    
     # ==================== MAIN VALIDATION METHOD ====================
     
     def validate(self, csv_path: str) -> Dict[str, Any]:
@@ -785,6 +1120,22 @@ class DynamicBusinessRulesValidator:
                     rule_result = self.validate_closing_balance(series, opening_series, debit_series, credit_series)
                 elif role == "phone":
                     rule_result = self.validate_phone(series)
+                elif role == "dob":
+                    rule_result = self.validate_dob(series)
+                elif role == "address":
+                    rule_result = self.validate_address(series)
+                elif role == "city":
+                    rule_result = self.validate_city(series)
+                elif role == "rate_percentage":
+                    rule_result = self.validate_rate_percentage(series)
+                elif role == "kyc_status":
+                    rule_result = self.validate_kyc_status(series)
+                elif role == "employee_status":
+                    rule_result = self.validate_employee_status(series)
+                elif role == "loan_account_no":
+                    rule_result = self.validate_loan_account_no(series)
+                elif role == "amount":
+                    rule_result = self.validate_amount(series)
                 
                 if rule_result:
                     rule_result["column_name"] = col_name
