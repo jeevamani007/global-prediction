@@ -57,8 +57,8 @@ class DynamicBusinessRulesValidator:
         "opening_balance": ["opening_balance", "open_balance", "balance_before", "initial_balance", "op_bal"],
         "closing_balance": ["closing_balance", "closing", "balance_after", "final_balance", "current_balance", "cl_bal"],
         "phone": ["phone", "mobile", "contact", "telephone", "phone_number", "mobile_number"],
-        # Additional columns - NOT unique identifiers
-        "dob": ["dob", "date_of_birth", "birth_date", "birthdate"],
+        # Additional columns - NOT unique identifiers (can repeat, NOT keys)
+        "dob": ["dob", "date_of_birth", "birth_date", "birthdate"],  # NOT UNIQUE - many people share same DOB
         "address": ["address", "street_address", "residential_address", "address_line1", "address_line2"],
         "city": ["city", "city_name"],
         "rate_percentage": ["rate_percentage", "interest_rate", "rate", "roi", "annual_rate", "percentage"],
@@ -798,7 +798,13 @@ class DynamicBusinessRulesValidator:
         }
     
     def validate_dob(self, series: pd.Series) -> Dict[str, Any]:
-        """Business Rule: Date of birth must be valid date, NOT unique (many people share same DOB)."""
+        """
+        Business Rule: Date of birth must be valid date format.
+        
+        CRITICAL: DOB is NOT unique - many people share the same date of birth.
+        DOB should NEVER be used as a unique identifier or primary key.
+        DOB is descriptive data, NOT an identifier.
+        """
         violations = []
         non_null = series.dropna().astype(str)
         
@@ -811,13 +817,15 @@ class DynamicBusinessRulesValidator:
         if valid_date_ratio < 0.95:
             violations.append(f"Invalid date format: {(1-valid_date_ratio)*100:.1f}%")
         
-        # NOTE: DOB can repeat (NOT unique) - many people share same date of birth
+        # CRITICAL: DOB can repeat (NOT unique) - many people share same date of birth
+        # DOB is NOT an identifier, NOT a key, NOT unique
+        # Multiple customers can have the same DOB - this is expected and valid
         
         return {
             "status": "PASS" if len(violations) == 0 else "FAIL",
             "violations": violations,
-            "rule_name": "Date of Birth Business Rule (NOT Unique)",
-            "note": "DOB can repeat - many people share same date of birth. This is NOT an identifier."
+            "rule_name": "Date of Birth Business Rule (NOT Unique, NOT Identifier)",
+            "note": "DOB can repeat - many people share same date of birth. This is descriptive data, NOT a unique identifier, NOT a key. DOB should NEVER be used for uniqueness checks."
         }
     
     def validate_address(self, series: pd.Series) -> Dict[str, Any]:

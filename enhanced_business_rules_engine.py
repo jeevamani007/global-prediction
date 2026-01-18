@@ -802,8 +802,30 @@ The data in this table is used for daily operations, reporting, compliance, and 
             rules = ['Must be valid date/time format', 'Used for temporal analysis', 'Critical for reporting']
         
         else:  # Text field
+            # CRITICAL: DOB and other descriptive fields should NEVER be treated as unique identifiers
+            # even if they have high uniqueness - many people share same DOB
+            non_unique_descriptive_fields = ['dob', 'date_of_birth', 'birth_date', 'birthdate', 
+                                            'address', 'city', 'state', 'country', 'description', 
+                                            'name', 'customer_name']
+            is_descriptive_field = any(field in normalized for field in non_unique_descriptive_fields)
+            
             unique_ratio = stats.get('uniqueness_percentage', 0)
-            if unique_ratio > 90:
+            
+            # If it's a descriptive field like DOB, treat it as descriptive even if unique
+            if is_descriptive_field:
+                if 'dob' in normalized or 'birth' in normalized:
+                    title = f'{column_name} Date of Birth Field'
+                    purpose = 'Stores customer date of birth information'
+                    explanation = f'The {column_name} column contains date of birth information. This is descriptive data used for age verification, KYC compliance, and age-based product eligibility. DOB is NOT unique - many people share the same date of birth.'
+                    workflow = f'The {column_name} is captured during customer onboarding and used for age verification, compliance checks, and determining product eligibility. DOB should NEVER be used as a unique identifier.'
+                    rules = ['Must be valid date format', 'NOT unique - can repeat', 'Used for age verification and compliance', 'NOT an identifier']
+                else:
+                    title = f'{column_name} Descriptive Text Field'
+                    purpose = 'Stores descriptive text information'
+                    explanation = f'The {column_name} column contains descriptive text data. This field provides information about records but is NOT a unique identifier.'
+                    workflow = f'The {column_name} stores descriptive information that appears in reports, statements, and user interfaces.'
+                    rules = ['Text format', 'Used for description', 'NOT a unique identifier']
+            elif unique_ratio > 90:
                 title = f'{column_name} Unique Text Identifier'
                 purpose = 'Stores unique text identifiers or codes'
                 explanation = f'The {column_name} column contains unique text values that serve as identifiers or codes. Each value is distinct and used for referencing records.'
