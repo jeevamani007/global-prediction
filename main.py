@@ -81,6 +81,7 @@ async def upload_file(file: UploadFile = File(...)):
         file_converter = None
         original_file_path = file_path
         file_ext = os.path.splitext(file.filename)[1].lower()
+        sql_schema_info = None  # Store SQL schema info for relationship prediction
         
         if file_ext in ['.sql', '.xlsx', '.xls']:
             try:
@@ -88,6 +89,13 @@ async def upload_file(file: UploadFile = File(...)):
                 # Convert to CSV
                 file_path = file_converter.convert_to_csv(file_path)
                 print(f"File converted to CSV: {file_path}")
+                
+                # 🔥 Extract SQL schema info (relationships, PKs, FKs) for SQL files
+                if file_ext == '.sql':
+                    sql_schema_info = file_converter.get_sql_schema_info()
+                    if sql_schema_info:
+                        print(f"SQL Schema Info Extracted: {len(sql_schema_info.get('foreign_keys', []))} foreign keys, "
+                              f"{len(sql_schema_info.get('primary_keys', {}))} primary keys")
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
@@ -273,13 +281,8 @@ async def upload_file(file: UploadFile = File(...)):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error during analysis: {str(e)}")
 
-        # Clean up temporary CSV file if file was converted
-        if file_converter:
-            try:
-                file_converter.cleanup_temp_files()
-            except Exception as e:
-                print(f"Warning: Could not clean up temp files: {e}")
-
+        # NOTE: Don't clean up temp files yet - we need them for blueprint and structure analysis
+        
         # 🔥 BANKING BLUEPRINT ANALYSIS (UNIFIED)
         banking_blueprint = None
         try:
@@ -342,6 +345,73 @@ async def upload_file(file: UploadFile = File(...)):
             traceback.print_exc()
             application_structure = {"error": str(e)}
 
+        # 🔥 BUILD COLUMN RELATIONSHIP ANALYSIS (For SQL files, use extracted relationships)
+        column_relationship_analysis = {}
+        if sql_schema_info and sql_schema_info.get("relationships"):
+            # Convert SQL relationships to the format expected by UI
+            sql_relationships_list = sql_schema_info.get("relationships", [])
+            sql_tables = sql_schema_info.get("tables", {})
+            sql_primary_keys = sql_schema_info.get("primary_keys", {})
+            
+            # Build file_domains (one entry per table)
+            file_domains = []
+            for table_name, table_info in sql_tables.items():
+                columns = table_info.get("columns", [])
+                file_domains.append({
+                    "file_name": f"{table_name}.sql",
+                    "total_columns": len(columns),
+                    "total_rows": 10,  # Placeholder since we don't know exact count
+                    "primary_domain": "Banking",
+                    "domain_icon": "🏦",
+                    "domain_confidence": 85,
+                    "domain_description": f"Table '{table_name}' from SQL schema with {len(columns)} columns",
+                    "matched_columns": columns
+                })
+            
+            # Build column_relationships in the format expected by UI
+            column_relationships = []
+            for rel in sql_relationships_list:
+                child_table = rel.get("child_table", "")
+                child_col = rel.get("child_column", "")
+                parent_table = rel.get("parent_table", "")
+                parent_col = rel.get("parent_column", "")
+                
+                column_relationships.append({
+                    "file1": f"{child_table}.sql",
+                    "file1_column": child_col,
+                    "file1_domain": "Banking",
+                    "file2": f"{parent_table}.sql",
+                    "file2_column": parent_col,
+                    "file2_domain": "Banking",
+                    "relationship_type": "FOREIGN KEY Reference",
+                    "connection_strength": "Strong",
+                    "explanation": rel.get("explanation", f"The '{child_col}' column in '{child_table}' references '{parent_col}' in '{parent_table}'. This is a foreign key relationship that links records between these tables."),
+                    "business_value": rel.get("business_rule", f"Every record in {child_table} must have a corresponding record in {parent_table}. This ensures data integrity and enables joins between these tables."),
+                    "overlap_info": {
+                        "overlap_count": 10,  # Placeholder
+                        "overlap_percentage": 100,  # FK should have 100% match
+                        "total_unique_file1": 10,
+                        "total_unique_file2": 10
+                    }
+                })
+            
+            column_relationship_analysis = {
+                "file_domains": file_domains,
+                "column_relationships": column_relationships,
+                "total_relationships": len(column_relationships),
+                "primary_keys": sql_primary_keys,
+                "foreign_keys": sql_schema_info.get("foreign_keys", []),
+                "source": "SQL Schema Analysis"
+            }
+            print(f"Column Relationship Analysis: {len(column_relationships)} relationships found from SQL schema")
+
+        # Clean up temporary files AFTER all analysis is done
+        if file_converter:
+            try:
+                file_converter.cleanup_temp_files()
+            except Exception as e:
+                print(f"Warning: Could not clean up temp files: {e}")
+
         return JSONResponse(
             content={
                 "message": "File analyzed successfully",
@@ -378,6 +448,18 @@ async def upload_file(file: UploadFile = File(...)):
                 
                 # 🔥 APPLICATION STRUCTURE GENERATOR (NEW FEATURE)
                 "application_structure": application_structure,
+                
+                # 🔥 SQL SCHEMA INFO (RELATIONSHIPS, PKs, FKs) - NEW FOR SQL FILES
+                "sql_schema_info": sql_schema_info,
+                "sql_relationships": sql_schema_info.get("relationships", []) if sql_schema_info else None,
+                "sql_primary_keys": sql_schema_info.get("primary_keys", {}) if sql_schema_info else None,
+                "sql_foreign_keys": sql_schema_info.get("foreign_keys", []) if sql_schema_info else None,
+                
+                # 🔥 COLUMN RELATIONSHIP ANALYSIS (For UI display)
+                "column_relationship_analysis": column_relationship_analysis,
+                "relationships": sql_schema_info.get("relationships", []) if sql_schema_info else [],
+                "primary_keys": sql_schema_info.get("primary_keys", {}) if sql_schema_info else {},
+                "foreign_keys": sql_schema_info.get("foreign_keys", []) if sql_schema_info else [],
                 
                 # 🔥 CORE BANKING ENGINE RESULTS (PRIMARY OUTPUT - KYC REMOVED)
                 "banking_core_analysis": banking_result.get("core_banking_analysis"),

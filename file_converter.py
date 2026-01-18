@@ -2,10 +2,12 @@
 File Converter Utility
 Converts various file formats (Excel, SQL) to CSV format
 so they can be processed by domain detectors.
+Enhanced to extract and preserve SQL relationship information.
 """
 import pandas as pd
 import os
 from sql_file_processor import SQLFileProcessor
+from typing import Dict, List, Optional
 
 
 class FileConverter:
@@ -14,6 +16,7 @@ class FileConverter:
     def __init__(self):
         self.sql_processor = SQLFileProcessor()
         self.temp_files = []
+        self.sql_schema_info = None  # Store SQL schema info (relationships, PKs, FKs)
     
     def convert_to_csv(self, file_path: str) -> str:
         """
@@ -25,18 +28,45 @@ class FileConverter:
         
         if file_ext == '.csv':
             # Already CSV, return as-is
+            self.sql_schema_info = None
             return file_path
         
         elif file_ext in ['.xlsx', '.xls']:
             # Convert Excel to CSV
+            self.sql_schema_info = None
             return self._excel_to_csv(file_path)
         
         elif file_ext == '.sql':
-            # Convert SQL to CSV
-            return self.sql_processor.parse_sql_file(file_path)
+            # Convert SQL to CSV and extract schema info
+            csv_path = self.sql_processor.parse_sql_file(file_path)
+            # Store extracted schema info for relationship prediction
+            self.sql_schema_info = self.sql_processor.get_sql_schema_info()
+            return csv_path
         
         else:
             raise ValueError(f"Unsupported file format: {file_ext}")
+    
+    def get_sql_relationships(self) -> Optional[List[Dict]]:
+        """Get extracted relationships from SQL file (foreign keys)"""
+        if self.sql_schema_info:
+            return self.sql_schema_info.get('relationships', [])
+        return None
+    
+    def get_sql_primary_keys(self) -> Optional[Dict[str, str]]:
+        """Get extracted primary keys from SQL file"""
+        if self.sql_schema_info:
+            return self.sql_schema_info.get('primary_keys', {})
+        return None
+    
+    def get_sql_foreign_keys(self) -> Optional[List[Dict]]:
+        """Get extracted foreign keys from SQL file"""
+        if self.sql_schema_info:
+            return self.sql_schema_info.get('foreign_keys', [])
+        return None
+    
+    def get_sql_schema_info(self) -> Optional[Dict]:
+        """Get complete SQL schema info"""
+        return self.sql_schema_info
     
     def _excel_to_csv(self, excel_path: str) -> str:
         """Convert Excel file to CSV"""

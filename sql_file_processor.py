@@ -2,6 +2,7 @@
 SQL File Processor
 Converts SQL files (CREATE TABLE, INSERT, SELECT statements) to CSV format
 so they can be processed by domain detectors using the same logic.
+Enhanced to handle multiple tables, foreign keys, schema-only files, and relationship extraction.
 """
 import re
 import pandas as pd
@@ -9,6 +10,7 @@ import os
 from sqlalchemy import text, inspect
 from database import engine
 import tempfile
+from typing import Dict, List, Tuple, Optional
 
 
 class SQLFileProcessor:
@@ -16,6 +18,10 @@ class SQLFileProcessor:
     
     def __init__(self):
         self.temp_files = []  # Track temp files for cleanup
+        self.extracted_relationships = []  # Store foreign key relationships from SQL
+        self.extracted_tables = {}  # Store table schemas with constraints
+        self.extracted_primary_keys = {}  # Store primary keys per table
+        self.extracted_foreign_keys = []  # Store foreign key relationships
     
     def parse_sql_file(self, sql_file_path: str) -> str:
         """
@@ -25,7 +31,9 @@ class SQLFileProcessor:
         Supports:
         - CREATE TABLE + INSERT statements
         - SELECT statements
-        - Multiple statements
+        - Multiple tables in one file
+        - Schema-only files (CREATE TABLE without data)
+        - Foreign key dependencies
         """
         try:
             with open(sql_file_path, 'r', encoding='utf-8') as f:
@@ -40,12 +48,17 @@ class SQLFileProcessor:
             if not statements:
                 raise ValueError("No valid SQL statements found in file")
             
-            # Process statements
-            df = None
-            table_name = None
+            # Parse all CREATE TABLE statements to extract schema
             create_statements = []
             insert_statements = []
             select_statements = []
+            table_schemas = {}  # Store schema info for each table
+            
+            # Reset extracted data for new file
+            self.extracted_relationships = []
+            self.extracted_tables = {}
+            self.extracted_primary_keys = {}
+            self.extracted_foreign_keys = []
             
             # Categorize statements
             for statement in statements:
@@ -53,35 +66,93 @@ class SQLFileProcessor:
                 
                 if statement_upper.startswith('CREATE TABLE'):
                     create_statements.append(statement)
-                    if not table_name:
-                        table_name = self._extract_table_name(statement)
+                    # Extract table name, columns, PKs, FKs from CREATE TABLE
+                    table_info = self._parse_create_table(statement)
+                    if table_info:
+                        table_schemas[table_info['name']] = table_info
+                        self.extracted_tables[table_info['name']] = table_info
                 
                 elif statement_upper.startswith('INSERT'):
                     insert_statements.append(statement)
-                    if not table_name:
-                        table_name = self._extract_table_name_from_insert(statement)
                 
                 elif statement_upper.startswith('SELECT'):
                     select_statements.append(statement)
             
-            # Execute CREATE TABLE statements first
-            for stmt in create_statements:
-                self._execute_statement(stmt)
-            
-            # Execute INSERT statements in a transaction
-            if insert_statements:
-                self._execute_inserts(insert_statements)
-            
-            # Execute SELECT statements (use first one)
+            # If we have SELECT statements, use them
             if select_statements:
                 df = self._execute_select(select_statements[0])
+                if df is not None and not df.empty:
+                    temp_csv_path = self._create_temp_csv(df, sql_file_path)
+                    return temp_csv_path
             
-            # If we have CREATE/INSERT but no SELECT, query the table
-            if df is None and table_name:
-                df = self._execute_select(f"SELECT * FROM {table_name}")
+            # Try to execute CREATE TABLE and INSERT statements
+            # Handle foreign key dependencies by temporarily disabling constraints
+            df = None
+            all_tables_data = []
             
+            try:
+                # Execute CREATE TABLE statements (handle foreign keys)
+                self._execute_create_tables(create_statements)
+                
+                # Execute INSERT statements
+                if insert_statements:
+                    self._execute_inserts(insert_statements)
+                
+                # Try to get data from all tables
+                for table_name in table_schemas.keys():
+                    try:
+                        table_df = self._execute_select(f"SELECT * FROM {table_name}")
+                        if table_df is not None and not table_df.empty:
+                            all_tables_data.append((table_name, table_df))
+                    except Exception as e:
+                        print(f"Warning: Could not query table {table_name}: {e}")
+                        # Create empty DataFrame with schema columns
+                        schema = table_schemas[table_name]
+                        columns = schema.get('columns', [])
+                        if columns:
+                            table_df = pd.DataFrame(columns=columns)
+                            all_tables_data.append((table_name, table_df))
+                
+                # Combine all tables into one DataFrame (if multiple tables)
+                if all_tables_data:
+                    if len(all_tables_data) == 1:
+                        # Single table - use it directly
+                        df = all_tables_data[0][1]
+                    else:
+                        # Multiple tables - combine all data with all columns
+                        # Strategy: Create a union of all columns and concatenate rows
+                        all_columns = set()
+                        for table_name, table_df in all_tables_data:
+                            all_columns.update(table_df.columns)
+                        
+                        # Create list of DataFrames with all columns
+                        combined_dfs = []
+                        for table_name, table_df in all_tables_data:
+                            # Add missing columns to each DataFrame
+                            for col in all_columns:
+                                if col not in table_df.columns:
+                                    table_df[col] = None
+                            # Reorder columns consistently
+                            table_df = table_df[list(all_columns)]
+                            combined_dfs.append(table_df)
+                        
+                        # Concatenate vertically (stack rows)
+                        df = pd.concat(combined_dfs, axis=0, ignore_index=True, sort=False)
+                        # Fill NaN with empty string for missing columns
+                        df = df.fillna('')
+                
+            except Exception as e:
+                print(f"Warning: Database execution failed: {e}")
+                # Fallback: Create CSV from schema information only
+                if table_schemas:
+                    df = self._create_df_from_schema(table_schemas)
+            
+            # If still no data, try to create from schema
             if df is None or df.empty:
-                raise ValueError("No data could be extracted from SQL file")
+                if table_schemas:
+                    df = self._create_df_from_schema(table_schemas)
+                else:
+                    raise ValueError("No data or schema could be extracted from SQL file")
             
             # Create temporary CSV file
             temp_csv_path = self._create_temp_csv(df, sql_file_path)
@@ -107,6 +178,185 @@ class SQLFileProcessor:
         
         return content
     
+    def _parse_create_table(self, create_statement: str) -> Optional[Dict]:
+        """Parse CREATE TABLE statement to extract table name, columns, PKs, and FKs"""
+        try:
+            # Extract table name
+            table_match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)', 
+                                   create_statement, re.IGNORECASE)
+            if not table_match:
+                return None
+            
+            table_name = table_match.group(1).strip()
+            
+            # Extract column definitions (between parentheses)
+            col_match = re.search(r'\((.*)\)', create_statement, re.DOTALL | re.IGNORECASE)
+            if not col_match:
+                return {"name": table_name, "columns": [], "primary_key": None, "foreign_keys": []}
+            
+            column_defs = col_match.group(1)
+            
+            # Parse columns (split by comma, but handle nested parentheses for constraints)
+            columns = []
+            primary_key = None
+            foreign_keys = []
+            current_col = ""
+            paren_depth = 0
+            
+            for char in column_defs:
+                if char == '(':
+                    paren_depth += 1
+                    current_col += char
+                elif char == ')':
+                    paren_depth -= 1
+                    current_col += char
+                elif char == ',' and paren_depth == 0:
+                    # End of column definition
+                    col_def = current_col.strip()
+                    if col_def:
+                        result = self._parse_column_def(col_def, table_name)
+                        if result:
+                            if result.get('type') == 'column':
+                                columns.append(result['name'])
+                                if result.get('is_primary_key'):
+                                    primary_key = result['name']
+                            elif result.get('type') == 'foreign_key':
+                                foreign_keys.append(result)
+                            elif result.get('type') == 'primary_key_constraint':
+                                primary_key = result.get('column')
+                    current_col = ""
+                else:
+                    current_col += char
+            
+            # Handle last column
+            if current_col.strip():
+                col_def = current_col.strip()
+                result = self._parse_column_def(col_def, table_name)
+                if result:
+                    if result.get('type') == 'column':
+                        columns.append(result['name'])
+                        if result.get('is_primary_key'):
+                            primary_key = result['name']
+                    elif result.get('type') == 'foreign_key':
+                        foreign_keys.append(result)
+                    elif result.get('type') == 'primary_key_constraint':
+                        primary_key = result.get('column')
+            
+            # Store primary key for this table
+            if primary_key:
+                self.extracted_primary_keys[table_name] = primary_key
+            
+            # Store foreign keys
+            for fk in foreign_keys:
+                self.extracted_foreign_keys.append({
+                    'child_table': table_name,
+                    'child_column': fk.get('column'),
+                    'parent_table': fk.get('references_table'),
+                    'parent_column': fk.get('references_column'),
+                    'relationship_type': 'FOREIGN_KEY'
+                })
+            
+            return {
+                "name": table_name, 
+                "columns": columns, 
+                "primary_key": primary_key, 
+                "foreign_keys": foreign_keys
+            }
+        except Exception as e:
+            print(f"Warning: Could not parse CREATE TABLE: {e}")
+            return None
+    
+    def _parse_column_def(self, col_def: str, table_name: str) -> Optional[Dict]:
+        """Parse a single column definition to extract column info, PKs, FKs"""
+        col_def_upper = col_def.upper().strip()
+        
+        # Check if this is a FOREIGN KEY constraint
+        if col_def_upper.startswith('FOREIGN KEY'):
+            # Pattern: FOREIGN KEY (column) REFERENCES table(column)
+            fk_match = re.search(
+                r'FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+([^\s(]+)\s*\(([^)]+)\)',
+                col_def, re.IGNORECASE
+            )
+            if fk_match:
+                return {
+                    'type': 'foreign_key',
+                    'column': fk_match.group(1).strip(),
+                    'references_table': fk_match.group(2).strip(),
+                    'references_column': fk_match.group(3).strip()
+                }
+            return None
+        
+        # Check if this is a PRIMARY KEY constraint
+        if col_def_upper.startswith('PRIMARY KEY'):
+            pk_match = re.search(r'PRIMARY\s+KEY\s*\(([^)]+)\)', col_def, re.IGNORECASE)
+            if pk_match:
+                return {
+                    'type': 'primary_key_constraint',
+                    'column': pk_match.group(1).strip()
+                }
+            return None
+        
+        # Check if this is a CONSTRAINT (skip)
+        if col_def_upper.startswith('CONSTRAINT'):
+            return None
+        
+        # Regular column definition
+        col_name_match = re.match(r'^\s*([^\s(]+)', col_def)
+        if col_name_match:
+            col_name = col_name_match.group(1).strip()
+            is_primary_key = 'PRIMARY KEY' in col_def_upper
+            return {
+                'type': 'column',
+                'name': col_name,
+                'is_primary_key': is_primary_key
+            }
+        
+        return None
+    
+    def get_extracted_relationships(self) -> List[Dict]:
+        """Return the extracted foreign key relationships from SQL"""
+        return self.extracted_foreign_keys
+    
+    def get_extracted_primary_keys(self) -> Dict[str, str]:
+        """Return the extracted primary keys per table"""
+        return self.extracted_primary_keys
+    
+    def get_extracted_foreign_keys(self) -> List[Dict]:
+        """Return the extracted foreign keys from SQL"""
+        return self.extracted_foreign_keys
+    
+    def get_sql_schema_info(self) -> Dict:
+        """Return complete schema info extracted from SQL"""
+        return {
+            'tables': self.extracted_tables,
+            'primary_keys': self.extracted_primary_keys,
+            'foreign_keys': self.extracted_foreign_keys,
+            'relationships': self._build_relationship_explanations()
+        }
+    
+    def _build_relationship_explanations(self) -> List[Dict]:
+        """Build human-readable relationship explanations from foreign keys"""
+        relationships = []
+        for fk in self.extracted_foreign_keys:
+            child_table = fk.get('child_table', '')
+            child_col = fk.get('child_column', '')
+            parent_table = fk.get('parent_table', '')
+            parent_col = fk.get('parent_column', '')
+            
+            relationships.append({
+                'relationship': f"{child_table}.{child_col} -> {parent_table}.{parent_col}",
+                'child_table': child_table,
+                'child_column': child_col,
+                'parent_table': parent_table,
+                'parent_column': parent_col,
+                'type': 'FOREIGN_KEY',
+                'explanation': f"The '{child_col}' column in '{child_table}' references '{parent_col}' in '{parent_table}'. "
+                              f"This indicates that each record in '{child_table}' is linked to a record in '{parent_table}'.",
+                'business_rule': f"Every {child_table} must have a valid {parent_table} reference through {child_col}."
+            })
+        
+        return relationships
+    
     def _extract_table_name(self, create_statement: str) -> str:
         """Extract table name from CREATE TABLE statement"""
         match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)', 
@@ -123,6 +373,41 @@ class SQLFileProcessor:
             return match.group(1).strip()
         raise ValueError("Could not extract table name from INSERT statement")
     
+    def _execute_create_tables(self, create_statements: List[str]):
+        """Execute CREATE TABLE statements, handling foreign key dependencies"""
+        # First pass: Create tables without foreign key constraints
+        for stmt in create_statements:
+            # Remove foreign key constraints temporarily
+            stmt_modified = re.sub(r',\s*FOREIGN\s+KEY\s+\([^)]+\)\s+REFERENCES\s+[^,)]+', '', stmt, flags=re.IGNORECASE)
+            stmt_modified = re.sub(r'FOREIGN\s+KEY\s+\([^)]+\)\s+REFERENCES\s+[^,)]+', '', stmt_modified, flags=re.IGNORECASE)
+            try:
+                self._execute_statement(stmt_modified)
+            except Exception as e:
+                # If still fails, try original statement
+                try:
+                    self._execute_statement(stmt)
+                except Exception as e2:
+                    print(f"Warning: Could not create table: {e2}")
+    
+    def _create_df_from_schema(self, table_schemas: Dict) -> pd.DataFrame:
+        """Create DataFrame from schema information when no data is available"""
+        # Collect all unique columns from all tables
+        all_columns_set = set()
+        for table_name, schema in table_schemas.items():
+            columns = schema.get('columns', [])
+            all_columns_set.update(columns)
+        
+        if all_columns_set:
+            # Create empty DataFrame with all columns (for schema-based prediction)
+            # Add one empty row so DataFrame is not completely empty
+            df = pd.DataFrame(columns=list(all_columns_set))
+            # Add one row with empty values so the DataFrame structure is preserved
+            df.loc[0] = [''] * len(all_columns_set)
+            return df
+        else:
+            # Fallback: Create empty DataFrame with at least one column
+            return pd.DataFrame(columns=['column_name'])
+    
     def _execute_statement(self, statement: str):
         """Execute a DDL statement (CREATE TABLE)"""
         try:
@@ -131,12 +416,18 @@ class SQLFileProcessor:
         except Exception as e:
             # If table already exists or other expected errors, continue
             error_str = str(e).lower()
-            if "already exists" in error_str or "duplicate" in error_str or "relation" in error_str:
+            if ("already exists" in error_str or "duplicate" in error_str or 
+                "relation" in error_str or "table" in error_str and "exists" in error_str):
                 # Table already exists, that's okay
                 pass
             else:
-                # Re-raise unexpected errors
-                raise
+                # For foreign key errors, also continue (we'll handle it differently)
+                if "foreign key" in error_str or "constraint" in error_str:
+                    print(f"Warning: Foreign key constraint issue (continuing): {e}")
+                    pass
+                else:
+                    # Re-raise unexpected errors
+                    raise
     
     def _execute_inserts(self, insert_statements: list):
         """Execute multiple INSERT statements in a single transaction"""
@@ -144,14 +435,23 @@ class SQLFileProcessor:
             with engine.begin() as conn:
                 for statement in insert_statements:
                     try:
+                        # Handle INSERT INTO table VALUES (row1), (row2), ... format
+                        # Some databases require explicit column names, so try both
                         conn.execute(text(statement))
                     except Exception as e:
                         error_str = str(e).lower()
-                        # Skip duplicate key errors, but raise others
-                        if "duplicate" not in error_str and "unique" not in error_str:
-                            raise
+                        # Skip duplicate key errors, foreign key errors (parent table might not exist yet), but log others
+                        if ("duplicate" in error_str or "unique" in error_str or 
+                            "foreign key" in error_str or "constraint" in error_str or
+                            "references" in error_str):
+                            print(f"Warning: Insert constraint issue (skipping): {e}")
+                            # Try to continue with next insert
+                            continue
+                        else:
+                            # For other errors, log but continue
+                            print(f"Warning: Insert error (continuing): {e}")
         except Exception as e:
-            # Log but don't fail - data might already be inserted
+            # Log but don't fail - data might already be inserted or constraints prevent it
             print(f"Warning executing INSERT statements: {e}")
     
     def _execute_select(self, select_statement: str) -> pd.DataFrame:

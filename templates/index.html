@@ -710,9 +710,18 @@
                 if (data[key]) sessionStorage.setItem(key, JSON.stringify(data[key]));
             });
 
-            // Multi-file data
+            // Multi-file data and SQL schema info
             if (data.banking_blueprint) sessionStorage.setItem('bankingBlueprint', JSON.stringify(data.banking_blueprint));
             if (data.application_structure) sessionStorage.setItem('applicationStructure', JSON.stringify(data.application_structure));
+            
+            // 🔥 Store SQL schema relationships for single file uploads (SQL files)
+            if (data.column_relationship_analysis) sessionStorage.setItem('columnRelationshipAnalysis', JSON.stringify(data.column_relationship_analysis));
+            if (data.sql_schema_info) sessionStorage.setItem('sqlSchemaInfo', JSON.stringify(data.sql_schema_info));
+            if (data.sql_relationships) sessionStorage.setItem('sqlRelationships', JSON.stringify(data.sql_relationships));
+            if (data.relationships) sessionStorage.setItem('multiFileRelationships', JSON.stringify(data.relationships));
+            if (data.primary_keys) sessionStorage.setItem('multiFilePrimaryKeys', JSON.stringify(data.primary_keys));
+            if (data.foreign_keys) sessionStorage.setItem('multiFileForeignKeys', JSON.stringify(data.foreign_keys));
+            
             if (data.multi_file_mode) {
                 sessionStorage.setItem('multiFileMode', 'true');
                 // Store Core Banking Business Rules for multi-file (per-file results)
@@ -725,12 +734,7 @@
                     };
                     sessionStorage.setItem('coreBankingBusinessRules', JSON.stringify(combinedRules));
                 }
-                if (data.relationships) sessionStorage.setItem('multiFileRelationships', JSON.stringify(data.relationships));
                 if (data.file_relationships) sessionStorage.setItem('fileRelationships', JSON.stringify(data.file_relationships));
-                if (data.column_relationship_analysis) sessionStorage.setItem('columnRelationshipAnalysis', JSON.stringify(data.column_relationship_analysis));
-                if (data.application_structure) sessionStorage.setItem('applicationStructure', JSON.stringify(data.application_structure));
-                if (data.primary_keys) sessionStorage.setItem('multiFilePrimaryKeys', JSON.stringify(data.primary_keys));
-                if (data.foreign_keys) sessionStorage.setItem('multiFileForeignKeys', JSON.stringify(data.foreign_keys));
                 if (data.domain_detection) sessionStorage.setItem('multiFileDomainDetection', JSON.stringify(data.domain_detection));
                 if (data.table_results) sessionStorage.setItem('multiFileTableResults', JSON.stringify(data.table_results));
                 if (data.business_explanation) sessionStorage.setItem('businessExplanation', JSON.stringify(data.business_explanation));
