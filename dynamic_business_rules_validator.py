@@ -1019,6 +1019,256 @@ class DynamicBusinessRulesValidator:
             "note": "This is a generic transaction amount field for deposits, withdrawals, transfers, etc. EMI rules do NOT apply to generic transaction amounts - EMI is loan-specific."
         }
     
+    # ==================== APPLICATION TYPE PREDICTION ====================
+    
+    def predict_application_type(self, column_roles: Dict[str, str], df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Predict banking application type based on detected columns.
+        
+        Uses pattern matching from application_types.md to determine the most likely
+        application type based on column presence and data patterns.
+        
+        Returns:
+            Dict with application_type, confidence, reasoning, and matched_columns
+        """
+        # Application type patterns (from application_types.md)
+        application_patterns = {
+            "Core Banking System (CBS)": {
+                "required": ["account_number", "customer_id", "balance"],
+                "optional": ["customer_name", "account_type", "account_status", "branch_code", 
+                           "ifsc_code", "transaction_id", "transaction_date", "transaction_type",
+                           "debit", "credit", "opening_balance", "closing_balance"],
+                "description": "Central application managing all customer accounts, transactions, and core banking operations."
+            },
+            "Customer Relationship Management (CRM)": {
+                "required": ["customer_id", "customer_name"],
+                "optional": ["phone", "email", "address", "city", "dob", "kyc_status"],
+                "description": "Manages customer data, interactions, and relationship history."
+            },
+            "Internet Banking / Online Banking Portal": {
+                "required": ["account_number", "transaction_id", "transaction_date"],
+                "optional": ["customer_id", "balance", "transaction_type", "amount", "debit", 
+                           "credit", "ifsc_code"],
+                "description": "Web-based banking platform for online transactions and account management."
+            },
+            "Mobile Banking Application": {
+                "required": ["account_number", "transaction_id", "transaction_date"],
+                "optional": ["customer_id", "phone", "balance", "transaction_type", "amount"],
+                "description": "Smartphone app for banking services and account monitoring."
+            },
+            "ATM Transaction System": {
+                "required": ["account_number", "transaction_id", "transaction_type"],
+                "optional": ["transaction_date", "amount", "atm_location", "card_number", "balance"],
+                "description": "Automated Teller Machine network for cash operations."
+            },
+            "Loan Management System (LMS)": {
+                "required": ["loan_account_no", "customer_id"],
+                "optional": ["loan_amount", "emi", "interest_rate", "tenure", "disbursement_date",
+                           "outstanding_balance", "loan_status", "loan_type"],
+                "description": "Handles loan origination, disbursement, and repayment."
+            },
+            "Credit Card Management System": {
+                "required": ["card_number", "customer_id", "transaction_id"],
+                "optional": ["card_type", "credit_limit", "available_credit", "billing_date",
+                           "due_date", "minimum_payment", "transaction_date", "merchant_name"],
+                "description": "Manages credit card lifecycle, transactions, and billing."
+            },
+            "Debit Card Management System": {
+                "required": ["card_number", "account_number", "transaction_id"],
+                "optional": ["transaction_date", "transaction_type", "amount", "merchant_name",
+                           "atm_location", "card_status"],
+                "description": "Administers debit card operations and ATM transactions."
+            },
+            "Payment Gateway System": {
+                "required": ["transaction_id", "amount"],
+                "optional": ["merchant_id", "payment_status", "payment_method", "transaction_date",
+                           "customer_id", "order_id", "settlement_date"],
+                "description": "Processes online payments and merchant transactions."
+            },
+            "Fund Transfer System (NEFT/RTGS/IMPS)": {
+                "required": ["account_number", "transaction_id", "amount"],
+                "optional": ["beneficiary_account", "ifsc_code", "transaction_date", "transfer_type",
+                           "transaction_status", "reference_number"],
+                "description": "Facilitates inter-bank and intra-bank transfers."
+            },
+            "KYC Compliance System": {
+                "required": ["customer_id", "kyc_status", "pan"],
+                "optional": ["customer_name", "dob", "address", "kyc_document_type",
+                           "kyc_verification_date", "kyc_expiry_date"],
+                "description": "Manages customer verification and regulatory compliance."
+            },
+            "Account Opening System": {
+                "required": ["customer_id", "account_number", "account_type"],
+                "optional": ["customer_name", "kyc_status", "branch_code", "account_opening_date",
+                           "account_status", "initial_deposit"],
+                "description": "Digital/branch account creation platform."
+            },
+            "Transaction Monitoring System": {
+                "required": ["transaction_id", "transaction_date", "amount"],
+                "optional": ["account_number", "transaction_type", "fraud_flag", "risk_score",
+                           "alert_status", "suspicious_reason"],
+                "description": "Real-time fraud detection and suspicious activity tracking."
+            },
+            "Anti-Money Laundering (AML) System": {
+                "required": ["transaction_id", "customer_id", "amount"],
+                "optional": ["transaction_date", "aml_flag", "risk_level", "suspicious_pattern",
+                           "reporting_status", "compliance_status"],
+                "description": "Detects and reports suspicious transactions for regulatory compliance."
+            },
+            "Statement Generation System": {
+                "required": ["account_number", "transaction_id", "transaction_date"],
+                "optional": ["balance", "debit", "credit", "transaction_type", "statement_period",
+                           "opening_balance", "closing_balance"],
+                "description": "Creates account statements and transaction reports."
+            },
+            "Fixed Deposit Management": {
+                "required": ["account_number", "customer_id"],
+                "optional": ["deposit_amount", "interest_rate", "maturity_date", "tenure",
+                           "fd_type", "renewal_status", "maturity_amount"],
+                "description": "Handles term deposits, renewals, and maturity processing."
+            },
+            "Recurring Deposit System": {
+                "required": ["account_number", "customer_id"],
+                "optional": ["installment_amount", "installment_date", "maturity_date", "tenure",
+                           "interest_rate", "total_amount", "rd_status"],
+                "description": "Manages periodic savings deposits and maturity calculations."
+            },
+            "Cheque Processing System": {
+                "required": ["account_number", "transaction_id"],
+                "optional": ["cheque_number", "cheque_amount", "cheque_date", "clearing_date",
+                           "cheque_status", "micr_code", "bank_name"],
+                "description": "Handles cheque deposits, clearances, and bounces."
+            },
+            "Standing Instruction System": {
+                "required": ["account_number", "amount"],
+                "optional": ["beneficiary_account", "standing_instruction_id", "frequency",
+                           "next_execution_date", "instruction_status", "end_date", "transaction_id"],
+                "description": "Automates recurring payments and transfers."
+            },
+            "Bill Payment System": {
+                "required": ["account_number", "amount"],
+                "optional": ["bill_type", "bill_number", "due_date", "payment_date", "bill_status",
+                           "merchant_id", "transaction_id"],
+                "description": "Processes utility bills, loan EMIs, and merchant payments."
+            }
+        }
+        
+        # Get all detected role names (normalized)
+        detected_roles = set(column_roles.values())
+        detected_role_names = {self.normalize_column_name(role) for role in detected_roles}
+        
+        # Calculate match scores for each application type
+        app_scores = {}
+        for app_type, pattern in application_patterns.items():
+            score = 0
+            max_score = 0
+            matched_required = []
+            matched_optional = []
+            missing_required = []
+            
+            # Check required columns (50 points each)
+            for req_col in pattern["required"]:
+                max_score += 50
+                norm_req = self.normalize_column_name(req_col)
+                # Check if any detected role matches
+                if norm_req in detected_role_names:
+                    score += 50
+                    matched_required.append(req_col)
+                else:
+                    # Check for variations
+                    found = False
+                    for detected_role in detected_roles:
+                        norm_detected = self.normalize_column_name(detected_role)
+                        if norm_req in norm_detected or norm_detected in norm_req:
+                            score += 50
+                            matched_required.append(req_col)
+                            found = True
+                            break
+                    if not found:
+                        missing_required.append(req_col)
+            
+            # Check optional columns (10 points each)
+            for opt_col in pattern["optional"]:
+                max_score += 10
+                norm_opt = self.normalize_column_name(opt_col)
+                if norm_opt in detected_role_names:
+                    score += 10
+                    matched_optional.append(opt_col)
+                else:
+                    # Check for variations
+                    for detected_role in detected_roles:
+                        norm_detected = self.normalize_column_name(detected_role)
+                        if norm_opt in norm_detected or norm_detected in norm_opt:
+                            score += 10
+                            matched_optional.append(opt_col)
+                            break
+            
+            # Calculate confidence percentage
+            if max_score > 0:
+                confidence = (score / max_score) * 100
+            else:
+                confidence = 0
+            
+            # Only consider if at least one required column is present
+            if len(matched_required) > 0:
+                app_scores[app_type] = {
+                    "score": score,
+                    "max_score": max_score,
+                    "confidence": round(confidence, 2),
+                    "matched_required": matched_required,
+                    "matched_optional": matched_optional,
+                    "missing_required": missing_required,
+                    "description": pattern["description"]
+                }
+        
+        # Select best match (highest confidence)
+        if not app_scores:
+            return {
+                "application_type": "Unknown",
+                "confidence": 0,
+                "reasoning": "No matching application type patterns found in detected columns.",
+                "matched_columns": {},
+                "all_matches": []
+            }
+        
+        # Sort by confidence
+        sorted_apps = sorted(app_scores.items(), key=lambda x: x[1]["confidence"], reverse=True)
+        best_match = sorted_apps[0]
+        best_app_type = best_match[0]
+        best_info = best_match[1]
+        
+        # Build reasoning
+        reasoning_parts = []
+        if best_info["matched_required"]:
+            reasoning_parts.append(f"✅ Required columns matched: {', '.join(best_info['matched_required'])}")
+        if best_info["matched_optional"]:
+            reasoning_parts.append(f"✅ Optional columns matched: {', '.join(best_info['matched_optional'][:5])}")
+        if best_info["missing_required"]:
+            reasoning_parts.append(f"⚠️ Missing required columns: {', '.join(best_info['missing_required'])}")
+        
+        reasoning = " | ".join(reasoning_parts) if reasoning_parts else "Pattern matching based on detected columns."
+        
+        # Prepare all matches (top 3)
+        all_matches = []
+        for app_type, info in sorted_apps[:3]:
+            all_matches.append({
+                "application_type": app_type,
+                "confidence": info["confidence"],
+                "matched_required": info["matched_required"],
+                "matched_optional": len(info["matched_optional"])
+            })
+        
+        return {
+            "application_type": best_app_type,
+            "confidence": best_info["confidence"],
+            "reasoning": reasoning,
+            "description": best_info["description"],
+            "matched_required": best_info["matched_required"],
+            "matched_optional": best_info["matched_optional"],
+            "missing_required": best_info["missing_required"],
+            "all_matches": all_matches
+        }
+    
     # ==================== MAIN VALIDATION METHOD ====================
     
     def validate(self, csv_path: str) -> Dict[str, Any]:
@@ -1055,6 +1305,9 @@ class DynamicBusinessRulesValidator:
             
             # STEP 1: Detect columns dynamically
             column_roles = self.detect_columns(df)
+            
+            # STEP 1.5: Predict application type based on detected columns
+            application_type_prediction = self.predict_application_type(column_roles, df)
             
             # STEP 2: Apply business rules for each detected column
             business_rules = []
@@ -1206,7 +1459,8 @@ class DynamicBusinessRulesValidator:
             return {
                 "detected_columns": column_roles,
                 "business_rules": all_business_rules,
-                "summary": summary
+                "summary": summary,
+                "application_type_prediction": application_type_prediction
             }
         
         except Exception as e:

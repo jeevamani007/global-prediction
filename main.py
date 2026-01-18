@@ -106,6 +106,21 @@ async def upload_file(file: UploadFile = File(...)):
             traceback.print_exc()
             core_banking_rules_result = {"error": str(e)}
 
+        # 🔥 DYNAMIC BUSINESS RULES VALIDATOR WITH APPLICATION TYPE PREDICTION
+        dynamic_business_rules_result = None
+        application_type_prediction = None
+        try:
+            from dynamic_business_rules_validator import DynamicBusinessRulesValidator
+            dynamic_validator = DynamicBusinessRulesValidator()
+            dynamic_business_rules_result = dynamic_validator.validate(file_path)
+            application_type_prediction = dynamic_business_rules_result.get("application_type_prediction")
+            print(f"Dynamic Business Rules Validator: Application type predicted: {application_type_prediction.get('application_type', 'Unknown') if application_type_prediction else 'None'}")
+        except Exception as e:
+            print(f"Warning: Dynamic Business Rules Validator error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            dynamic_business_rules_result = {"error": str(e)}
+
         # Run domain detection – banking first, then others as needed
         try:
             # Banking domain detection
@@ -353,6 +368,10 @@ async def upload_file(file: UploadFile = File(...)):
                 
                 # 🔥 CORE BANKING BUSINESS RULES ENGINE (PRIMARY - RUNS FIRST)
                 "core_banking_business_rules": core_banking_rules_result,
+                
+                # 🔥 DYNAMIC BUSINESS RULES VALIDATOR WITH APPLICATION TYPE PREDICTION
+                "dynamic_business_rules": dynamic_business_rules_result,
+                "application_type_prediction": application_type_prediction,
                 
                 # 🔥 BANKING BLUEPRINT (NEW UNIFIED ANALYSIS)
                 "banking_blueprint": banking_blueprint,

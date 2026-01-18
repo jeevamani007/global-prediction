@@ -931,26 +931,51 @@
         }
 
         function loadApplicationType() {
+            // Priority order: 1. Dynamic prediction, 2. Blueprint, 3. Banking result, 4. Other sources
+            const appTypePrediction = JSON.parse(sessionStorage.getItem('applicationTypePrediction') || 'null');
             const blueprint = JSON.parse(sessionStorage.getItem('bankingBlueprint') || 'null');
             const appType = JSON.parse(sessionStorage.getItem('bankingApplicationType') || 'null');
             const bankingResult = JSON.parse(sessionStorage.getItem('bankingResult') || 'null');
 
-            if (blueprint) {
-                const banner = document.getElementById('appTypeBanner');
+            const banner = document.getElementById('appTypeBanner');
+            
+            // Priority 1: Dynamic Business Rules Validator Application Type Prediction (NEW)
+            if (appTypePrediction && appTypePrediction.application_type && appTypePrediction.application_type !== 'Unknown') {
+                banner.style.display = 'flex';
+                document.getElementById('appName').textContent = appTypePrediction.application_type;
+                document.getElementById('appConfidence').textContent = `${appTypePrediction.confidence || 0}%`;
+                
+                // Add reasoning tooltip if available
+                if (appTypePrediction.reasoning) {
+                    banner.title = appTypePrediction.reasoning;
+                    banner.style.cursor = 'help';
+                }
+                return;
+            }
+            
+            // Priority 2: Banking Blueprint
+            if (blueprint && blueprint.application) {
                 banner.style.display = 'flex';
                 document.getElementById('appName').textContent = blueprint.application || 'Core Banking System';
                 document.getElementById('appConfidence').textContent = `${blueprint.application_confidence || 0}%`;
-            } else if (appType && appType.predicted_application) {
-                const banner = document.getElementById('appTypeBanner');
+                return;
+            }
+            
+            // Priority 3: Banking Application Type
+            if (appType && appType.predicted_application) {
                 banner.style.display = 'flex';
                 document.getElementById('appName').textContent = appType.predicted_application;
                 document.getElementById('appConfidence').textContent = `${appType.confidence || 0}%`;
-            } else if (bankingResult && bankingResult.banking_application_type) {
+                return;
+            }
+            
+            // Priority 4: Banking Result
+            if (bankingResult && bankingResult.banking_application_type) {
                 const at = bankingResult.banking_application_type;
-                const banner = document.getElementById('appTypeBanner');
                 banner.style.display = 'flex';
                 document.getElementById('appName').textContent = at.predicted_application || 'Core Banking System';
                 document.getElementById('appConfidence').textContent = `${at.confidence || 0}%`;
+                return;
             }
         }
 
@@ -1673,9 +1698,106 @@
             const bankingResult = JSON.parse(sessionStorage.getItem('bankingResult') || 'null');
             const tableResults = JSON.parse(sessionStorage.getItem('multiFileTableResults') || '[]');
             const validator = JSON.parse(sessionStorage.getItem('bankingDatasetValidator') || 'null');
+            const appTypePrediction = JSON.parse(sessionStorage.getItem('applicationTypePrediction') || 'null');
             const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
 
             let rulesHtml = '';
+            
+            // Add Application Type Prediction Section at the top
+            if (appTypePrediction && appTypePrediction.application_type && appTypePrediction.application_type !== 'Unknown') {
+                rulesHtml += `
+                    <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border: 2px solid #0284c7;">
+                        <div class="card-header" style="border-bottom: 2px solid #0284c7;">
+                            <h3 class="card-title" style="color: #0c4a6e;">🎯 Predicted Application Type</h3>
+                        </div>
+                        <div style="padding: 20px;">
+                            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: #0c4a6e; margin-bottom: 8px;">
+                                        ${appTypePrediction.application_type}
+                                    </div>
+                                    <div style="color: #075985; font-size: 0.95rem;">
+                                        ${appTypePrediction.description || 'Banking application type detected based on column patterns.'}
+                                    </div>
+                                </div>
+                                <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; min-width: 120px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <div style="font-size: 2rem; font-weight: 700; color: var(--primary);">${appTypePrediction.confidence || 0}%</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Confidence</div>
+                                </div>
+                            </div>
+                            
+                            ${appTypePrediction.reasoning ? `
+                                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 16px; border-left: 4px solid #0284c7;">
+                                    <strong style="color: #0c4a6e; display: block; margin-bottom: 8px;">📋 Prediction Reasoning:</strong>
+                                    <div style="color: #075985; line-height: 1.6;">${appTypePrediction.reasoning}</div>
+                                </div>
+                            ` : ''}
+                            
+                            ${appTypePrediction.matched_required && appTypePrediction.matched_required.length > 0 ? `
+                                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 12px;">
+                                    <strong style="color: #0c4a6e; display: block; margin-bottom: 8px;">✅ Matched Required Columns:</strong>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        ${appTypePrediction.matched_required.map(col => `
+                                            <span style="background: #dbeafe; color: #1e40af; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 500;">
+                                                ${col}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${appTypePrediction.matched_optional && appTypePrediction.matched_optional.length > 0 ? `
+                                <div style="background: white; padding: 16px; border-radius: 8px; margin-top: 12px;">
+                                    <strong style="color: #0c4a6e; display: block; margin-bottom: 8px;">📊 Matched Optional Columns (${appTypePrediction.matched_optional.length}):</strong>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        ${appTypePrediction.matched_optional.slice(0, 10).map(col => `
+                                            <span style="background: #f0f9ff; color: #0369a1; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem;">
+                                                ${col}
+                                            </span>
+                                        `).join('')}
+                                        ${appTypePrediction.matched_optional.length > 10 ? `<span style="color: var(--text-muted); font-size: 0.85rem; padding: 6px 12px;">+${appTypePrediction.matched_optional.length - 10} more</span>` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${appTypePrediction.missing_required && appTypePrediction.missing_required.length > 0 ? `
+                                <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin-top: 12px; border-left: 4px solid #dc2626;">
+                                    <strong style="color: #991b1b; display: block; margin-bottom: 8px;">⚠️ Missing Required Columns:</strong>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        ${appTypePrediction.missing_required.map(col => `
+                                            <span style="background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 500;">
+                                                ${col}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${appTypePrediction.all_matches && appTypePrediction.all_matches.length > 1 ? `
+                                <details style="margin-top: 16px;">
+                                    <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 12px; background: white; border-radius: 6px; user-select: none;">
+                                        🔍 View Other Possible Matches (${appTypePrediction.all_matches.length - 1})
+                                    </summary>
+                                    <div style="margin-top: 12px; padding: 16px; background: white; border-radius: 8px;">
+                                        ${appTypePrediction.all_matches.slice(1).map((match, idx) => `
+                                            <div style="padding: 12px; background: #f8fafc; border-radius: 6px; margin-bottom: 8px;">
+                                                <div style="font-weight: 600; color: var(--text-dark); margin-bottom: 4px;">
+                                                    ${idx + 2}. ${match.application_type}
+                                                </div>
+                                                <div style="font-size: 0.85rem; color: var(--text-muted);">
+                                                    Confidence: ${match.confidence}% | 
+                                                    Required: ${match.matched_required.length} | 
+                                                    Optional: ${match.matched_optional}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </details>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
 
             // 1. CORE BANKING BUSINESS RULES ENGINE (HIGHEST PRIORITY - UI-READY FORMAT)
             // Handle both single-file and multi-file results
