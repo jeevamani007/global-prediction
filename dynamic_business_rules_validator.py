@@ -66,7 +66,19 @@ class DynamicBusinessRulesValidator:
         "employee_status": ["employee_status", "emp_status", "staff_status"],
         "loan_account_no": ["loan_account_no", "loan_account", "loan_account_number"],
         # Generic transaction amount (NOT EMI-specific)
-        "amount": ["amount", "transaction_amount", "txn_amount", "amt", "value"]
+        "amount": ["amount", "transaction_amount", "txn_amount", "amt", "value"],
+        # New Banking Columns
+        "card_present_flag": ["card_present_flag", "cp_flag", "card_present", "is_card_present"],
+        "bpay_biller_code": ["bpay_biller_code", "biller_code", "bpay_code"],
+        "txn_description": ["txn_description", "transaction_description", "narration", "description", "details"],
+        "merchant_id": ["merchant_id", "merch_id", "mid", "merchant_identifier"],
+        "merchant_code": ["merchant_code", "mcc", "merchant_category_code", "category_code"],
+        "merchant_suburb": ["merchant_suburb", "suburb", "merchant_city"],
+        "merchant_state": ["merchant_state", "state_code", "merchant_province"],
+        "currency": ["currency", "curr", "iso_code", "txn_currency"],
+        "long_lat": ["long_lat", "lat_long", "coordinates", "geo_location", "customer_location"],
+        "merchant_long_lat": ["merchant_long_lat", "merchant_coordinates", "store_location"],
+        "extraction": ["extraction", "extraction_id", "batch_id", "run_id", "load_id", "process_id"]
     }
     
     # Allowed values for enumerated columns
@@ -356,6 +368,53 @@ class DynamicBusinessRulesValidator:
                     return False
                 non_negative_ratio = (numeric_series.dropna() >= 0).mean()
                 return non_negative_ratio >= 0.8
+
+            # --- NEW PATTERN CHECKS ---
+            elif role == "card_present_flag":
+                # Boolean-like (Y/N/0/1)
+                valid_vals = ["Y", "N", "YES", "NO", "T", "F", "TRUE", "FALSE", "0", "1"]
+                normalized = non_null_str.str.upper().str.strip()
+                return normalized.isin(valid_vals).mean() >= 0.8
+
+            elif role == "bpay_biller_code":
+                # Numeric/Alphanumeric, 3-10 chars
+                length_ok = non_null_str.str.len().between(3, 10).mean() >= 0.8
+                return length_ok
+
+            elif role == "txn_description":
+                # Text, usually has spaces, length >= 5
+                has_space = non_null_str.str.contains(" ").mean() >= 0.5
+                min_len = (non_null_str.str.len() >= 5).mean() >= 0.8
+                return has_space or min_len
+
+            elif role == "merchant_id":
+                # Alphanumeric
+                return non_null_str.str.fullmatch(r"[A-Za-z0-9\-\s]+").mean() >= 0.8
+
+            elif role == "merchant_code":
+                # 4 digits
+                return non_null_str.str.fullmatch(r"\d{4}").mean() >= 0.9
+
+            elif role == "merchant_suburb":
+                # Text
+                return non_null_str.str.fullmatch(r"[A-Za-z\s]+").mean() >= 0.8
+
+            elif role == "merchant_state":
+                # 2-3 uppercase letters
+                return non_null_str.str.match(r"[A-Z]{2,3}").mean() >= 0.8
+
+            elif role == "currency":
+                # 3 letters
+                return non_null_str.str.match(r"[A-Z]{3}").mean() >= 0.9
+
+            elif role == "long_lat" or role == "merchant_long_lat":
+                # Numeric, decimals
+                is_numeric = pd.to_numeric(non_null_str, errors='coerce').notna().mean() >= 0.9
+                return is_numeric
+
+            elif role == "extraction":
+                # Alphanumeric
+                return non_null_str.str.isalnum().mean() >= 0.8
             
             return False  # Unknown role
         except Exception:
@@ -1029,6 +1088,182 @@ class DynamicBusinessRulesValidator:
             "rule_name": "Transaction Amount Business Rule (NOT EMI-Specific)",
             "note": "This is a generic transaction amount field for deposits, withdrawals, transfers, etc. EMI rules do NOT apply to generic transaction amounts - EMI is loan-specific."
         }
+
+    # ==================== NEW VALIDATION METHODS ====================
+
+    def validate_card_present_flag(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Card Present Flag must be boolean-like (Y/N, 1/0)."""
+        violations = []
+        non_null = series.dropna().astype(str).str.upper().str.strip()
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+            
+        valid_vals = ["Y", "N", "YES", "NO", "T", "F", "TRUE", "FALSE", "0", "1"]
+        valid_ratio = non_null.isin(valid_vals).mean()
+        
+        if valid_ratio < 0.95:
+             violations.append(f"Invalid boolean values: {(1-valid_ratio)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Card Present Flag Business Rule"
+        }
+
+    def validate_bpay_biller_code(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: BPAY Biller Code 3-10 chars."""
+        violations = []
+        non_null = series.dropna().astype(str).str.strip()
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+
+        length_ratio = non_null.str.len().between(3, 10).mean()
+        if length_ratio < 0.95:
+             violations.append(f"Invalid length (expected 3-10): {(1-length_ratio)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "BPAY Biller Code Business Rule"
+        }
+
+    def validate_txn_description(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Transaction Description should be descriptive text."""
+        violations = []
+        non_null = series.dropna().astype(str).str.strip()
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+
+        min_len_ratio = (non_null.str.len() >= 5).mean()
+        if min_len_ratio < 0.9: # Allow some short ones
+             violations.append(f"Description too short (<5 chars): {(1-min_len_ratio)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Transaction Description Business Rule"
+        }
+
+    def validate_merchant_id(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Merchant ID alphanumeric."""
+        violations = []
+        non_null = series.dropna().astype(str).str.strip()
+        if len(non_null) == 0:
+             return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+
+        # Just check not empty mostly, and alphanumeric check
+        alphanumeric = non_null.str.match(r"^[A-Za-z0-9\-\s]+$").mean()
+        if alphanumeric < 0.95:
+             violations.append(f"Invalid format (expected alphanumeric): {(1-alphanumeric)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Merchant ID Business Rule"
+        }
+
+    def validate_merchant_code(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: MCC is 4 digits."""
+        violations = []
+        non_null = series.dropna().astype(str).str.strip()
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+            
+        format_match = non_null.str.fullmatch(r"\d{4}").mean()
+        if format_match < 0.95:
+             violations.append(f"Invalid MCC format (expected 4 digits): {(1-format_match)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Merchant Code (MCC) Business Rule"
+        }
+
+    def validate_merchant_suburb(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Merchant Suburb text."""
+        violations = []
+        non_null = series.dropna().astype(str).str.strip()
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+
+        # Loose validation for text
+        text_match = non_null.str.match(r"^[A-Za-z\s\.]+$").mean()
+        if text_match < 0.9:
+             violations.append(f"Invalid suburb format: {(1-text_match)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Merchant Suburb Business Rule"
+        }
+    
+    def validate_merchant_state(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Merchant State 2-3 char code."""
+        violations = []
+        non_null = series.dropna().astype(str).str.upper().str.strip()
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+
+        state_match = non_null.str.match(r"^[A-Z]{2,3}$").mean()
+        if state_match < 0.9:
+             violations.append(f"Invalid state code format: {(1-state_match)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Merchant State Business Rule"
+        }
+
+    def validate_currency(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Currency ISO code (3 chars)."""
+        violations = []
+        non_null = series.dropna().astype(str).str.upper().str.strip()
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+
+        iso_match = non_null.str.match(r"^[A-Z]{3}$").mean()
+        if iso_match < 0.95:
+             violations.append(f"Invalid Currency ISO format: {(1-iso_match)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": "Currency Business Rule"
+        }
+    
+    def validate_geo_coordinates(self, series: pd.Series, name="Geo Coordinates") -> Dict[str, Any]:
+        """Business Rule: Valid Lat/Long."""
+        violations = []
+        numeric_series = pd.to_numeric(series, errors="coerce")
+        non_null = numeric_series.dropna()
+        
+        if len(non_null) == 0:
+            return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+            
+        # Range check [-180, 180] covers both lat and long loosely
+        range_match = non_null.between(-180, 180).mean()
+        if range_match < 0.95:
+             violations.append(f"Values out of geographic range: {(1-range_match)*100:.1f}%")
+
+        return {
+            "status": "PASS" if len(violations) == 0 else "FAIL",
+            "violations": violations,
+            "rule_name": f"{name} Business Rule"
+        }
+
+    def validate_extraction(self, series: pd.Series) -> Dict[str, Any]:
+        """Business Rule: Extraction/Batch ID."""
+        violations = []
+        non_null = series.dropna().astype(str)
+        if len(non_null) == 0:
+             return {"status": "SKIPPED", "reason": "Column is empty", "violations": []}
+        
+        # Just existence is enough usually, maybe check for strange characters
+        return {
+            "status": "PASS",
+            "violations": [],
+            "rule_name": "Extraction ID Business Rule"
+        }
     
     # ==================== APPLICATION TYPE PREDICTION ====================
     
@@ -1400,6 +1635,30 @@ class DynamicBusinessRulesValidator:
                     rule_result = self.validate_loan_account_no(series)
                 elif role == "amount":
                     rule_result = self.validate_amount(series)
+                
+                # --- NEW VALIDATIONS ---
+                elif role == "card_present_flag":
+                    rule_result = self.validate_card_present_flag(series)
+                elif role == "bpay_biller_code":
+                    rule_result = self.validate_bpay_biller_code(series)
+                elif role == "txn_description":
+                    rule_result = self.validate_txn_description(series)
+                elif role == "merchant_id":
+                    rule_result = self.validate_merchant_id(series)
+                elif role == "merchant_code":
+                    rule_result = self.validate_merchant_code(series)
+                elif role == "merchant_suburb":
+                    rule_result = self.validate_merchant_suburb(series)
+                elif role == "merchant_state":
+                    rule_result = self.validate_merchant_state(series)
+                elif role == "currency":
+                    rule_result = self.validate_currency(series)
+                elif role == "long_lat":
+                    rule_result = self.validate_geo_coordinates(series, "Customer Location")
+                elif role == "merchant_long_lat":
+                    rule_result = self.validate_geo_coordinates(series, "Merchant Location")
+                elif role == "extraction":
+                    rule_result = self.validate_extraction(series)
                 
                 if rule_result:
                     rule_result["column_name"] = col_name

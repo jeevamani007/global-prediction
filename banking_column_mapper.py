@@ -36,7 +36,18 @@ class BankingColumnMapper:
             "CREDIT",
             "OPENING_BALANCE",
             "CLOSING_BALANCE",
-            "TRANSACTION_DATE"
+            "TRANSACTION_DATE",
+            "CARD_PRESENT_FLAG",
+            "BPAY_BILLER_CODE", 
+            "TXN_DESCRIPTION", 
+            "MERCHANT_ID", 
+            "MERCHANT_CODE", 
+            "MERCHANT_SUBURB", 
+            "MERCHANT_STATE", 
+            "CURRENCY", 
+            "LONG_LAT", 
+            "MERCHANT_LONG_LAT", 
+            "EXTRACTION"
         ]
     
     def normalize(self, text):
@@ -485,6 +496,210 @@ class BankingColumnMapper:
                 return 0.0
         except Exception:
             return 0.0
+
+    def check_card_present_flag_pattern(self, series):
+        """
+        Check if series matches CARD_PRESENT_FLAG pattern:
+        - Boolean-like values (Y/N, Yes/No, T/F, 0/1)
+        - Low cardinality (typically 2 values)
+        """
+        try:
+            non_null = series.dropna().astype(str).str.upper().str.strip()
+            if len(non_null) == 0:
+                return False, 0.0
+
+            # Check for common boolean patterns
+            y_n_ratio = non_null.isin(["Y", "N", "YES", "NO"]).mean()
+            t_f_ratio = non_null.isin(["T", "F", "TRUE", "FALSE"]).mean()
+            zero_one_ratio = non_null.isin(["0", "1"]).mean()
+
+            confidence = 0.0
+            if y_n_ratio >= 0.9:
+                confidence = 90.0
+            elif t_f_ratio >= 0.9:
+                confidence = 85.0
+            elif zero_one_ratio >= 0.9:
+                confidence = 80.0
+            
+            # Check cardinality
+            unique_count = non_null.nunique()
+            if unique_count > 5:  # Too many values for a flag
+                confidence *= 0.5
+            
+            if confidence > 0:
+                return True, confidence
+            else:
+                return False, 0.0
+        except Exception:
+            return False, 0.0
+
+    def check_bpay_biller_code_pattern(self, series):
+        """
+        Check if series matches BPAY_BILLER_CODE pattern:
+        - Numeric or Alphanumeric
+        - Typically 4-6 digits
+        """
+        try:
+            non_null = series.dropna().astype(str).str.strip()
+            if len(non_null) == 0:
+                return False, 0.0
+
+            # Check length (4-10 chars for biller codes)
+            length_ok_ratio = non_null.str.len().between(3, 10).mean()
+            
+            # Check if numeric (most biller codes are numeric)
+            numeric_ratio = pd.to_numeric(non_null, errors="coerce").notna().mean()
+            
+            confidence = 0.0
+            if numeric_ratio >= 0.9 and length_ok_ratio >= 0.9:
+                confidence = 75.0
+            elif length_ok_ratio >= 0.9:
+                confidence = 60.0
+                
+            return True, confidence if confidence > 0 else 0.0
+        except Exception:
+            return False, 0.0
+
+    def check_txn_description_pattern(self, series):
+        """
+        Check if series matches TXN_DESCRIPTION pattern:
+        - Text with moderate length
+        - High uniqueness or moderate repetition
+        - Contains spaces/special chars
+        """
+        try:
+            non_null = series.dropna().astype(str).str.strip()
+            if len(non_null) == 0:
+                return False, 0.0
+
+            # Check length (descriptions are usually longer than codes)
+            avg_len = non_null.str.len().mean()
+            if avg_len < 5:
+                return False, 0.0
+            
+            # Check for spaces (descriptions usually have spaces)
+            has_space_ratio = non_null.str.contains(" ").mean()
+            
+            confidence = 0.0
+            if has_space_ratio >= 0.5:
+                confidence = 70.0
+            
+            # Descriptions often have alphanumeric content
+            if confidence > 0:
+                return True, confidence
+            else:
+                return False, 0.0
+        except Exception:
+            return False, 0.0
+
+    def check_merchant_patterns(self, series, type="id"):
+        """
+        Check merchant patterns:
+        - ID: Alphanumeric, uniqueish
+        - Code (MCC): 4 digits usually
+        - Suburb: Text
+        - State: Short text (2-3 chars or full names)
+        """
+        try:
+            non_null = series.dropna().astype(str).str.strip()
+            if len(non_null) == 0:
+                return False, 0.0
+
+            confidence = 0.0
+            
+            if type == "id":
+                # Alphanumeric
+                alphanum = non_null.str.fullmatch(r"[A-Za-z0-9]+").mean()
+                if alphanum >= 0.8:
+                    confidence = 60.0 # Generic ID confidence
+            elif type == "code":
+                # MCC is usually 4 digits
+                digits = non_null.str.fullmatch(r"\d{4}").mean()
+                if digits >= 0.8:
+                    confidence = 85.0
+            elif type == "suburb":
+                # Text, letters
+                letters = non_null.str.fullmatch(r"[A-Za-z\s]+").mean()
+                if letters >= 0.8:
+                    confidence = 60.0
+            elif type == "state":
+                # 2-3 uppercase letters
+                state_code = non_null.str.fullmatch(r"[A-Z]{2,3}").mean()
+                if state_code >= 0.8:
+                    confidence = 80.0
+                    
+            return True, confidence
+        except Exception:
+            return False, 0.0
+
+    def check_currency_pattern(self, series):
+        """
+        Check CURRENCY pattern:
+        - 3 letter ISO codes (USD, INR, AUD, etc.)
+        """
+        try:
+            non_null = series.dropna().astype(str).str.upper().str.strip()
+            if len(non_null) == 0:
+                return False, 0.0
+                
+            iso_code = non_null.str.fullmatch(r"[A-Z]{3}").mean()
+            known_codes = non_null.isin(["USD", "EUR", "GBP", "INR", "AUD", "CAD", "JPY", "CNY", "NZD"]).mean()
+            
+            confidence = 0.0
+            if known_codes >= 0.8:
+                confidence = 95.0
+            elif iso_code >= 0.9:
+                confidence = 80.0
+                
+            return True, confidence
+        except Exception:
+            return False, 0.0
+
+    def check_geo_coordinates_pattern(self, series):
+        """
+        Check Lat/Long pattern:
+        - Numeric decimals
+        - Lat: -90 to 90
+        - Long: -180 to 180
+        """
+        try:
+            non_null = pd.to_numeric(series, errors="coerce").dropna()
+            if len(non_null) == 0:
+                return False, 0.0
+                
+            in_range = non_null.between(-180, 180).mean()
+            is_float = (non_null % 1 != 0).mean() # Should have decimals
+            
+            confidence = 0.0
+            if in_range >= 0.95 and is_float > 0.5:
+                confidence = 85.0
+            
+            return True, confidence
+        except Exception:
+            return False, 0.0
+
+    def check_extraction_pattern(self, series):
+        """
+        Check Extraction/Batch ID pattern:
+        - High cardinality
+        - Often timestamp based or auto-increment
+        """
+        try:
+            non_null = series.dropna().astype(str)
+            if len(non_null) == 0:
+                return False, 0.0
+            
+            # Not a very distinct pattern, relies mostly on name
+            # But checking if it's alphanumeric/numeric
+            is_alphanum = non_null.str.isalnum().mean()
+            
+            confidence = 0.0
+            if is_alphanum >= 0.9:
+                confidence = 40.0 # Low base confidence, relies on name boost
+                
+            return True, confidence
+        except Exception:
+            return False, 0.0
     
     def map_columns(self, csv_path):
         """
@@ -577,6 +792,60 @@ class BankingColumnMapper:
                 matches, conf = self.check_closing_balance_pattern(series)
                 if matches and conf > 0:
                     column_analyses[col]["scores"]["CLOSING_BALANCE"] = conf
+
+                # --- NEW PATTERNS ---
+                
+                # CARD_PRESENT_FLAG
+                matches, conf = self.check_card_present_flag_pattern(series)
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["CARD_PRESENT_FLAG"] = conf
+
+                # BPAY_BILLER_CODE
+                matches, conf = self.check_bpay_biller_code_pattern(series)
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["BPAY_BILLER_CODE"] = conf
+
+                # TXN_DESCRIPTION
+                matches, conf = self.check_txn_description_pattern(series)
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["TXN_DESCRIPTION"] = conf
+
+                # MERCHANT_ID
+                matches, conf = self.check_merchant_patterns(series, type="id")
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["MERCHANT_ID"] = conf
+
+                # MERCHANT_CODE
+                matches, conf = self.check_merchant_patterns(series, type="code")
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["MERCHANT_CODE"] = conf
+
+                # MERCHANT_SUBURB
+                matches, conf = self.check_merchant_patterns(series, type="suburb")
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["MERCHANT_SUBURB"] = conf
+
+                # MERCHANT_STATE
+                matches, conf = self.check_merchant_patterns(series, type="state")
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["MERCHANT_STATE"] = conf
+
+                # CURRENCY
+                matches, conf = self.check_currency_pattern(series)
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["CURRENCY"] = conf
+
+                # GEO COORDINATES (LONG_LAT / MERCHANT_LONG_LAT)
+                matches, conf = self.check_geo_coordinates_pattern(series)
+                if matches and conf > 0:
+                    # Can be either, deciding later based on name
+                    column_analyses[col]["scores"]["LONG_LAT"] = conf
+                    column_analyses[col]["scores"]["MERCHANT_LONG_LAT"] = conf
+                
+                # EXTRACTION
+                matches, conf = self.check_extraction_pattern(series)
+                if matches and conf > 0:
+                    column_analyses[col]["scores"]["EXTRACTION"] = conf
             
             # Second pass: Identify TRANSACTION_AMOUNT (needs context from debit/credit)
             # Also refine balance calculations
@@ -719,6 +988,57 @@ class BankingColumnMapper:
                             analysis["scores"]["OPENING_BALANCE"] -= 20.0
                         if "CLOSING_BALANCE" in analysis["scores"]:
                             analysis["scores"]["CLOSING_BALANCE"] -= 20.0
+                    
+                    # --- NEW NAME HINTS ---
+                    
+                    # CARD_PRESENT_FLAG
+                    if ("card" in norm_col and "present" in norm_col) or "cp_flag" in norm_col:
+                         if "CARD_PRESENT_FLAG" in analysis["scores"]:
+                            analysis["scores"]["CARD_PRESENT_FLAG"] += 20.0
+                            
+                    # BPAY_BILLER_CODE
+                    if "bpay" in norm_col or "biller" in norm_col:
+                        if "BPAY_BILLER_CODE" in analysis["scores"]:
+                            analysis["scores"]["BPAY_BILLER_CODE"] += 20.0
+                            
+                    # TXN_DESCRIPTION
+                    if "desc" in norm_col or "narration" in norm_col or "details" in norm_col:
+                        if "TXN_DESCRIPTION" in analysis["scores"]:
+                            analysis["scores"]["TXN_DESCRIPTION"] += 20.0
+                            
+                    # MERCHANT Details
+                    if "merchant" in norm_col:
+                        if "id" in norm_col and "MERCHANT_ID" in analysis["scores"]:
+                            analysis["scores"]["MERCHANT_ID"] += 20.0
+                        if "code" in norm_col and "MERCHANT_CODE" in analysis["scores"]:
+                            analysis["scores"]["MERCHANT_CODE"] += 20.0
+                        if "suburb" in norm_col and "MERCHANT_SUBURB" in analysis["scores"]:
+                            analysis["scores"]["MERCHANT_SUBURB"] += 20.0
+                        if "state" in norm_col and "MERCHANT_STATE" in analysis["scores"]:
+                            analysis["scores"]["MERCHANT_STATE"] += 20.0
+                        if ("lat" in norm_col or "long" in norm_col) and "MERCHANT_LONG_LAT" in analysis["scores"]:
+                            analysis["scores"]["MERCHANT_LONG_LAT"] += 20.0
+                            # Remove generic LONG_LAT
+                            if "LONG_LAT" in analysis["scores"]:
+                                del analysis["scores"]["LONG_LAT"]
+                                
+                    # CURRENCY
+                    if "currency" in norm_col or "curr" in norm_col or "iso" in norm_col:
+                        if "CURRENCY" in analysis["scores"]:
+                            analysis["scores"]["CURRENCY"] += 20.0
+                            
+                    # LONG_LAT (User location)
+                    if ("long" in norm_col or "lat" in norm_col) and "merchant" not in norm_col:
+                        if "LONG_LAT" in analysis["scores"]:
+                            analysis["scores"]["LONG_LAT"] += 20.0
+                            # Remove merchant long lat
+                            if "MERCHANT_LONG_LAT" in analysis["scores"]:
+                                del analysis["scores"]["MERCHANT_LONG_LAT"]
+
+                    # EXTRACTION
+                    if "extract" in norm_col or "batch" in norm_col or "process" in norm_col:
+                        if "EXTRACTION" in analysis["scores"]:
+                            analysis["scores"]["EXTRACTION"] += 20.0
                     # CUSTOMER_ID: Only show if pattern matches (confidence >= 50%)
                     # If column name suggests customer_id but pattern doesn't match, hide it
                     if ("customer" in norm_col or "cust" in norm_col):

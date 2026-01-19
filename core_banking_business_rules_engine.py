@@ -940,6 +940,226 @@ class CoreBankingBusinessRulesEngine:
                     "reason": "Exited (churn) status is the TARGET OUTCOME for customer retention analysis. Indicates whether customer left the bank. Business goal is to predict and prevent churn. High churn rate impacts revenue, market share, and customer acquisition costs.",
                     "violation_impact": "BUSINESS: Loss of customers and revenue. FINANCIAL: Acquisition cost wasted, lifetime value loss. STRATEGIC: Market share reduction, competitive disadvantage."
                 }
+            },
+            
+            # ============================================
+            # NEW BANKING CONCEPTS (EXPANSION)
+            # ============================================
+            "card_present_flag": {
+                "domain": "Transaction",
+                "name_patterns": ["card_present_flag", "cp_flag", "card_present", "is_card_present"],
+                "data_patterns": {
+                    "type": ["text", "boolean"],
+                    "uniqueness": "very_low",
+                    "cardinality": {"max": 5},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Transaction": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Boolean (Y/N, 1/0, Yes/No)",
+                    "allowed_values": ["Y", "N", "Yes", "No", "1", "0"],
+                    "reason": "Indicates if the physical card was present during the transaction. different fraud rules apply for CP (Card Present) vs CNP (Card Not Present).",
+                    "violation_impact": "BUSINESS: Incorrect fraud detection logic. FINANCIAL: Increased fraud risk for CNP transactions."
+                }
+            },
+            "bpay_biller_code": {
+                "domain": "Transaction",
+                "name_patterns": ["bpay_biller_code", "biller_code", "bpay_code"],
+                "data_patterns": {
+                    "type": ["numeric", "alphanumeric"],
+                    "uniqueness": "low",
+                    "length": {"min": 3, "max": 10},
+                    "nullable": True
+                },
+                "is_identifier": False,
+                "table_role": {"Transaction": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": False,  # Only for BPAY txns
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Numeric or Alphanumeric code",
+                    "allowed_values": None,
+                    "reason": "Identifies the biller for BPAY transactions. Essential for routing payments to the correct utility or merchant organization.",
+                    "violation_impact": "BUSINESS: Payment routing failures. FINANCIAL: Incorrect settlements. CUSTOMER: Bill payment failures."
+                }
+            },
+            "txn_description": {
+                "domain": "Transaction",
+                "name_patterns": ["txn_description", "transaction_description", "narration", "description", "details"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "medium",
+                    "length": {"min": 5, "max": 200},
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"Transaction": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Free text description",
+                    "allowed_values": None,
+                    "reason": "Provides context for the transaction (e.g., 'Woolworths Suburb', 'Netflix Subscription'). Critical for customer understanding and statement narration.",
+                    "violation_impact": "CUSTOMER: Unclear statements. BUSINESS: Customer support calls increase."
+                }
+            },
+            "merchant_id": {
+                "domain": "Merchant",
+                "name_patterns": ["merchant_id", "merch_id", "mid", "merchant_identifier"],
+                "data_patterns": {
+                    "type": ["alphanumeric"],
+                    "uniqueness": "low",  # Repeats across transactions
+                    "length": {"min": 5, "max": 30},
+                    "nullable": True  # Only for merchant txns
+                },
+                "is_identifier": True,
+                "table_role": {"Merchant": "PK", "Transaction": "FK"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": False,
+                    "primary_key": False,
+                    "foreign_key": True,
+                    "format": "Alphanumeric identifier",
+                    "allowed_values": None,
+                    "reason": "Uniquely identifies the merchant. Used for settlement, fee calculation, and merchant analytics.",
+                    "violation_impact": "BUSINESS: Valid merchant identification failure. FINANCIAL: Settlement errors."
+                }
+            },
+            "merchant_code": {
+                "domain": "Merchant",
+                "name_patterns": ["merchant_code", "mcc", "merchant_category_code", "category_code"],
+                "data_patterns": {
+                    "type": ["numeric"],
+                    "uniqueness": "low",
+                    "length": {"min": 4, "max": 4},
+                    "nullable": True
+                },
+                "is_identifier": False,
+                "table_role": {"Merchant": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": False,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "4-digit Numeric Code (Standard MCC)",
+                    "allowed_values": None,
+                    "reason": "Classifies the merchant's business type (e.g., 5411 for Grocery Stores). Used for rewards, cashback logic, and risk categorization.",
+                    "violation_impact": "BUSINESS: Incorrect reward calculation. APPLICATION: Spend categorization errors."
+                }
+            },
+            "merchant_suburb": {
+                "domain": "Merchant",
+                "name_patterns": ["merchant_suburb", "suburb", "merchant_city"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "low",
+                    "nullable": True
+                },
+                "is_identifier": False,
+                "table_role": {"Merchant": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": False,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Text (Suburb Name)",
+                    "allowed_values": None,
+                    "reason": "Location of the merchant. Used for geo-analysis and location-based fraud detection.",
+                    "violation_impact": "BUSINESS: Inaccurate location insights. RISK: Reduced fraud detection capability."
+                }
+            },
+            "merchant_state": {
+                "domain": "Merchant",
+                "name_patterns": ["merchant_state", "state_code", "merchant_province"],
+                "data_patterns": {
+                    "type": ["text"],
+                    "uniqueness": "very_low",
+                    "length": {"min": 2, "max": 3},
+                    "nullable": True
+                },
+                "is_identifier": False,
+                "table_role": {"Merchant": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": False,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Valid State Code (e.g., NSW, VIC, CA, NY)",
+                    "allowed_values": None,
+                    "reason": "State/Province of the merchant. Used for regional analysis and tax compliance.",
+                    "violation_impact": "COMPLIANCE: Regional tax reporting errors. BUSINESS: Regional spend analysis failure."
+                }
+            },
+            "long_lat": {
+                "domain": "Customer",
+                "name_patterns": ["long_lat", "lat_long", "coordinates", "geo_location", "customer_location"],
+                "data_patterns": {
+                    "type": ["numeric", "text"],
+                    "uniqueness": "medium",
+                    "nullable": True
+                },
+                "is_identifier": False,
+                "table_role": {"Customer": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": False,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Decimal Degrees (Latitude, Longitude)",
+                    "allowed_values": None,
+                    "reason": "Geographic coordinates of the customer or transaction origin. Critical for real-time location checks and fraud anomalies.",
+                    "violation_impact": "RISK: Fraud detection bypass. BUSINESS: Location intelligence missing."
+                }
+            },
+            "merchant_long_lat": {
+                "domain": "Merchant",
+                "name_patterns": ["merchant_long_lat", "merchant_coordinates", "store_location"],
+                "data_patterns": {
+                    "type": ["numeric", "text"],
+                    "uniqueness": "medium",
+                    "nullable": True
+                },
+                "is_identifier": False,
+                "table_role": {"Merchant": "descriptive"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": False,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "Decimal Degrees (Latitude, Longitude)",
+                    "allowed_values": None,
+                    "reason": "Geographic coordinates of the merchant. Used to calculate distance from customer home location for fraud rules.",
+                    "violation_impact": "RISK: Distance-based fraud rules won't fail. BUSINESS: Merchant mapping features fail."
+                }
+            },
+            "extraction": {
+                "domain": "System",
+                "name_patterns": ["extraction", "extraction_id", "batch_id", "run_id", "load_id"],
+                "data_patterns": {
+                    "type": ["numeric", "alphanumeric"],
+                    "uniqueness": "low",
+                    "nullable": False
+                },
+                "is_identifier": False,
+                "table_role": {"System": "metadata"},
+                "business_rules": {
+                    "unique": False,
+                    "mandatory": True,
+                    "primary_key": False,
+                    "foreign_key": False,
+                    "format": "System generated ID",
+                    "allowed_values": None,
+                    "reason": "Technical metadata field tracking the ETL batch or extraction run. Used for data lineage and auditing.",
+                    "violation_impact": "TECHNICAL: Data lineage broken. COMPLIANCE: Audit trail gaps."
+                }
             }
         }
     
