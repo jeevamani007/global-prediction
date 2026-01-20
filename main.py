@@ -1214,18 +1214,33 @@ async def upload_file(file: UploadFile = File(...)):
             traceback.print_exc()
             core_banking_rules_result = {"error": str(e)}
         
-        # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT)
+        # 🔥 ENHANCED BANKING DATA VALIDATION ENGINE (COMPREHENSIVE 23-COLUMN VALIDATION)
         banking_data_validation_result = None
+        enhanced_banking_validation_result = None
         try:
-            from banking_data_validation_engine import BankingDataValidationEngine
-            validation_engine = BankingDataValidationEngine()
-            banking_data_validation_result = validation_engine.validate_file(file_path)
-            print(f"Banking Data Validation Engine: Validated file with {len(banking_data_validation_result.get('fields', []))} fields")
+            # Use enhanced validation engine for comprehensive validation
+            from enhanced_banking_validation import EnhancedBankingValidationEngine
+            import pandas as pd
+            df = pd.read_csv(file_path)
+            enhanced_validation_engine = EnhancedBankingValidationEngine()
+            enhanced_banking_validation_result = enhanced_validation_engine.validate_file(file_path, df)
+            print(f"Enhanced Banking Validation Engine: Validated file with {enhanced_banking_validation_result.get('summary', {}).get('total_columns', 0)} columns")
+            
+            # Keep legacy format for backward compatibility
+            banking_data_validation_result = enhanced_banking_validation_result
         except Exception as e:
-            print(f"Warning: Banking Data Validation Engine error: {str(e)}")
+            print(f"Warning: Enhanced Banking Validation Engine error: {str(e)}")
             import traceback
             traceback.print_exc()
-            banking_data_validation_result = {"error": str(e)}
+            # Fallback to basic validation
+            try:
+                from banking_data_validation_engine import BankingDataValidationEngine
+                validation_engine = BankingDataValidationEngine()
+                banking_data_validation_result = validation_engine.validate_file(file_path)
+            except Exception as fallback_e:
+                print(f"Warning: Fallback validation also failed: {str(fallback_e)}")
+                banking_data_validation_result = {"error": str(e)}
+            enhanced_banking_validation_result = banking_data_validation_result
 
         # 🔥 DYNAMIC BUSINESS RULES VALIDATOR WITH APPLICATION TYPE PREDICTION
         dynamic_business_rules_result = None
@@ -1593,6 +1608,8 @@ async def upload_file(file: UploadFile = File(...)):
                 "file_type": "SQL" if file.filename.lower().endswith('.sql') else "CSV/Excel",
                 # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT)
                 "banking_data_validation": banking_data_validation_result,
+                # 🔥 ENHANCED BANKING VALIDATION (COMPREHENSIVE 23 COLUMNS)
+                "enhanced_banking_validation": enhanced_banking_validation_result,
                 "banking": banking_result,
                 "banking_account_validation": banking_result.get("account_number_validation"),
                 "banking_account_check": banking_result.get("account_number_check"),
@@ -1735,21 +1752,27 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
         except Exception as e:
             print(f"Warning: Core Banking Business Rules Engine initialization error: {str(e)}")
         
-        # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT) - MULTI-FILE
+        # 🔥 ENHANCED BANKING DATA VALIDATION ENGINE (MULTI-FILE) - COMPREHENSIVE 23-COLUMN VALIDATION
         banking_data_validation_results = {}
+        enhanced_banking_validation_results = {}
         try:
-            from banking_data_validation_engine import BankingDataValidationEngine
-            validation_engine = BankingDataValidationEngine()
+            from enhanced_banking_validation import EnhancedBankingValidationEngine
+            import pandas as pd
+            enhanced_validation_engine = EnhancedBankingValidationEngine()
             
             for file_path in file_paths:
                 try:
                     file_name = os.path.basename(file_path)
-                    validation_result = validation_engine.validate_file(file_path)
-                    banking_data_validation_results[file_name] = validation_result
+                    df = pd.read_csv(file_path)
+                    enhanced_validation_result = enhanced_validation_engine.validate_file(file_path, df)
+                    enhanced_banking_validation_results[file_name] = enhanced_validation_result
+                    # Keep legacy format for backward compatibility
+                    banking_data_validation_results[file_name] = enhanced_validation_result
                 except Exception as e:
-                    print(f"Warning: Banking Data Validation failed for {file_path}: {str(e)}")
+                    print(f"Warning: Enhanced Banking Validation failed for {file_path}: {str(e)}")
                     file_name = os.path.basename(file_path)
                     banking_data_validation_results[file_name] = {"error": str(e)}
+                    enhanced_banking_validation_results[file_name] = {"error": str(e)}
         except Exception as e:
             print(f"Warning: Banking Data Validation Engine initialization error: {str(e)}")
         
@@ -1817,6 +1840,8 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     "total_files": result.get("total_files", len(file_paths)),
                     # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT)
                     "banking_data_validation": banking_data_validation_results,
+                    # 🔥 ENHANCED BANKING VALIDATION (COMPREHENSIVE 23 COLUMNS)
+                    "enhanced_banking_validation": enhanced_banking_validation_results,
                     # 🔥 CORE BANKING BUSINESS RULES ENGINE (PRIMARY - RUNS FIRST)
                     "core_banking_business_rules": core_banking_rules_results,
                     "banking": banking_result,
@@ -1883,6 +1908,11 @@ async def account_page(request: Request):
 async def account_page_html(request: Request):
     """Return the account.html page (html suffix)"""
     return templates.TemplateResponse("account.html", {"request": request})
+
+@app.get("/banking_validation", response_class=HTMLResponse)
+async def banking_validation_page(request: Request):
+    """Return the banking_validation.html page for detailed field-level validation results"""
+    return templates.TemplateResponse("banking_validation.html", {"request": request})
 
 
 if __name__ == "__main__":

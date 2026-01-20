@@ -1,0 +1,237 @@
+{
+  "file_name": "test_banking_validation_data.csv",
+  "status": "INVALID",
+  "columns": [
+    {
+      "column_name": "customer_id",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "INVALID",
+      "definition": "A unique identifier assigned to each customer in the banking system. This is the primary key that links all customer accounts, transactions, and services.",
+      "condition": "8-12 alphanumeric characters, optionally starting with CUST",
+      "violations": [
+        "Contains 1 duplicate values but must be unique"
+      ],
+      "warnings": [],
+      "action": {
+        "issue": "This Customer ID already exists in our system. Each customer must have a unique ID.",
+        "why_required": "Without a valid Customer ID, we cannot uniquely identify you in our banking system",
+        "what_to_do": "Please correct the issues listed above",
+        "blocked_actions": [
+          "Account creation",
+          "Transaction processing",
+          "Service enrollment"
+        ]
+      }
+    },
+    {
+      "column_name": "customer_name",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "VALID",
+      "definition": "The full legal name of the customer as per government-issued identification. Critical for KYC compliance and legal documentation.",
+      "condition": "2-100 characters, letters, spaces, hyphens, apostrophes only",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Customer name is complete and properly formatted",
+        "usage": [
+          "Appears on all official documents (statements, certificates, cards)",
+          "Used for KYC verification against government IDs",
+          "Required for legal agreements and contracts",
+          "Displayed in customer communication"
+        ],
+        "next_steps": "Name will be used for all official correspondence"
+      }
+    },
+    {
+      "column_name": "age",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "VALID",
+      "definition": "Customer's age in years. Determines account eligibility, product offerings, and regulatory requirements (minor accounts, senior citizen benefits).",
+      "condition": "Numeric value between 0-150",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Age is within acceptable range and verified",
+        "usage": [
+          "Determines eligible account types (minor/regular/senior)",
+          "Triggers special benefits (senior citizen interest rates)",
+          "Required for risk assessment and insurance products",
+          "Used for regulatory compliance (minors need guardians)"
+        ],
+        "next_steps": "Age-appropriate products and services will be offered"
+      }
+    },
+    {
+      "column_name": "phone_number",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "VALID",
+      "definition": "Customer's primary contact number for banking alerts, OTPs, and transaction notifications. Critical security parameter for two-factor authentication.",
+      "condition": "10-digit number starting with 6-9 (India) or international format",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Phone number is correctly formatted and verified via OTP",
+        "usage": [
+          "Transaction alerts and notifications (SMS/WhatsApp)",
+          "OTP for secure login and transaction authorization",
+          "Account recovery and password reset",
+          "Fraud detection alerts",
+          "UPI registration"
+        ],
+        "next_steps": "You'll receive all banking alerts on this number"
+      },
+      "masked_sample": "******3210",
+      "display_note": "Sensitive data is masked for security"
+    },
+    {
+      "column_name": "email",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "INVALID",
+      "definition": "Customer's email address for official communications, e-statements, and online banking credentials.",
+      "condition": "Valid email format (e.g., name@example.com)",
+      "violations": [
+        "1 values do not match required format: Valid email format (e.g., name@example.com)"
+      ],
+      "warnings": [],
+      "action": {
+        "issue": "Please enter a valid email address (e.g., name@example.com).",
+        "why_required": "Needed for e-statements, online banking, and official communications",
+        "what_to_do": "Please correct the issues listed above",
+        "blocked_actions": [
+          "Online banking setup",
+          "E-statement enrollment"
+        ]
+      },
+      "masked_sample": "r***@gmail.com",
+      "display_note": "Sensitive data is masked for security"
+    },
+    {
+      "column_name": "account_number",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "INVALID",
+      "definition": "A unique identifier for each bank account. Core reference for all transactions, balances, and banking operations.",
+      "condition": "10-16 digits only",
+      "violations": [
+        "1 values do not match required format: 10-16 digits only"
+      ],
+      "warnings": [],
+      "action": {
+        "issue": "Account number must be 10-16 digits only.",
+        "why_required": "Account number is the fundamental identifier for all banking operations",
+        "what_to_do": "Please correct the issues listed above",
+        "blocked_actions": [
+          "ALL transactions blocked until valid account number assigned"
+        ]
+      },
+      "masked_sample": "*****7890",
+      "display_note": "Sensitive data is masked for security"
+    },
+    {
+      "column_name": "account_type",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "INVALID",
+      "definition": "The category of bank account determining features, benefits, transaction limits, and fees.",
+      "condition": "Standard banking validation rules",
+      "violations": [
+        "Contains invalid values: INVALID_TYPE. Allowed: SAVINGS, CURRENT, SALARY, FIXED_DEPOSIT, RECURRING_DEPOSIT, ZERO_BALANCE, SENIOR_CITIZEN"
+      ],
+      "warnings": [],
+      "action": {
+        "issue": "Invalid account type. Please select from: Savings, Current, Salary, Fixed Deposit, Recurring Deposit, Zero Balance, Senior Citizen.",
+        "why_required": "Determines interest rates, fees, and account features",
+        "what_to_do": "Please correct the issues listed above",
+        "blocked_actions": [
+          "Interest calculation",
+          "Fee application",
+          "Benefit enrollment"
+        ]
+      }
+    },
+    {
+      "column_name": "account_status",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "VALID",
+      "definition": "Current operational state of the account, indicating whether transactions are allowed, restricted, or blocked.",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Account status is clearly defined",
+        "usage": [
+          "ACTIVE: All transactions allowed",
+          "INACTIVE: Read-only access, reactivation required",
+          "DORMANT: Auto-flagged after 2 years inactivity",
+          "FROZEN: All transactions blocked, legal clearance needed",
+          "CLOSED: No operations allowed"
+        ],
+        "next_steps": "Transaction rules applied based on status"
+      }
+    },
+    {
+      "column_name": "balance",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "VALID",
+      "definition": "Current available balance in the account, representing total funds available for transactions.",
+      "condition": "Numeric value, can be negative for overdraft accounts",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Balance is properly recorded and meets account requirements",
+        "usage": [
+          "Determines available funds for withdrawals/transfers",
+          "Checked before transaction authorization",
+          "Used for minimum balance fee calculation",
+          "Interest calculation on average monthly balance",
+          "Overdraft limit monitoring"
+        ],
+        "next_steps": "Balance available for authorized transactions"
+      }
+    },
+    {
+      "column_name": "transaction_amount",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "INVALID",
+      "definition": "The monetary value of a financial transaction (deposit, withdrawal, transfer).",
+      "condition": "Positive numeric value, up to 2 decimal places",
+      "violations": [
+        "1 values are below minimum of 0.01"
+      ],
+      "warnings": [],
+      "action": {
+        "issue": "Field has validation issues",
+        "why_required": "Amount determines debit/credit value and regulatory compliance",
+        "what_to_do": "Please correct the issues listed above",
+        "blocked_actions": [
+          "Transaction will not be processed"
+        ]
+      }
+    },
+    {
+      "column_name": "transaction_type",
+      "file_name": "test_banking_validation_data.csv",
+      "status": "INVALID",
+      "definition": "The category of transaction indicating the nature of the operation - debit (outflow) or credit (inflow).",
+      "condition": "Standard banking validation rules",
+      "violations": [
+        "Contains invalid values: INVALID. Allowed: DEBIT, DR, CREDIT, CR, WITHDRAWAL, DEPOSIT, TRANSFER, SALARY, FEE, INTEREST, REVERSAL"
+      ],
+      "warnings": [],
+      "action": {
+        "issue": "Invalid transaction type. Use: DEBIT, CREDIT, WITHDRAWAL, DEPOSIT, TRANSFER, SALARY, FEE, INTEREST, or REVERSAL.",
+        "why_required": "Type determines how transaction affects account balance",
+        "what_to_do": "Please correct the issues listed above",
+        "blocked_actions": [
+          "Transaction cannot be processed"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "total_columns": 11,
+    "valid_count": 5,
+    "warning_count": 0,
+    "invalid_count": 6,
+    "message": "File 'test_banking_validation_data.csv' has 6 field(s) that require correction. Please correct these fields before the upload can proceed. 5 field(s) are valid and 0 field(s) have warnings."
+  },
+  "can_proceed": false
+}

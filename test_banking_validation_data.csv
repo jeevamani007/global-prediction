@@ -1,0 +1,6 @@
+customer_id,customer_name,age,phone_number,email,account_number,account_type,account_status,balance,transaction_amount,transaction_type
+CUST00001,Rajesh Kumar,35,9876543210,rajesh@gmail.com,1234567890,SAVINGS,ACTIVE,50000,1000,CREDIT
+CUST00002,Priya Sharma,28,9123456789,priya.s@yahoo.com,9876543211,CURRENT,ACTIVE,150000,5000,DEBIT
+CUST00003,Amit Patel,45,8765432109,amit.patel@outlook.com,5432167890,SALARY,ACTIVE,75000,2000,TRANSFER
+CUST00001,Mohammed Ali,52,7654321098,invalid-email,invalid123,INVALID_TYPE,DORMANT,-5000,0,INVALID
+CUST00005,Sunita Reddy,65,6543210987,sunita.r@gmail.com,3456789012,SENIOR_CITIZEN,ACTIVE,200000,10000,WITHDRAWAL
