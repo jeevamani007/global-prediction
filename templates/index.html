@@ -689,6 +689,9 @@
             // Store Core Banking Business Rules (PRIORITY - Runs First)
             if (data.core_banking_business_rules) sessionStorage.setItem('coreBankingBusinessRules', JSON.stringify(data.core_banking_business_rules));
 
+            // Store new standardized business rules (Definition / Condition / Action per column)
+            if (data.standard_business_rules) sessionStorage.setItem('standardBusinessRules', JSON.stringify(data.standard_business_rules));
+
             // Store dynamic business rules and application type prediction
             if (data.dynamic_business_rules) sessionStorage.setItem('dynamicBusinessRules', JSON.stringify(data.dynamic_business_rules));
             if (data.application_type_prediction) sessionStorage.setItem('applicationTypePrediction', JSON.stringify(data.application_type_prediction));
