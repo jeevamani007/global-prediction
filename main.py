@@ -1217,6 +1217,19 @@ async def upload_file(file: UploadFile = File(...)):
             import traceback
             traceback.print_exc()
             core_banking_rules_result = {"error": str(e)}
+        
+        # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT)
+        banking_data_validation_result = None
+        try:
+            from banking_data_validation_engine import BankingDataValidationEngine
+            validation_engine = BankingDataValidationEngine()
+            banking_data_validation_result = validation_engine.validate_file(file_path)
+            print(f"Banking Data Validation Engine: Validated file with {len(banking_data_validation_result.get('fields', []))} fields")
+        except Exception as e:
+            print(f"Warning: Banking Data Validation Engine error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            banking_data_validation_result = {"error": str(e)}
 
         # 🔥 DYNAMIC BUSINESS RULES VALIDATOR WITH APPLICATION TYPE PREDICTION
         dynamic_business_rules_result = None
@@ -1582,6 +1595,8 @@ async def upload_file(file: UploadFile = File(...)):
                 "message": "File analyzed successfully",
                 "filename": file.filename,
                 "file_type": "SQL" if file.filename.lower().endswith('.sql') else "CSV/Excel",
+                # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT)
+                "banking_data_validation": banking_data_validation_result,
                 "banking": banking_result,
                 "banking_account_validation": banking_result.get("account_number_validation"),
                 "banking_account_check": banking_result.get("account_number_check"),
@@ -1724,6 +1739,24 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
         except Exception as e:
             print(f"Warning: Core Banking Business Rules Engine initialization error: {str(e)}")
         
+        # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT) - MULTI-FILE
+        banking_data_validation_results = {}
+        try:
+            from banking_data_validation_engine import BankingDataValidationEngine
+            validation_engine = BankingDataValidationEngine()
+            
+            for file_path in file_paths:
+                try:
+                    file_name = os.path.basename(file_path)
+                    validation_result = validation_engine.validate_file(file_path)
+                    banking_data_validation_results[file_name] = validation_result
+                except Exception as e:
+                    print(f"Warning: Banking Data Validation failed for {file_path}: {str(e)}")
+                    file_name = os.path.basename(file_path)
+                    banking_data_validation_results[file_name] = {"error": str(e)}
+        except Exception as e:
+            print(f"Warning: Banking Data Validation Engine initialization error: {str(e)}")
+        
         # Process multiple files using multi-file processor
         try:
             multi_file_processor = MultiFileProcessor()
@@ -1786,6 +1819,8 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     "message": "Files analyzed successfully",
                     "multi_file_mode": True,
                     "total_files": result.get("total_files", len(file_paths)),
+                    # 🔥 BANKING DATA VALIDATION ENGINE (UI-FRIENDLY FORMAT)
+                    "banking_data_validation": banking_data_validation_results,
                     # 🔥 CORE BANKING BUSINESS RULES ENGINE (PRIMARY - RUNS FIRST)
                     "core_banking_business_rules": core_banking_rules_results,
                     "banking": banking_result,
