@@ -1,0 +1,4 @@
+customer_id,customer_name,account_number,account_type,branch_code,branch_name,ifsc_verified,customer_category,account_open_date,account_closure_date,daily_transaction_limit,monthly_transaction_limit,atm_withdrawal_limit,otp_verified,login_attempts,account_lock_status,transaction_channel,transaction_status,reversal_flag,aml_alert_flag,suspicious_txn_score,customer_consent,statement_cycle,notification_preference
+CUST00001,Rajesh Kumar,1234567890,SAVINGS,BR001,Main Branch,TRUE,VIP,2020-01-15,,50000,500000,10000,TRUE,0,UNLOCKED,INTERNET_BANKING,SUCCESS,FALSE,FALSE,15,TRUE,MONTHLY,ALL
+CUST00002,Priya Sharma,9876543211,CURRENT,BR002,City Center Branch,TRUE,STANDARD,2021-06-10,,100000,1000000,20000,TRUE,1,UNLOCKED,MOBILE_APP,SUCCESS,FALSE,FALSE,25,TRUE,QUARTERLY,EMAIL
+CUST00003,Amit Patel,5432167890,SALARY,INVALID,Downtown Branch,FALSE,SENIOR_CITIZEN,2019-03-22,,25000,250000,5000,FALSE,0,UNLOCKED,ATM,PENDING,FALSE,FALSE,35,TRUE,MONTHLY,SMS

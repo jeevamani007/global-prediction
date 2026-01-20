@@ -1,0 +1,493 @@
+{
+  "file_name": "test_extended_validation.csv",
+  "status": "VALID",
+  "columns": [
+    {
+      "column_name": "customer_id",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "A unique identifier assigned to each customer in the banking system. This is the primary key that links all customer accounts, transactions, and services.",
+      "condition": "8-12 alphanumeric characters, optionally starting with CUST",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Customer ID is unique and properly formatted",
+        "usage": [
+          "Links all accounts, transactions, and services to this customer",
+          "Used for customer identification in all banking operations",
+          "Required for KYC compliance and audit trails",
+          "Enables personalized banking services"
+        ],
+        "next_steps": "Customer record is ready for account creation/transaction processing"
+      }
+    },
+    {
+      "column_name": "customer_name",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "The full legal name of the customer as per government-issued identification. Critical for KYC compliance and legal documentation.",
+      "condition": "2-100 characters, letters, spaces, hyphens, apostrophes only",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Customer name is complete and properly formatted",
+        "usage": [
+          "Appears on all official documents (statements, certificates, cards)",
+          "Used for KYC verification against government IDs",
+          "Required for legal agreements and contracts",
+          "Displayed in customer communication"
+        ],
+        "next_steps": "Name will be used for all official correspondence"
+      }
+    },
+    {
+      "column_name": "account_number",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "A unique identifier for each bank account. Core reference for all transactions, balances, and banking operations.",
+      "condition": "10-16 digits only",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Account number is unique and active in the system",
+        "usage": [
+          "Primary identifier for all transactions (deposit, withdrawal, transfer)",
+          "Used in NEFT/RTGS/IMPS transfers",
+          "Required for salary credits and direct deposits",
+          "Links to debit/credit cards",
+          "Reference for balance inquiries"
+        ],
+        "next_steps": "Use this account number for all banking transactions"
+      },
+      "masked_sample": "*****7890",
+      "display_note": "Sensitive data is masked for security"
+    },
+    {
+      "column_name": "account_type",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "The category of bank account determining features, benefits, transaction limits, and fees.",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Account type is recognized and properly configured",
+        "usage": [
+          "Determines interest rates",
+          "Sets transaction limits",
+          "Defines minimum balance requirements",
+          "Triggers fees and charges",
+          "Enables type-specific features"
+        ],
+        "next_steps": "Account rules and benefits applied based on this type"
+      }
+    },
+    {
+      "column_name": "branch_code",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Unique alphanumeric code identifying a specific bank branch. Used for routing transactions and branch-level reporting.",
+      "condition": "4-10 alphanumeric characters, uppercase",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Branch code is correctly formatted and registered",
+        "usage": [
+          "Links customer account to specific branch",
+          "Used in branch-level transaction reporting",
+          "Enables branch-specific services and offers",
+          "Required for internal audit and reconciliation",
+          "Determines branch jurisdiction for legal matters"
+        ],
+        "next_steps": "Branch code verified; branch services enabled"
+      }
+    },
+    {
+      "column_name": "branch_name",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Full name of the bank branch where the account is maintained. Used for customer reference and correspondence.",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Branch name is complete and verified",
+        "usage": [
+          "Displayed on account statements and documents",
+          "Used for customer identification of home branch",
+          "Printed on cheque books and cards",
+          "Reference for branch locator services",
+          "Required for legal documentation"
+        ],
+        "next_steps": "Branch name will appear on all official documents"
+      }
+    },
+    {
+      "column_name": "ifsc_verified",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Boolean flag indicating whether the IFSC code has been verified against RBI's official database.",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "IFSC code verification status is recorded",
+        "usage": [
+          "Ensures IFSC is valid and registered with RBI",
+          "Prevents transaction failures due to invalid IFSC",
+          "Required for enabling online fund transfers",
+          "Compliance with NPCI guidelines",
+          "Reduces fraud risk from fake IFSC codes"
+        ],
+        "next_steps": "IFSC verified; online transfers enabled"
+      }
+    },
+    {
+      "column_name": "customer_category",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Classification of customer based on relationship value, demographics, or business criteria (e.g., VIP, Senior Citizen, Student, Standard).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Customer category is properly classified",
+        "usage": [
+          "Determines service priority and benefits",
+          "Triggers category-specific interest rates",
+          "Enables special discounts and offers",
+          "Sets minimum balance requirements",
+          "Defines fee waiver eligibility"
+        ],
+        "next_steps": "Category-specific benefits applied to account"
+      }
+    },
+    {
+      "column_name": "account_open_date",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "The date when the account was officially opened and became active. Used for calculating account age and anniversary benefits.",
+      "condition": "Valid past date (YYYY-MM-DD or DD-MM-YYYY)",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Account opening date is recorded and valid",
+        "usage": [
+          "Calculates account age for loyalty benefits",
+          "Determines eligibility for tenure-based offers",
+          "Used in dormancy calculations (no activity for 2 years)",
+          "Required for audit and compliance reporting",
+          "Triggers anniversary rewards and notifications"
+        ],
+        "next_steps": "Account age tracked; loyalty benefits enabled"
+      }
+    },
+    {
+      "column_name": "account_closure_date",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "The date when the account was closed. NULL for active accounts. Used for archival and compliance tracking.",
+      "condition": "Valid date (YYYY-MM-DD or DD-MM-YYYY), NULL if account active",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Account closure date is recorded (account closed)",
+        "usage": [
+          "Marks account as permanently closed",
+          "Triggers final statement generation",
+          "Used in archived records retention",
+          "Compliance with regulatory record-keeping (7 years)",
+          "Prevents reopening of closed accounts"
+        ],
+        "next_steps": "Account archived; no further transactions allowed"
+      }
+    },
+    {
+      "column_name": "daily_transaction_limit",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Maximum amount that can be transacted per day across all channels. Used for fraud prevention and risk management.",
+      "condition": "Positive numeric value (\u20b9)",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Daily transaction limit is set and active",
+        "usage": [
+          "Prevents unauthorized high-value transactions",
+          "Fraud detection and prevention",
+          "Customizable based on customer profile",
+          "Varies by account type and risk classification",
+          "Can be temporarily increased for specific needs"
+        ],
+        "next_steps": "Transactions monitored against daily limit"
+      }
+    },
+    {
+      "column_name": "monthly_transaction_limit",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Maximum amount that can be transacted per month. Used for expense tracking and budget management.",
+      "condition": "Positive numeric value (\u20b9)",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Monthly transaction limit is configured",
+        "usage": [
+          "Budget control and expense management",
+          "Risk mitigation for account abuse",
+          "Supports customer spending goals",
+          "Varies by account type and customer category",
+          "Alerts sent when approaching limit"
+        ],
+        "next_steps": "Monthly spending tracked; alerts enabled"
+      }
+    },
+    {
+      "column_name": "atm_withdrawal_limit",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Maximum amount that can be withdrawn from ATMs per day. Separate from overall daily transaction limit.",
+      "condition": "Positive numeric value (\u20b9), typically \u20b910,000-\u20b950,000",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "ATM withdrawal limit is set",
+        "usage": [
+          "Limits cash withdrawal from ATMs per day",
+          "Prevents card cloning fraud losses",
+          "Protects against unauthorized withdrawals",
+          "Can be customized via mobile/internet banking",
+          "Separate tracking from online/POS transactions"
+        ],
+        "next_steps": "ATM withdrawals monitored against limit"
+      }
+    },
+    {
+      "column_name": "otp_verified",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Boolean flag indicating whether the customer's phone number has been verified via OTP (One-Time Password).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "OTP verification completed successfully",
+        "usage": [
+          "Enables two-factor authentication (2FA)",
+          "Allows OTP-based transaction authorization",
+          "Required for online banking activation",
+          "Validates phone number ownership",
+          "Mandatory for UPI and mobile banking"
+        ],
+        "next_steps": "OTP-based services enabled; 2FA active"
+      }
+    },
+    {
+      "column_name": "login_attempts",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Number of consecutive failed login attempts. Used for account security and automatic locking after threshold.",
+      "condition": "Integer value (0-10), auto-locks after threshold",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Login attempts tracked within safe threshold",
+        "usage": [
+          "Monitors failed login attempts",
+          "Triggers account lock after 5 failed attempts",
+          "Protects against brute-force attacks",
+          "Sends security alerts to customer",
+          "Resets after successful login"
+        ],
+        "next_steps": "Login attempts monitored; account secure"
+      }
+    },
+    {
+      "column_name": "account_lock_status",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Indicates whether the account is locked due to security reasons (failed logins, suspicious activity, or manual lock).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Account lock status is normal (UNLOCKED)",
+        "usage": [
+          "UNLOCKED: Normal account access",
+          "LOCKED: Temporary security lock, can be unlocked",
+          "TEMPORARILY_LOCKED: Auto-unlocks after 24 hours",
+          "PERMANENTLY_LOCKED: Requires manual intervention"
+        ],
+        "next_steps": "Account accessible; no lock restrictions"
+      }
+    },
+    {
+      "column_name": "transaction_channel",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "The channel through which the transaction was initiated (ATM, Internet Banking, Mobile App, Branch, POS).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Transaction channel is recognized",
+        "usage": [
+          "Categorizes transactions by channel",
+          "Channel-specific fee application",
+          "Fraud detection based on channel patterns",
+          "Performance analytics per channel",
+          "Enables channel-specific limits"
+        ],
+        "next_steps": "Transaction processed via specified channel"
+      }
+    },
+    {
+      "column_name": "transaction_status",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Current status of the transaction (Success, Pending, Failed, Reversed, In Process).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Transaction status is tracked",
+        "usage": [
+          "Determines transaction completion state",
+          "Triggers notifications based on status",
+          "Affects balance update timing",
+          "Used in reconciliation processes",
+          "Enables retry for failed transactions"
+        ],
+        "next_steps": "Status updated in real-time; notifications sent"
+      }
+    },
+    {
+      "column_name": "reversal_flag",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Boolean flag indicating whether the transaction is a reversal of a previous transaction (refund/chargeback).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Reversal flag status recorded",
+        "usage": [
+          "Identifies refund/reversal transactions",
+          "Restores balance for failed transactions",
+          "Links to original transaction for audit",
+          "Compliance with dispute resolution",
+          "Separate reporting for reversals"
+        ],
+        "next_steps": "Reversal processed; balance restored"
+      }
+    },
+    {
+      "column_name": "aml_alert_flag",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Anti-Money Laundering alert flag. TRUE if suspicious patterns detected requiring manual review.",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "AML monitoring status tracked",
+        "usage": [
+          "Flags suspicious transaction patterns",
+          "Triggers manual compliance review",
+          "Regulatory reporting (STR/CTR)",
+          "Prevents financial crimes",
+          "Customer due diligence (CDD/EDD)"
+        ],
+        "next_steps": "AML monitoring active; alerts generated for suspicious activity"
+      }
+    },
+    {
+      "column_name": "suspicious_txn_score",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Risk score (0-100) indicating likelihood of suspicious activity. Calculated by fraud detection algorithms.",
+      "condition": "Integer value 0-100 (0=safe, 100=highly suspicious)",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Suspicious transaction score calculated",
+        "usage": [
+          "0-30: Low risk (normal processing)",
+          "31-60: Medium risk (enhanced monitoring)",
+          "61-100: High risk (manual review required)",
+          "Machine learning based scoring",
+          "Updated with each transaction"
+        ],
+        "next_steps": "Score monitored; alerts triggered for high scores"
+      }
+    },
+    {
+      "column_name": "customer_consent",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Boolean flag indicating customer's consent for data sharing, marketing communications, and third-party services.",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Customer consent recorded",
+        "usage": [
+          "Compliance with data privacy regulations (GDPR, RBI guidelines)",
+          "Controls marketing communications",
+          "Third-party data sharing permissions",
+          "Can be withdrawn anytime",
+          "Affects service offerings and promotions"
+        ],
+        "next_steps": "Consent preferences applied to account"
+      }
+    },
+    {
+      "column_name": "statement_cycle",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Frequency of account statement generation and delivery (Monthly, Quarterly, Annually).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Statement cycle preference set",
+        "usage": [
+          "Determines statement generation frequency",
+          "Email/physical delivery as per preference",
+          "Available for download anytime",
+          "Compliance with regulatory requirements",
+          "Can be changed via internet banking"
+        ],
+        "next_steps": "Statements generated as per selected cycle"
+      }
+    },
+    {
+      "column_name": "notification_preference",
+      "file_name": "test_extended_validation.csv",
+      "status": "VALID",
+      "definition": "Customer's preferred channel for notifications (SMS, Email, Push, WhatsApp, All).",
+      "condition": "Standard banking validation rules",
+      "violations": [],
+      "warnings": [],
+      "action": {
+        "message": "Notification preference set",
+        "usage": [
+          "Sends alerts via preferred channel",
+          "Transaction notifications",
+          "Balance alerts",
+          "Security alerts (cannot be disabled)",
+          "Promotional messages (if consented)"
+        ],
+        "next_steps": "Notifications sent via preferred channel"
+      }
+    }
+  ],
+  "summary": {
+    "total_columns": 24,
+    "valid_count": 24,
+    "warning_count": 0,
+    "invalid_count": 0,
+    "message": "File 'test_extended_validation.csv' is valid and ready for processing. All 24 field(s) meet banking data requirements."
+  },
+  "can_proceed": true
+}

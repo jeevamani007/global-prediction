@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 class BankingValidationRules:
     """Centralized banking validation rules configuration"""
     
-    # Comprehensive validation rules for all 23 banking columns
+    # Comprehensive validation rules for all banking columns (23 core + 30 extended = 53 total)
     RULES = {
         "customer_id": {
             "definition": "A unique identifier assigned to each customer in the banking system. This is the primary key that links all customer accounts, transactions, and services.",
@@ -694,8 +694,51 @@ class BankingValidationRules:
                 "blocked_actions": ["Loan rejected if EMI > 50% of income", "Missed EMI leads to penalty and credit score damage"]
             },
             "name_patterns": ["emi_amount", "emi", "monthly_installment", "installment"]
+        },
+        
+        # ===== BRANCH INFORMATION MODULE (4 columns) =====
+        
+        "branch_code": {
+            "definition": "Equated Monthly Installment - the fixed monthly payment for loan repayment, including both principal and interest.",
+            "mandatory": False,
+            "unique": False,
+            "sensitive": False,
+            "data_type": "numeric",
+            "min_value": 0.01,
+            "max_value": 10000000,
+            "format_description": "Positive numeric value",
+            "action_valid": {
+                "message": "EMI is correctly calculated and affordable",
+                "usage": [
+                    "Auto-debited from account on EMI due date",
+                    "Part goes to principal repayment, part to interest",
+                    "Reduces outstanding loan balance each month",
+                    "Used for credit score calculation",
+                    "Standing instruction set for auto-debit"
+                ],
+                "next_steps": "EMI schedule created; auto-debit mandate registered"
+            },
+            "action_invalid": {
+                "missing_loan": "EMI amount calculation failed. Please recalculate.",
+                "exceeds_income": "❌ EMI exceeds 50% of monthly income. Loan may not be approved.",
+                "insufficient_balance": "⚠️ Insufficient balance for EMI debit. Maintain minimum balance by due date.",
+                "why_required": "EMI determines loan affordability and repayment tracking",
+                "blocked_actions": ["Loan rejected if EMI > 50% of income", "Missed EMI leads to penalty and credit score damage"]
+            },
+            "name_patterns": ["emi_amount", "emi", "monthly_installment", "installment"]
         }
     }
+    
+    # Merge extended rules on initialization
+    @classmethod
+    def _merge_extended_rules(cls):
+        """Merge extended banking rules into main RULES"""
+        try:
+            from extended_banking_validation_rules import EXTENDED_RULES
+            cls.RULES.update(EXTENDED_RULES)
+        except ImportError:
+            pass  # Extended rules file not available
+    
     
     @classmethod
     def get_rule(cls, column_name: str) -> Optional[Dict[str, Any]]:
@@ -768,3 +811,7 @@ class BankingValidationRules:
     def get_all_column_types(cls) -> List[str]:
         """Get list of all supported column types"""
         return list(cls.RULES.keys())
+
+# Merge extended rules on module import
+BankingValidationRules._merge_extended_rules()
+
