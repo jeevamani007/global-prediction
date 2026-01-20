@@ -831,20 +831,20 @@
         }
 
 
-        #business-rules .tab-content > div[style*="grid-template-columns"] {
+        #business-rules .tab-content>div[style*="grid-template-columns"] {
             grid-template-columns: 1fr 420px !important;
             gap: 16px !important;
         }
 
         @media (max-width: 1400px) {
-            #business-rules .tab-content > div[style*="grid-template-columns"] {
+            #business-rules .tab-content>div[style*="grid-template-columns"] {
                 grid-template-columns: 1fr 380px !important;
                 gap: 16px !important;
             }
         }
 
         @media (max-width: 1200px) {
-            #business-rules .tab-content > div[style*="grid-template-columns"] {
+            #business-rules .tab-content>div[style*="grid-template-columns"] {
                 grid-template-columns: 1fr !important;
             }
         }
@@ -877,7 +877,7 @@
             padding: 0 !important;
         }
 
-        #business-rules .card > div:not(.card-header) {
+        #business-rules .card>div:not(.card-header) {
             padding: 16px 20px;
         }
 
@@ -1113,7 +1113,8 @@
                     🏷️ Primary Domain Details
                 </h4>
                 <p style="color: var(--text-muted); margin-bottom: 20px;">
-                    Overview of primary domains identified for each file, including domain type, confidence score, and key characteristics.
+                    Overview of primary domains identified for each file, including domain type, confidence score, and
+                    key characteristics.
                 </p>
                 <div id="primaryDomainDetailsContent">
                     <div class="empty-state">
@@ -1250,7 +1251,8 @@
                             <h3 class="card-title">📋 Column Business Rules</h3>
                         </div>
                         <p style="color: var(--text-muted); margin-bottom: 16px;">
-                            Each column is analyzed with its Definition, Condition, and Action (why valid/invalid). Review each rule below.
+                            Each column is analyzed with its Definition, Condition, and Action (why valid/invalid).
+                            Review each rule below.
                         </p>
                         <div id="businessRulesContent">
                             <!-- Dynamic business rules will be inserted here -->
@@ -2112,7 +2114,7 @@
 
             try {
                 const columnAnalysis = JSON.parse(sessionStorage.getItem('columnRelationshipAnalysis') || 'null');
-                
+
                 if (!columnAnalysis || !columnAnalysis.file_domains || columnAnalysis.file_domains.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
@@ -2389,10 +2391,9 @@
                 const isWarning = status === 'WARNING';
 
                 return `
-                    <div class="business-rule-card" style="margin-bottom:0; border-left-width:5px; ${
-                        isInvalid
-                            ? 'border-left-color: var(--danger);'
-                            : isWarning
+                    <div class="business-rule-card" style="margin-bottom:0; border-left-width:5px; ${isInvalid
+                        ? 'border-left-color: var(--danger);'
+                        : isWarning
                             ? 'border-left-color: var(--warning);'
                             : 'border-left-color: var(--success);'
                     }">
@@ -2434,119 +2435,77 @@
 
             const renderFailedColumnCard = renderColumnCard; // Keep for backward compatibility
 
-            // Decide global validity across either single-file or multi-file
+            // Decide status and message
             const globalAllValid = isMulti
                 ? !!(standardRules.summary && standardRules.summary.all_valid)
                 : !!(standardRules.summary && standardRules.summary.all_valid);
 
-            // Show header with validation status
             let html = '';
             if (globalAllValid) {
                 html = `
-                    <div class="card" style="margin-bottom:16px;">
-                        <div class="card-header">
-                            <h3 class="card-title">✅ All details are valid and verified successfully</h3>
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                            <span style="font-size: 1.5rem;">✔</span>
+                            <h3 style="color: #166534; margin: 0; font-size: 1.25rem; font-weight: 700;">All Details Valid</h3>
                         </div>
-                        <div style="color: var(--text-muted); font-size:0.95rem; line-height:1.7;">
-                            - All required banking fields passed format/policy checks.<br>
-                            - The bank can safely use this data for security, limits, AML checks, and notifications (sensitive values stay masked).
-                        </div>
+                        <p style="color: #166534; font-size: 1rem; margin-bottom: 0;">
+                            Your banking data has been verified against core business rules. All mandatory fields and formats are correct, and no critical issues were found.
+                        </p>
                     </div>
                 `;
             } else {
                 html = `
-                    <div class="card" style="margin-bottom:12px;">
-                        <div class="card-header">
-                            <h3 class="card-title">⚠️ Some fields need attention</h3>
+                    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                            <span style="font-size: 1.5rem;">⚠️</span>
+                            <h3 style="color: #92400e; margin: 0; font-size: 1.25rem; font-weight: 700;">Some Details Need Attention</h3>
                         </div>
-                        <div style="color: var(--text-muted); font-size:0.95rem; line-height:1.7;">
-                            Review the business rules below. Fields marked as INVALID or WARNING need to be corrected.
-                        </div>
+                        <p style="color: #92400e; font-size: 1rem; margin-bottom: 0;">
+                            We identified some fields that require review or correction based on banking rules. Please address the issues listed below to ensure full processing.
+                        </p>
                     </div>
                 `;
             }
 
-            // Helper function to render a single column rule card (one by one format)
+            // Helper function to render a single column rule card (simplified format)
             const renderColumnRuleCard = (col, fileLabel) => {
-                const full = {
-                    ...col,
-                    issues: Array.isArray(col.issues) ? col.issues : [],
-                    ui_issue_message: col.ui_issue_message || '',
-                    action_valid_points: Array.isArray(col.action_valid_points) ? col.action_valid_points : [],
-                    action_invalid_points: Array.isArray(col.action_invalid_points) ? col.action_invalid_points : []
-                };
-                const status = (full.status || 'UNKNOWN').toUpperCase();
-                const displayName = full.display_name || full.original_column_name || full.column_name || 'Column';
-                const field = full.original_column_name || full.column_name || '';
-                const issues = (full.issues || []).filter(Boolean);
-                const cardClass = status === 'VALID' ? 'valid' : (status === 'WARNING' ? 'warning' : (status === 'INVALID' ? 'invalid' : 'warning'));
+                const status = (col.status || 'UNKNOWN').toUpperCase();
+                const displayName = col.display_name || col.column_name || 'Column';
+                const field = col.original_column_name || col.column_name || '';
+                const isSensitive = !!col.is_sensitive;
+                const fieldDisplay = isSensitive ? '••••••••' : field;
 
-                const renderPoints = (arr, fallbackText) => {
-                    const pts = Array.isArray(arr) ? arr.filter(Boolean) : [];
-                    const p = pts.length ? pts : (fallbackText ? [fallbackText] : []);
-                    if (!p.length) return '<li style="color: var(--text-muted); font-style: italic;">No specific points available.</li>';
-                    return p.map(x => `<li>${escapeHtml(x)}</li>`).join('');
-                };
+                const validAction = col.action_valid || 'Ready for banking processes.';
+                const invalidAction = col.ui_issue_message || col.action_invalid || 'Fix this detail to proceed.';
 
                 return `
-                    <div class="column-rule-card ${cardClass}">
-                        <div class="column-rule-header">
+                    <div style="padding: 16px; border-bottom: 1px solid #f3f4f6; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                             <div>
-                                <div class="column-rule-title">${escapeHtml(displayName)}</div>
-                                <div class="column-rule-field">
-                                    ${fileLabel ? `<strong>File:</strong> ${escapeHtml(fileLabel)} | ` : ''}
-                                    <strong>Field:</strong> <code style="background:#f3f4f6; padding:2px 6px; border-radius:4px;">${escapeHtml(field)}</code>
-                                    ${full.is_sensitive ? ' | <span style="color: var(--warning);">🔒 Sensitive (Masked)</span>' : ''}
+                                <div style="font-weight: 700; color: var(--text-dark); font-size: 1rem;">${escapeHtml(displayName)}</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                                    ${fileLabel ? `<span style="margin-right: 12px;"><strong>File:</strong> ${escapeHtml(fileLabel)}</span>` : ''}
+                                    <span><strong>Field:</strong> <code style="background:#f9fafb; padding:2px 6px; border-radius:4px; font-family: monospace;">${escapeHtml(fieldDisplay)}</code></span>
+                                    ${isSensitive ? ' <span style="color: #f59e0b; margin-left: 8px;">🔒 Masked</span>' : ''}
                                 </div>
                             </div>
-                            <div>${statusBadge(status)}</div>
-                        </div>
-
-                        <div class="column-rule-section">
-                            <div class="column-rule-section-title">📖 Definition</div>
-                            <div class="column-rule-section-content">
-                                ${escapeHtml(full.definition || 'No definition available.')}
+                            <div style="background: ${status === 'VALID' ? '#d1fae5' : (status === 'WARNING' ? '#fef3c7' : '#fee2e2')}; 
+                                        color: ${status === 'VALID' ? '#065f46' : (status === 'WARNING' ? '#92400e' : '#991b1b')}; 
+                                        padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
+                                ${status}
                             </div>
                         </div>
 
-                        <div class="column-rule-section">
-                            <div class="column-rule-section-title">✓ Condition</div>
-                            <div class="column-rule-section-content">
-                                ${escapeHtml(full.condition || 'No condition specified.')}
-                            </div>
-                        </div>
-
-                        <div class="column-rule-section">
-                            <div class="column-rule-section-title">✅ Why Valid</div>
-                            <div class="why-valid-box">
-                                <div class="why-box-title">When this field is VALID, the bank can:</div>
-                                <ul class="column-rule-points">
-                                    ${renderPoints(full.action_valid_points, full.action_valid)}
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div class="column-rule-section">
-                            <div class="column-rule-section-title">❌ Why Invalid</div>
-                            <div class="why-invalid-box">
-                                <div class="why-box-title">When this field is INVALID, you need to:</div>
-                                ${full.ui_issue_message ? `<div style="margin-bottom:8px; padding:8px; background:rgba(255,255,255,0.7); border-radius:6px;"><strong>⚠️ Issue:</strong> ${escapeHtml(full.ui_issue_message)}</div>` : ''}
-                                <ul class="column-rule-points">
-                                    ${renderPoints(full.action_invalid_points, full.action_invalid)}
-                                </ul>
-                                ${issues.length > 0 ? `
-                                    <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(153,27,27,0.2);">
-                                        <strong style="color: #991b1b; font-size:0.9rem;">Additional Issues:</strong>
-                                        <ul class="column-rule-points" style="margin-top:6px;">
-                                            ${issues.slice(0, 3).map(i => `<li>${escapeHtml(i)}</li>`).join('')}
-                                        </ul>
-                                    </div>
-                                ` : ''}
-                            </div>
+                        <div style="font-size: 0.95rem; line-height: 1.6; color: var(--text-muted);">
+                            <div style="margin-bottom: 4px;">✔ <strong>Correct Logic:</strong> ${escapeHtml(validAction)}</div>
+                            ${status !== 'VALID' ? `
+                            <div style="color: #b91c1c;">🚩 <strong>Action Needed:</strong> ${escapeHtml(invalidAction)}</div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
             };
+
 
             // Collect all columns (from all files if multi-file)
             let allColumns = [];
@@ -2573,12 +2532,69 @@
                 return;
             }
 
-            // Render each column one by one
-            allColumns.forEach(col => {
-                html += renderColumnRuleCard(col, col.source_file || null);
+            // Filter: Show ONLY fields with WARNING or INVALID status
+            const issueColumns = allColumns.filter(col => {
+                const status = (col.status || 'UNKNOWN').toUpperCase();
+                return status === 'WARNING' || status === 'INVALID';
             });
 
+            // If all fields are valid, show success message only
+            if (issueColumns.length === 0) {
+                html += `
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <div style="font-size: 3rem; margin-bottom: 16px;">✅</div>
+                        <h4 style="color: var(--text-dark); margin-bottom: 8px;">All ${allColumns.length} Fields Verified</h4>
+                        <p style="font-size: 0.95rem;">Your data meets all banking requirements. No corrections needed.</p>
+                    </div>
+                `;
+            } else {
+                // Show issue count summary
+                const warningCount = issueColumns.filter(c => (c.status || '').toUpperCase() === 'WARNING').length;
+                const invalidCount = issueColumns.filter(c => (c.status || '').toUpperCase() === 'INVALID').length;
+
+                html += `
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                        ${invalidCount > 0 ? `<div style="background: #fee2e2; color: #991b1b; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem;"><strong>🚩 ${invalidCount}</strong> Critical Issue${invalidCount > 1 ? 's' : ''}</div>` : ''}
+                        ${warningCount > 0 ? `<div style="background: #fef3c7; color: #92400e; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem;"><strong>⚠️ ${warningCount}</strong> Warning${warningCount > 1 ? 's' : ''}</div>` : ''}
+                    </div>
+                `;
+
+                // Render ONLY issue columns
+                issueColumns.forEach(col => {
+                    html += renderColumnRuleCard(col, col.source_file || null);
+                });
+            }
+
             container.innerHTML = html;
+
+            // Add "What Happens Next" section
+            const nextSteps = document.createElement('div');
+            nextSteps.style.marginTop = '24px';
+            nextSteps.style.padding = '24px';
+            nextSteps.style.background = '#f9fafb';
+            nextSteps.style.border = '1px solid #e5e7eb';
+            nextSteps.style.borderRadius = '12px';
+
+            if (globalAllValid) {
+                nextSteps.innerHTML = `
+                    <h3 style="color: var(--text-dark); font-size: 1.15rem; font-weight: 700; margin-bottom: 12px;">What Happens Next?</h3>
+                    <ul style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.8; padding-left: 20px;">
+                        <li><strong>Step 1:</strong> The validated dataset will be queued for application-level processing.</li>
+                        <li><strong>Step 2:</strong> Sensitive fields will be automatically encrypted and stored securely.</li>
+                        <li><strong>Step 3:</strong> You can now proceed to the "Column Relationships" and "Application Structure" tabs to explore your data.</li>
+                    </ul>
+                `;
+            } else {
+                nextSteps.innerHTML = `
+                    <h3 style="color: var(--text-dark); font-size: 1.15rem; font-weight: 700; margin-bottom: 12px;">What Happens Next?</h3>
+                    <ul style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.8; padding-left: 20px;">
+                        <li><strong>Step 1:</strong> Identify the fields marked as 🚩 <strong>INVALID</strong> or ⚠️ <strong>WARNING</strong> in the list above.</li>
+                        <li><strong>Step 2:</strong> Download the file, correct the identified values, and re-upload the dataset.</li>
+                        <li><strong>Step 3:</strong> If you are unsure about a rule, consult your bank manager or domain administrator for clarification.</li>
+                    </ul>
+                `;
+            }
+            container.appendChild(nextSteps);
         }
 
         // Helper function to load Application Type banner in Business Rules tab
@@ -2634,7 +2650,7 @@
             try {
                 // Try multiple sources
                 let appStructure = null;
-                
+
                 // Source 1: Direct sessionStorage
                 const appStructureStr = sessionStorage.getItem('applicationStructure');
                 if (appStructureStr) {
@@ -2644,7 +2660,7 @@
                         console.warn('Failed to parse applicationStructure from sessionStorage:', e);
                     }
                 }
-                
+
                 // Source 2: Multi-file result
                 if (!appStructure || appStructure.error) {
                     const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
@@ -2660,7 +2676,7 @@
                         }
                     }
                 }
-                
+
                 // Source 3: Single-file upload result
                 if (!appStructure || appStructure.error) {
                     try {
@@ -2680,14 +2696,14 @@
                 }
 
                 let html = '';
-                
+
                 // Get application type
                 const appType = appStructure.application_type || appStructure.structure_tree?.application_type || 'Banking Application';
                 const appTypeInfo = appStructure.application_type;
-                const appTypeName = (appTypeInfo && appTypeInfo.application_type) ? appTypeInfo.application_type : 
-                                   (typeof appType === 'string' ? appType : 'Banking Application');
+                const appTypeName = (appTypeInfo && appTypeInfo.application_type) ? appTypeInfo.application_type :
+                    (typeof appType === 'string' ? appType : 'Banking Application');
                 const appTypeConfidence = (appTypeInfo && appTypeInfo.confidence) ? appTypeInfo.confidence : 0;
-                
+
                 // Build tree diagram
                 html += `
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
@@ -2695,10 +2711,10 @@
                         ${appTypeConfidence > 0 ? `<div style="font-size: 0.75rem; opacity: 0.9;">Confidence: ${appTypeConfidence}%</div>` : ''}
                     </div>
                 `;
-                
+
                 // Collect modules from both sources
                 let modulesList = [];
-                
+
                 // Source 1: appStructure.modules (dictionary)
                 if (appStructure.modules && Object.keys(appStructure.modules).length > 0) {
                     for (const [moduleName, moduleInfo] of Object.entries(appStructure.modules)) {
@@ -2712,7 +2728,7 @@
                         }
                     }
                 }
-                
+
                 // Source 2: structure_tree.modules (array) as fallback
                 if (modulesList.length === 0 && appStructure.structure_tree && appStructure.structure_tree.modules) {
                     const treeModules = appStructure.structure_tree.modules || [];
@@ -2727,21 +2743,21 @@
                         }
                     });
                 }
-                
+
                 // Render tree diagram
                 if (modulesList.length > 0) {
                     html += '<div style="font-family: \'Courier New\', monospace; font-size: 0.75rem; line-height: 1.6; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid var(--border);">';
-                    
+
                     modulesList.forEach((module, idx) => {
                         const isLast = idx === modulesList.length - 1;
                         const connector = isLast ? '└──' : '├──';
                         const subConnector = isLast ? '    ' : '│   ';
-                        
+
                         const statusColor = module.status === 'COMPLETE' ? '#10b981' :
-                                          module.status === 'PARTIAL' ? '#f59e0b' : '#ef4444';
+                            module.status === 'PARTIAL' ? '#f59e0b' : '#ef4444';
                         const statusIcon = module.status === 'COMPLETE' ? '✅' :
-                                         module.status === 'PARTIAL' ? '⚠️' : '❌';
-                        
+                            module.status === 'PARTIAL' ? '⚠️' : '❌';
+
                         html += `
                             <div style="margin-bottom: 8px;">
                                 <div style="color: var(--text-dark); font-weight: 600;">
@@ -2749,22 +2765,22 @@
                                     <span style="color: ${statusColor}; margin-left: 8px; font-size: 0.7rem;">${module.confidence}%</span>
                                 </div>
                         `;
-                        
+
                         // Show columns (max 5)
                         if (module.columns && Array.isArray(module.columns) && module.columns.length > 0) {
                             const colsToShow = module.columns.slice(0, 5);
                             colsToShow.forEach((col, colIdx) => {
                                 const isLastCol = colIdx === colsToShow.length - 1 && module.columns.length <= 5;
                                 const colConnector = isLastCol ? '└──' : '├──';
-                                const colName = (typeof col === 'string' && col.includes('.')) ? col.split('.').pop() : 
-                                              (typeof col === 'object' && col.name) ? col.name : col;
+                                const colName = (typeof col === 'string' && col.includes('.')) ? col.split('.').pop() :
+                                    (typeof col === 'object' && col.name) ? col.name : col;
                                 html += `
                                     <div style="color: var(--text-muted); margin-left: 20px; font-size: 0.7rem;">
                                         ${subConnector}${colConnector} <code style="background:#e5e7eb; padding:1px 4px; border-radius:3px;">${colName}</code>
                                     </div>
                                 `;
                             });
-                            
+
                             if (module.columns.length > 5) {
                                 html += `
                                     <div style="color: var(--text-muted); margin-left: 20px; font-size: 0.7rem;">
@@ -2773,15 +2789,15 @@
                                 `;
                             }
                         }
-                        
+
                         html += `</div>`;
                     });
-                    
+
                     html += '</div>';
                 } else {
                     html += '<div style="padding: 16px; color: var(--text-muted); font-size: 0.85rem; text-align: center;">No modules detected. Upload files to generate application structure.</div>';
                 }
-                
+
                 container.innerHTML = html;
             } catch (e) {
                 console.error('Error loading application structure:', e);
@@ -2797,7 +2813,7 @@
             try {
                 // Try multiple sources
                 let columnAnalysis = null;
-                
+
                 // Source 1: Direct sessionStorage
                 const columnAnalysisStr = sessionStorage.getItem('columnRelationshipAnalysis');
                 if (columnAnalysisStr) {
@@ -2807,7 +2823,7 @@
                         console.warn('Failed to parse columnRelationshipAnalysis from sessionStorage:', e);
                     }
                 }
-                
+
                 // Source 2: Multi-file result
                 if (!columnAnalysis || !columnAnalysis.file_domains) {
                     const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
@@ -2823,7 +2839,7 @@
                         }
                     }
                 }
-                
+
                 // Source 3: Single-file upload result
                 if (!columnAnalysis || !columnAnalysis.file_domains) {
                     try {
@@ -2844,7 +2860,7 @@
 
                 let html = '';
                 const fileDomains = columnAnalysis.file_domains.slice(0, 3); // Show max 3 in compact view
-                
+
                 fileDomains.forEach((fileInfo, idx) => {
                     const confidenceColor = fileInfo.domain_confidence >= 70 ? 'var(--success)' :
                         fileInfo.domain_confidence >= 40 ? 'var(--warning)' : 'var(--danger)';
@@ -2896,7 +2912,7 @@
             try {
                 // Try multiple sources
                 let columnAnalysis = null;
-                
+
                 // Source 1: Direct sessionStorage
                 const columnAnalysisStr = sessionStorage.getItem('columnRelationshipAnalysis');
                 if (columnAnalysisStr) {
@@ -2906,7 +2922,7 @@
                         console.warn('Failed to parse columnRelationshipAnalysis from sessionStorage:', e);
                     }
                 }
-                
+
                 // Source 2: Multi-file result
                 if (!columnAnalysis || (!columnAnalysis.column_relationships && !columnAnalysis.file_domains)) {
                     const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
@@ -2922,7 +2938,7 @@
                         }
                     }
                 }
-                
+
                 // Source 3: Single-file upload result
                 if (!columnAnalysis || (!columnAnalysis.column_relationships && !columnAnalysis.file_domains)) {
                     try {
@@ -2942,7 +2958,7 @@
                 }
 
                 let html = '';
-                
+
                 // Show column relationships if available
                 if (columnAnalysis.column_relationships && Array.isArray(columnAnalysis.column_relationships) && columnAnalysis.column_relationships.length > 0) {
                     const relationships = columnAnalysis.column_relationships.slice(0, 5); // Show max 5
@@ -2968,7 +2984,7 @@
                         html += `<div style="padding: 8px; text-align: center; font-size: 0.8rem; color: var(--text-muted);">+${columnAnalysis.column_relationships.length - 5} more relationships</div>`;
                     }
                 }
-                
+
                 // Show file domains if no relationships but domains exist
                 if (!html && columnAnalysis.file_domains && Array.isArray(columnAnalysis.file_domains) && columnAnalysis.file_domains.length > 0) {
                     columnAnalysis.file_domains.forEach((domain, idx) => {
@@ -3141,7 +3157,7 @@
                 // Wait a bit for account verification to load, then copy
                 setTimeout(() => {
                     const accountVerificationContent = document.getElementById('accountVerificationContent');
-                    if (accountVerificationContent && accountVerificationContent.innerHTML.trim() && 
+                    if (accountVerificationContent && accountVerificationContent.innerHTML.trim() &&
                         accountVerificationContent.innerHTML.indexOf('empty-state') === -1) {
                         container.innerHTML = accountVerificationContent.innerHTML;
                     } else {
@@ -3176,7 +3192,7 @@
                 // Wait a bit for application structure to load, then copy
                 setTimeout(() => {
                     const applicationStructureContent = document.getElementById('applicationStructureContent');
-                    if (applicationStructureContent && applicationStructureContent.innerHTML.trim() && 
+                    if (applicationStructureContent && applicationStructureContent.innerHTML.trim() &&
                         applicationStructureContent.innerHTML.indexOf('Loading') === -1 &&
                         applicationStructureContent.innerHTML.indexOf('empty-state') === -1) {
                         container.innerHTML = applicationStructureContent.innerHTML;
@@ -3219,7 +3235,7 @@
             }
 
             const isMulti = !!standardRules.multi_file;
-            
+
             // Get all columns and their validation status
             let allColumns = [];
             let allValid = true;
@@ -3245,8 +3261,8 @@
                 if (standardRules.summary && standardRules.summary.failed_columns) {
                     standardRules.summary.failed_columns.forEach(fc => {
                         // Try to find matching column in allColumns and add if not already there
-                        const existing = failedColumns.find(f => 
-                            (f.column_name || f.original_column_name || f.display_name) === 
+                        const existing = failedColumns.find(f =>
+                            (f.column_name || f.original_column_name || f.display_name) ===
                             (fc.column_name || fc.original_column_name || fc.display_name)
                         );
                         if (!existing) {
@@ -3264,7 +3280,7 @@
                 const summary = standardRules.summary || {};
                 allValid = !!(summary.all_valid);
                 failedColumns = summary.failed_columns || [];
-                
+
                 // Also check columns directly if summary doesn't have failed_columns
                 if (failedColumns.length === 0) {
                     allColumns.forEach(col => {
@@ -3296,7 +3312,7 @@
             // Get unique failed columns (avoid duplicates)
             const uniqueFailedColumns = [];
             const seenColumns = new Set();
-            
+
             failedColumns.forEach(col => {
                 const colKey = col.column_name || col.original_column_name || col.display_name || '';
                 if (colKey && !seenColumns.has(colKey)) {
@@ -3374,11 +3390,11 @@
                             </div>
                         ` : `
                             ${uniqueFailedColumns.map(col => {
-                                const displayName = col.display_name || col.original_column_name || col.column_name || 'Field';
-                                const field = col.original_column_name || col.column_name || '';
-                                const sourceFile = col.source_file ? ` (${col.source_file})` : '';
-                                const msg = col.ui_issue_message || 'Invalid value. Please correct this field.';
-                                return `
+                const displayName = col.display_name || col.original_column_name || col.column_name || 'Field';
+                const field = col.original_column_name || col.column_name || '';
+                const sourceFile = col.source_file ? ` (${col.source_file})` : '';
+                const msg = col.ui_issue_message || 'Invalid value. Please correct this field.';
+                return `
                                     <div class="issue-row">
                                         <div class="issue-title">${esc(displayName)}${esc(sourceFile)}</div>
                                         <div class="issue-msg">${esc(msg)}</div>
@@ -3387,7 +3403,7 @@
                                         </div>
                                     </div>
                                 `;
-                            }).join('')}
+            }).join('')}
                         `}
 
                         <div class="result-actions">

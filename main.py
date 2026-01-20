@@ -988,11 +988,9 @@ def _map_column_to_business_rule_template(col_name: str) -> Dict[str, Any]:
                     "is_sensitive": tpl["is_sensitive"],
                     "definition": one_line(tpl["definition"]),
                     "condition": one_line(tpl["condition"]),
-                    "action_valid_points": action_valid_points[:2],
-                    "action_invalid_points": action_invalid_points[:2],
-                    "ui_issue_message": ui_issue_message,
-                    "action_valid": " ".join(action_valid_points) if action_valid_points else "",
-                    "action_invalid": " ".join(action_invalid_points) if action_invalid_points else "",
+                    "action_valid": pts_to_string(tpl.get("action_valid_points"), tpl.get("action_valid")),
+                    "action_invalid": pts_to_string(tpl.get("action_invalid_points"), tpl.get("action_invalid")),
+                    "ui_issue_message": tpl.get("ui_issue_message"),
                 }
         except Exception:
             continue
@@ -1003,20 +1001,18 @@ def _map_column_to_business_rule_template(col_name: str) -> Dict[str, Any]:
         "column_name": _normalize_column_name(col_name),
         "display_name": pretty_name,
         "is_sensitive": False,
-        "definition": f"{pretty_name} is a banking data field used in reporting and internal processing.",
-        "condition": "Should follow a consistent format and not be empty when used in core workflows.",
-        "action_valid_points": pts(
-            "Value is acceptable for banking processing.",
-            "Used in internal workflows and reporting where applicable."
-        ),
-        "action_invalid_points": pts(
-            "Value is missing/invalid for this field.",
-            "Fix only this field; dependent workflows may pause but others continue."
-        ),
+        "definition": f"{pretty_name} is a banking data field.",
+        "condition": "Should follow a consistent format.",
+        "action_valid": "This field meets banking standards.",
+        "action_invalid": "This field is missing or invalid. Please correct it.",
         "ui_issue_message": "This field is missing/invalid. Please correct it and re-submit.",
-        "action_valid": "Value is acceptable for banking processing. Used in internal workflows and reporting where applicable.",
-        "action_invalid": "This field is missing/invalid. Please correct it and re-submit.",
     }
+
+def pts_to_string(pts_list, fallback):
+    if pts_list and isinstance(pts_list, list):
+        return pts_list[0] if pts_list else fallback
+    return fallback or ""
+
 
 
 def build_standard_business_rules(
