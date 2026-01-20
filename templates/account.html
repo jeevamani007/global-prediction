@@ -432,6 +432,38 @@
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
         }
 
+        .business-rule-column-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .business-rule-column-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Field-level error styling */
+        .field-error {
+            border: 2px solid var(--danger) !important;
+            background-color: #fef2f2 !important;
+        }
+
+        .field-error-message {
+            color: var(--danger);
+            font-size: 0.9rem;
+            margin-top: 4px;
+            padding: 8px 12px;
+            background: #fee2e2;
+            border-radius: 6px;
+            border-left: 3px solid var(--danger);
+        }
+
+        /* Sensitive data masking */
+        .sensitive-data {
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+        }
+
         .rule-header {
             display: flex;
             align-items: center;
@@ -1630,6 +1662,90 @@
             ).join('');
         }
 
+        // Helper function to generate business rules in standard format
+        // Uses backend-generated fields if available, otherwise generates from available data
+        function generateBusinessRuleFormat(colAnalysis) {
+            const uiFormat = colAnalysis.ui_ready_format || {};
+            const columnName = uiFormat['Column Name'] || colAnalysis.column_name || 'Unknown Column';
+            const identifiedAs = uiFormat['Identified As'] || (colAnalysis.step3_identified_as ? colAnalysis.step3_identified_as.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown');
+            
+            // 1. DEFINITION - Use backend-generated definition if available
+            const definition = colAnalysis.step5_definition || uiFormat['Definition'] || 
+                colAnalysis.step5_md_description || uiFormat['Business Meaning'] || 
+                colAnalysis.step5_business_meaning || 
+                `This column is identified as ${identifiedAs} in the banking system. It serves a critical role in banking operations and data management.`;
+            
+            // 2. CONDITION - Use backend-generated condition if available
+            let condition = colAnalysis.step5_condition || uiFormat['Condition'] || '';
+            
+            if (!condition) {
+                // Fallback: Generate from available data
+                const profile = colAnalysis.step1_profile || {};
+                const businessRules = colAnalysis.step5_business_rules || {};
+                
+                if (businessRules.rules_display) {
+                    condition = businessRules.rules_display;
+                } else if (businessRules.format) {
+                    condition = `Format: ${businessRules.format}. `;
+                    if (businessRules.mandatory !== undefined) {
+                        condition += businessRules.mandatory ? 'This field is mandatory. ' : 'This field is optional. ';
+                    }
+                    if (businessRules.unique !== undefined) {
+                        condition += businessRules.unique ? 'Values must be unique. ' : 'Duplicate values are allowed. ';
+                    }
+                } else {
+                    // Generate from profile
+                    condition = `Data Type: ${profile.data_type || 'Unknown'}. `;
+                    if (profile.null_percentage !== undefined) {
+                        condition += `Null values: ${profile.null_percentage.toFixed(1)}%. `;
+                    }
+                    if (profile.uniqueness_percentage !== undefined) {
+                        condition += `Uniqueness: ${profile.uniqueness_percentage.toFixed(1)}%. `;
+                    }
+                }
+            }
+            
+            // 3. ACTION (Valid Case) - Use backend-generated valid action if available
+            const validAction = colAnalysis.step5_valid_action || uiFormat['Valid Action'] || 
+                (() => {
+                    const workflowRole = uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role || '';
+                    return `✅ **Valid Data**: When this column contains valid data, it is marked as VALID. ` +
+                        `This means the data meets all banking business rules and can be used in banking processes such as ` +
+                        `${workflowRole ? workflowRole.toLowerCase() : 'transactions, account management, KYC verification, compliance reporting, and system operations'}. ` +
+                        `Valid data allows the system to proceed with dependent actions like processing transactions, activating accounts, ` +
+                        `generating reports, and completing customer verification workflows.`;
+                })();
+            
+            // 4. ACTION (Invalid Case) - Use backend-generated invalid action if available
+            const invalidAction = colAnalysis.step5_invalid_action || uiFormat['Invalid Action'] || 
+                (() => {
+                    const violationImpact = uiFormat['Violation Impact'] || colAnalysis.step5_violation_impact || 
+                        'Invalid data may cause transaction failures, compliance issues, or system errors.';
+                    return `❌ **Invalid or Missing Data**: If this column contains invalid data or is missing required values, ` +
+                        `the system will highlight ONLY this specific column in the UI with a clear error message. ` +
+                        `The error message will explain what is wrong, why this field is required, and what needs to be corrected. ` +
+                        `Other columns and system functions will continue to work normally. Only dependent actions related to this column ` +
+                        `will be blocked until the issue is resolved. ${violationImpact}`;
+                })();
+            
+            // Check if column contains sensitive data that should be masked
+            const sensitiveKeywords = ['account', 'phone', 'pan', 'aadhaar', 'card', 'cvv', 'pin', 'password', 'ssn'];
+            const isSensitive = sensitiveKeywords.some(keyword => 
+                columnName.toLowerCase().includes(keyword)
+            );
+            
+            return {
+                columnName,
+                identifiedAs,
+                definition,
+                condition,
+                validAction,
+                invalidAction,
+                isSensitive,
+                confidence: colAnalysis.step4_confidence_score || 0
+            };
+        }
+
         function loadBusinessRules() {
             // PRIORITY 1: Core Banking Business Rules Engine (Runs First)
             const coreBankingRules = JSON.parse(sessionStorage.getItem('coreBankingBusinessRules') || 'null');
@@ -1797,8 +1913,12 @@
                 // Header
                 rulesHtml += `
                     <div style="text-align: center; margin-bottom: 32px;">
-                        <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 8px;">🏦 Core Banking Business Rules</h2>
-                        <p style="color: var(--text-muted); font-size: 1.05rem;">Industry-standard banking rules applied to each column</p>
+                        <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 8px;">🏦 Banking Domain Business Rules</h2>
+                        <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 800px; margin: 0 auto; line-height: 1.6;">
+                            Each column is validated using standard banking business rules. For each column, you'll see:
+                            <strong>Definition</strong> (why it exists), <strong>Condition</strong> (validation rules), 
+                            <strong>Action when Valid</strong> (how it's used), and <strong>Action when Invalid</strong> (error handling).
+                        </p>
                         ${summaryToDisplay ? `
                             <div style="display: flex; justify-content: center; gap: 20px; margin-top: 16px; flex-wrap: wrap;">
                                 <div style="background: #f0f5ff; padding: 12px 20px; border-radius: 8px;">
@@ -1858,86 +1978,90 @@
                             `;
                         }
 
-                        // Display columns for this file
+                        // Display columns for this file - NEW STANDARD BANKING BUSINESS RULE FORMAT
                         fileColumns.forEach((colAnalysis, idx) => {
-                            const uiFormat = colAnalysis.ui_ready_format || {};
-                            const confidence = colAnalysis.step4_confidence_score || 0;
-                            const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
+                            const ruleData = generateBusinessRuleFormat(colAnalysis);
+                            const confidenceColor = ruleData.confidence >= 80 ? '#059669' : ruleData.confidence >= 50 ? '#d97706' : '#dc2626';
+                            const displayColumnName = ruleData.isSensitive ? 
+                                ruleData.columnName.replace(/(.{4}).*(.{4})/, '$1****$2') : ruleData.columnName;
 
                             rulesHtml += `
-                                <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                                <div class="business-rule-column-card" style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
                                         <div style="flex: 1;">
-                                            <h4 style="color: var(--primary); font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
-                                                <span style="background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600;">
+                                            <h4 style="color: var(--primary); font-size: 1.2rem; margin: 0; display: flex; align-items: center; gap: 10px;">
+                                                <span style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 600;">
                                                     ${idx + 1}
                                                 </span>
-                                                ${uiFormat['Column Name'] || colAnalysis.column_name}
+                                                <span>${displayColumnName}</span>
+                                                ${ruleData.isSensitive ? '<span style="font-size: 0.75rem; background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 12px; font-weight: 500;">🔒 Sensitive</span>' : ''}
                                             </h4>
+                                            <div style="margin-top: 8px; color: var(--text-muted); font-size: 0.9rem;">
+                                                Identified as: <strong style="color: var(--primary);">${ruleData.identifiedAs}</strong>
+                                            </div>
                                         </div>
-                                        <span style="background: ${confidenceColor}; color: white; padding: 6px 14px; border-radius: 16px; font-size: 0.85rem; font-weight: 600; white-space: nowrap;">
-                                            ${(confidence || 0).toFixed(0)}% Confidence
+                                        <span style="background: ${confidenceColor}; color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; white-space: nowrap;">
+                                            ${ruleData.confidence.toFixed(0)}% Confidence
                                         </span>
                                     </div>
                             
-                                    <div style="display: grid; grid-template-columns: 1fr; gap: 16px;">
-                                        <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
-                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Identified As</strong>
-                                            <div style="color: var(--primary); font-weight: 600; font-size: 1rem;">
-                                                ${uiFormat['Identified As'] || (colAnalysis.step3_identified_as ? colAnalysis.step3_identified_as.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown')}
+                                    <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                                        <!-- 1. DEFINITION -->
+                                        <div style="background: linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid var(--primary);">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                                <span style="font-size: 1.5rem;">📖</span>
+                                                <strong style="color: #1e40af; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">1. Definition</strong>
+                                            </div>
+                                            <div style="color: #1f2937; line-height: 1.8; font-size: 1rem;">
+                                                ${ruleData.definition}
                                             </div>
                                         </div>
                                         
-                                        <div style="background: #f0f5ff; padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
-                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                                📚 Business Meaning
-                                                ${colAnalysis.step5_md_section ? `<span style="margin-left: 8px; font-size: 0.75rem; color: var(--primary); background: white; padding: 2px 8px; border-radius: 12px;">${colAnalysis.step5_md_section}</span>` : ''}
-                                            </strong>
-                                            <div style="color: #1f2937; line-height: 1.7; font-size: 0.95rem;">
-                                                ${colAnalysis.step5_md_description || uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
+                                        <!-- 2. CONDITION -->
+                                        <div style="background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #d97706;">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                                <span style="font-size: 1.5rem;">✓</span>
+                                                <strong style="color: #92400e; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">2. Condition</strong>
                                             </div>
-                                            ${colAnalysis.step5_md_description && colAnalysis.step5_md_description !== colAnalysis.step5_business_meaning ? `
-                                                <div style="margin-top: 8px; padding: 8px; background: rgba(26, 86, 219, 0.1); border-radius: 4px; font-size: 0.85rem; color: #1e40af;">
-                                                    <strong>📋 Detailed Explanation:</strong> ${colAnalysis.step5_business_meaning || ''}
-                                                </div>
-                                            ` : ''}
-                                        </div>
-                                        
-                                        <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
-                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Rules</strong>
-                                            <div style="color: #1f2937; white-space: pre-line; line-height: 1.8; font-size: 0.95rem;">
-                                                ${uiFormat['Business Rules'] || (colAnalysis.step5_business_rules?.rules_display || 'Standard banking rules apply')}
+                                            <div style="color: #78350f; line-height: 1.8; font-size: 1rem; white-space: pre-line;">
+                                                ${ruleData.condition || 'Standard validation rules apply based on data type and banking requirements.'}
                                             </div>
                                         </div>
                                         
-                                        <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 3px solid #d97706;">
-                                            <strong style="color: #92400e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Why This Rule Exists</strong>
-                                            <div style="color: #78350f; line-height: 1.7; font-size: 0.95rem;">
-                                                ${uiFormat['Why This Rule Exists'] || colAnalysis.step5_why_rule_exists || 'Standard banking requirement'}
+                                        <!-- 3. ACTION (Valid Case) -->
+                                        <div style="background: linear-gradient(135deg, #d1fae5 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #059669;">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                                <span style="font-size: 1.5rem;">✅</span>
+                                                <strong style="color: #065f46; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">3. Action (Valid Case - User Explanation)</strong>
+                                            </div>
+                                            <div style="color: #047857; line-height: 1.8; font-size: 1rem;">
+                                                ${ruleData.validAction}
                                             </div>
                                         </div>
                                         
-                                        ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role ? `
-                                        <div style="background: #e0f2fe; padding: 16px; border-radius: 8px; border-left: 3px solid #0284c7;">
-                                            <strong style="color: #0c4a6e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Data Workflow Role</strong>
-                                            <div style="color: #075985; line-height: 1.7; font-size: 0.95rem;">
-                                                ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role || 'Standard workflow role'}
+                                        <!-- 4. ACTION (Invalid Case) -->
+                                        <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #dc2626;">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                                <span style="font-size: 1.5rem;">❌</span>
+                                                <strong style="color: #991b1b; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">4. Action (Invalid Case - UI Handling)</strong>
+                                            </div>
+                                            <div style="color: #7f1d1d; line-height: 1.8; font-size: 1rem;">
+                                                ${ruleData.invalidAction}
                                             </div>
                                         </div>
-                                        ` : ''}
                                     </div>
                                     
                                     ${colAnalysis.step1_profile ? `
-                                        <details style="margin-top: 16px;">
-                                            <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 12px; background: #f8fafc; border-radius: 6px; user-select: none;">
+                                        <details style="margin-top: 20px;">
+                                            <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 12px; background: #f8fafc; border-radius: 6px; user-select: none; border: 1px solid #e5e7eb;">
                                                 📊 Column Profile Details (Click to expand)
                                             </summary>
                                             <div style="margin-top: 12px; padding: 16px; background: #f8fafc; border-radius: 8px;">
                                                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
-                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
-                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
-                                                    <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
+                                                    <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
+                                                    <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
+                                                    <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
+                                                    <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
                                                 </div>
                                             </div>
                                         </details>
@@ -1973,86 +2097,90 @@
                         `;
                     }
 
-                    // Display columns
+                    // Display columns - NEW STANDARD BANKING BUSINESS RULE FORMAT
                     columnsToDisplay.forEach((colAnalysis, idx) => {
-                        const uiFormat = colAnalysis.ui_ready_format || {};
-                        const confidence = colAnalysis.step4_confidence_score || 0;
-                        const confidenceColor = confidence >= 80 ? '#059669' : confidence >= 50 ? '#d97706' : '#dc2626';
+                        const ruleData = generateBusinessRuleFormat(colAnalysis);
+                        const confidenceColor = ruleData.confidence >= 80 ? '#059669' : ruleData.confidence >= 50 ? '#d97706' : '#dc2626';
+                        const displayColumnName = ruleData.isSensitive ? 
+                            ruleData.columnName.replace(/(.{4}).*(.{4})/, '$1****$2') : ruleData.columnName;
 
                         rulesHtml += `
-                            <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                            <div class="business-rule-column-card" style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${confidenceColor}; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
                                     <div style="flex: 1;">
-                                        <h4 style="color: var(--primary); font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
-                                            <span style="background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600;">
+                                        <h4 style="color: var(--primary); font-size: 1.2rem; margin: 0; display: flex; align-items: center; gap: 10px;">
+                                            <span style="background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 600;">
                                                 ${idx + 1}
                                             </span>
-                                            ${uiFormat['Column Name'] || colAnalysis.column_name}
+                                            <span>${displayColumnName}</span>
+                                            ${ruleData.isSensitive ? '<span style="font-size: 0.75rem; background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 12px; font-weight: 500;">🔒 Sensitive</span>' : ''}
                                         </h4>
+                                        <div style="margin-top: 8px; color: var(--text-muted); font-size: 0.9rem;">
+                                            Identified as: <strong style="color: var(--primary);">${ruleData.identifiedAs}</strong>
+                                        </div>
                                     </div>
-                                    <span style="background: ${confidenceColor}; color: white; padding: 6px 14px; border-radius: 16px; font-size: 0.85rem; font-weight: 600; white-space: nowrap;">
-                                        ${(confidence || 0).toFixed(0)}% Confidence
+                                    <span style="background: ${confidenceColor}; color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; white-space: nowrap;">
+                                        ${ruleData.confidence.toFixed(0)}% Confidence
                                     </span>
                                 </div>
                                 
-                                <div style="display: grid; grid-template-columns: 1fr; gap: 16px;">
-                                    <div style="background: #f8fafc; padding: 16px; border-radius: 8px;">
-                                        <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Identified As</strong>
-                                        <div style="color: var(--primary); font-weight: 600; font-size: 1rem;">
-                                            ${uiFormat['Identified As'] || (colAnalysis.step3_identified_as ? colAnalysis.step3_identified_as.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown')}
+                                <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                                    <!-- 1. DEFINITION -->
+                                    <div style="background: linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid var(--primary);">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                            <span style="font-size: 1.5rem;">📖</span>
+                                            <strong style="color: #1e40af; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">1. Definition</strong>
+                                        </div>
+                                        <div style="color: #1f2937; line-height: 1.8; font-size: 1rem;">
+                                            ${ruleData.definition}
                                         </div>
                                     </div>
                                     
-                                        <div style="background: #f0f5ff; padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
-                                            <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                                📚 Business Meaning
-                                                ${colAnalysis.step5_md_section ? `<span style="margin-left: 8px; font-size: 0.75rem; color: var(--primary); background: white; padding: 2px 8px; border-radius: 12px;">${colAnalysis.step5_md_section}</span>` : ''}
-                                            </strong>
-                                            <div style="color: #1f2937; line-height: 1.7; font-size: 0.95rem;">
-                                                ${colAnalysis.step5_md_description || uiFormat['Business Meaning'] || colAnalysis.step5_business_meaning || 'Not available'}
-                                            </div>
-                                            ${colAnalysis.step5_md_description && colAnalysis.step5_md_description !== colAnalysis.step5_business_meaning ? `
-                                                <div style="margin-top: 8px; padding: 8px; background: rgba(26, 86, 219, 0.1); border-radius: 4px; font-size: 0.85rem; color: #1e40af;">
-                                                    <strong>📋 Detailed Explanation:</strong> ${colAnalysis.step5_business_meaning || ''}
-                                                </div>
-                                            ` : ''}
+                                    <!-- 2. CONDITION -->
+                                    <div style="background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #d97706;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                            <span style="font-size: 1.5rem;">✓</span>
+                                            <strong style="color: #92400e; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">2. Condition</strong>
                                         </div>
-                                    
-                                    <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
-                                        <strong style="color: #374151; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Business Rules</strong>
-                                        <div style="color: #1f2937; white-space: pre-line; line-height: 1.8; font-size: 0.95rem;">
-                                            ${uiFormat['Business Rules'] || (colAnalysis.step5_business_rules?.rules_display || 'Standard banking rules apply')}
+                                        <div style="color: #78350f; line-height: 1.8; font-size: 1rem; white-space: pre-line;">
+                                            ${ruleData.condition || 'Standard validation rules apply based on data type and banking requirements.'}
                                         </div>
                                     </div>
                                     
-                                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 3px solid #d97706;">
-                                        <strong style="color: #92400e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Why This Rule Exists</strong>
-                                        <div style="color: #78350f; line-height: 1.7; font-size: 0.95rem;">
-                                            ${uiFormat['Why This Rule Exists'] || colAnalysis.step5_why_rule_exists || 'Standard banking requirement'}
+                                    <!-- 3. ACTION (Valid Case) -->
+                                    <div style="background: linear-gradient(135deg, #d1fae5 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #059669;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                            <span style="font-size: 1.5rem;">✅</span>
+                                            <strong style="color: #065f46; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">3. Action (Valid Case - User Explanation)</strong>
+                                        </div>
+                                        <div style="color: #047857; line-height: 1.8; font-size: 1rem;">
+                                            ${ruleData.validAction}
                                         </div>
                                     </div>
                                     
-                                    ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role ? `
-                                    <div style="background: #e0f2fe; padding: 16px; border-radius: 8px; border-left: 3px solid #0284c7;">
-                                        <strong style="color: #0c4a6e; display: block; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Data Workflow Role</strong>
-                                        <div style="color: #075985; line-height: 1.7; font-size: 0.95rem;">
-                                            ${uiFormat['Data Workflow Role'] || colAnalysis.step5_workflow_role || 'Standard workflow role'}
+                                    <!-- 4. ACTION (Invalid Case) -->
+                                    <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #dc2626;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                            <span style="font-size: 1.5rem;">❌</span>
+                                            <strong style="color: #991b1b; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">4. Action (Invalid Case - UI Handling)</strong>
+                                        </div>
+                                        <div style="color: #7f1d1d; line-height: 1.8; font-size: 1rem;">
+                                            ${ruleData.invalidAction}
                                         </div>
                                     </div>
-                                    ` : ''}
                                 </div>
                                 
                                 ${colAnalysis.step1_profile ? `
-                                    <details style="margin-top: 16px;">
-                                        <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 12px; background: #f8fafc; border-radius: 6px; user-select: none;">
+                                    <details style="margin-top: 20px;">
+                                        <summary style="cursor: pointer; color: var(--primary); font-weight: 600; padding: 12px; background: #f8fafc; border-radius: 6px; user-select: none; border: 1px solid #e5e7eb;">
                                             📊 Column Profile Details (Click to expand)
                                         </summary>
                                         <div style="margin-top: 12px; padding: 16px; background: #f8fafc; border-radius: 8px;">
                                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
-                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
-                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
-                                                <div style="background: white; padding: 12px; border-radius: 6px;"><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
+                                                <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Data Type:</strong> ${colAnalysis.step1_profile.data_type || 'Unknown'}</div>
+                                                <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Uniqueness:</strong> ${colAnalysis.step1_profile.uniqueness_percentage?.toFixed(1) || 0}%</div>
+                                                <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Null Values:</strong> ${colAnalysis.step1_profile.null_percentage?.toFixed(1) || 0}%</div>
+                                                <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;"><strong>Total Records:</strong> ${colAnalysis.step1_profile.total_records || 0}</div>
                                             </div>
                                         </div>
                                     </details>

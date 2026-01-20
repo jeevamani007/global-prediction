@@ -1253,7 +1253,12 @@ class CoreBankingBusinessRulesEngine:
             "Business Rules": business_rules["rules_display"],
             "Why This Rule Exists": business_rules["why_rule_exists"],
             "Violation Impact": business_rules["violation_impact"],
-            "Data Workflow Role": business_rules["workflow_role"]
+            "Data Workflow Role": business_rules["workflow_role"],
+            # NEW STANDARD BANKING BUSINESS RULE FORMAT
+            "Definition": business_rules.get("definition", business_rules["business_meaning"]),
+            "Condition": business_rules.get("condition", business_rules["rules_display"]),
+            "Valid Action": business_rules.get("valid_action", ""),
+            "Invalid Action": business_rules.get("invalid_action", "")
         }
         
         return {
@@ -1271,6 +1276,11 @@ class CoreBankingBusinessRulesEngine:
             "step5_why_rule_exists": business_rules["why_rule_exists"],
             "step5_violation_impact": business_rules["violation_impact"],
             "step5_workflow_role": business_rules["workflow_role"],
+            # NEW STANDARD BANKING BUSINESS RULE FORMAT
+            "step5_definition": business_rules.get("definition", business_rules["business_meaning"]),
+            "step5_condition": business_rules.get("condition", business_rules["rules_display"]),
+            "step5_valid_action": business_rules.get("valid_action", ""),
+            "step5_invalid_action": business_rules.get("invalid_action", ""),
             "ui_ready_format": ui_format
         }
     
@@ -1656,12 +1666,13 @@ class CoreBankingBusinessRulesEngine:
         """
         STEP 5: APPLY REAL BANKING BUSINESS RULES
         
-        For each column, generate:
-        - Business Meaning (WHAT) - Uses .md file definitions
-        - Business Rules (Unique / Not Unique, Mandatory / Optional, Format & length, PK / FK, Allowed values)
-        - Business Reason (WHY)
-        - Violation Impact (BUSINESS / FINANCIAL / COMPLIANCE)
-        - Data Workflow Role
+        STANDARD BANKING BUSINESS RULE FORMAT:
+        1. Definition - Why this column exists in banking system
+        2. Condition - Validation conditions (format, mandatory, uniqueness, etc.)
+        3. Action (Valid Case) - User explanation when data is valid
+        4. Action (Invalid Case) - UI handling when data is invalid
+        
+        Returns structured format for UI display with field-level error handling.
         """
         # Get column name from profile
         column_name = profile.get("column_name", "")
@@ -1676,18 +1687,41 @@ class CoreBankingBusinessRulesEngine:
         if concept_match["concept"] == "unknown":
             # Use .md definition if available, otherwise generic
             if md_definition:
-                business_meaning = md_definition.get("description", "")
+                definition = md_definition.get("description", "")
             else:
-                business_meaning = f"This column contains data relevant to banking operations. Exact business meaning requires domain expert review."
+                definition = f"This column contains data relevant to banking operations. Exact business meaning requires domain expert review."
+            
+            # Generate condition from profile
+            condition_parts = []
+            condition_parts.append(f"Data Type: {profile.get('data_type', 'Unknown')}")
+            if profile.get('null_percentage') is not None:
+                condition_parts.append(f"Null values: {profile.get('null_percentage', 0):.1f}%")
+            if profile.get('uniqueness_percentage') is not None:
+                condition_parts.append(f"Uniqueness: {profile.get('uniqueness_percentage', 0):.1f}%")
+            condition = ". ".join(condition_parts) + "."
+            
+            # Valid action
+            valid_action = ("✅ **Valid Data**: When this column contains valid data, it is marked as VALID. "
+                          "This means the data meets all banking business rules and can be used in banking processes "
+                          "such as transactions, account management, KYC verification, compliance reporting, and system operations. "
+                          "Valid data allows the system to proceed with dependent actions like processing transactions, "
+                          "activating accounts, generating reports, and completing customer verification workflows.")
+            
+            # Invalid action
+            invalid_action = ("❌ **Invalid or Missing Data**: If this column contains invalid data or is missing required values, "
+                            "the system will highlight ONLY this specific column in the UI with a clear error message. "
+                            "The error message will explain what is wrong, why this field is required, and what needs to be corrected. "
+                            "Other columns and system functions will continue to work normally. Only dependent actions related to this column "
+                            "will be blocked until the issue is resolved. Impact: Business operations may be delayed, compliance issues may arise.")
             
             return {
-                "business_meaning": business_meaning,
+                "business_meaning": definition,
                 "md_description": md_definition.get("description", "") if md_definition else "",
                 "md_section": md_definition.get("section", "") if md_definition else "",
                 "rules": {
                     "unique": "Unknown",
                     "mandatory": "Unknown",
-                    "format": f"Based on data type: {profile['data_type']}",
+                    "format": f"Based on data type: {profile.get('data_type', 'Unknown')}",
                     "primary_key": False,
                     "foreign_key": False,
                     "allowed_values": None
@@ -1695,7 +1729,12 @@ class CoreBankingBusinessRulesEngine:
                 "rules_display": "Business rules require domain expert review for this column.",
                 "why_rule_exists": "Column purpose not clearly identified. Manual review recommended." if not md_definition else md_definition.get("description", ""),
                 "violation_impact": "Impact cannot be determined without proper identification.",
-                "workflow_role": "Role in banking workflow requires expert review."
+                "workflow_role": "Role in banking workflow requires expert review.",
+                # NEW STANDARD FORMAT
+                "definition": definition,
+                "condition": condition,
+                "valid_action": valid_action,
+                "invalid_action": invalid_action
             }
         
         concept_def = concept_match["concept_definition"]
@@ -1705,7 +1744,104 @@ class CoreBankingBusinessRulesEngine:
         is_pk = business_rules.get("primary_key", False) and identifier_check["is_eligible"]
         is_fk = business_rules.get("foreign_key", False)
         
-        # Build rules display
+        # ========== 1. DEFINITION ==========
+        # Build definition - prioritize .md definition, explain WHY this column exists
+        if md_definition and md_definition.get("description"):
+            definition = md_definition["description"]
+            # Add concept context if different
+            if concept_match['concept_display'].lower() not in definition.lower():
+                definition = f"{definition} This column represents {concept_match['concept_display']} in the banking system."
+        else:
+            # Build from concept and business rules reason
+            concept_display = concept_match['concept_display']
+            reason = business_rules.get('reason', '')
+            if reason:
+                definition = f"This column represents {concept_display} in the banking system. {reason}"
+            else:
+                definition = f"This column represents {concept_display} in the banking system. It serves a critical role in banking operations and data management."
+        
+        # ========== 2. CONDITION ==========
+        # Build precise validation conditions
+        condition_parts = []
+        
+        # Format requirements
+        if business_rules.get("format"):
+            condition_parts.append(f"Format: {business_rules['format']}")
+        
+        # Mandatory/Optional
+        if business_rules.get("mandatory") is not None:
+            if business_rules["mandatory"]:
+                condition_parts.append("MANDATORY (cannot be null or empty)")
+            else:
+                condition_parts.append("Optional (can be null)")
+        
+        # Uniqueness
+        if business_rules.get("unique") is not None:
+            if business_rules["unique"]:
+                condition_parts.append("Values must be UNIQUE (no duplicates allowed)")
+            else:
+                condition_parts.append("Duplicate values are allowed")
+        
+        # Primary/Foreign Key
+        if is_pk:
+            condition_parts.append("PRIMARY KEY (unique identifier for the table)")
+        if is_fk:
+            condition_parts.append("FOREIGN KEY (references another table)")
+        
+        # Allowed values
+        if business_rules.get("allowed_values"):
+            allowed_vals = business_rules["allowed_values"]
+            if len(allowed_vals) <= 5:
+                allowed_vals_str = [str(v) for v in allowed_vals]
+                condition_parts.append(f"Allowed values: {', '.join(allowed_vals_str)}")
+            else:
+                allowed_vals_str = [str(v) for v in allowed_vals[:5]]
+                condition_parts.append(f"Allowed values: {', '.join(allowed_vals_str)} (and {len(allowed_vals) - 5} more)")
+        
+        # Data type from profile
+        if profile.get('data_type'):
+            condition_parts.append(f"Data Type: {profile['data_type']}")
+        
+        # Length constraints (if available)
+        if profile.get('min_length') or profile.get('max_length'):
+            length_info = []
+            if profile.get('min_length'):
+                length_info.append(f"min: {profile['min_length']}")
+            if profile.get('max_length'):
+                length_info.append(f"max: {profile['max_length']}")
+            if length_info:
+                condition_parts.append(f"Length: {', '.join(length_info)}")
+        
+        condition = ". ".join(condition_parts) if condition_parts else "Standard validation rules apply based on data type and banking requirements."
+        
+        # ========== 3. ACTION (Valid Case) ==========
+        # Determine workflow role for valid action explanation
+        workflow_role = self._determine_workflow_role(concept_match["concept"], concept_def)
+        
+        # Build valid action explanation
+        workflow_usage = workflow_role.lower() if workflow_role else "transactions, account management, KYC verification, compliance reporting, and system operations"
+        
+        valid_action = (f"✅ **Valid Data**: When this column contains valid data, it is marked as VALID. "
+                       f"This means the data meets all banking business rules and can be used in banking processes such as "
+                       f"{workflow_usage}. "
+                       f"Valid data allows the system to proceed with dependent actions like processing transactions, "
+                       f"activating accounts, generating reports, and completing customer verification workflows. "
+                       f"The column status is set to VALID, and it is accepted for use in the banking process.")
+        
+        # ========== 4. ACTION (Invalid Case) ==========
+        # Get violation impact
+        violation_impact = business_rules.get("violation_impact", 
+            "BUSINESS: Operational delays. FINANCIAL: Potential financial losses. COMPLIANCE: Regulatory violations.")
+        
+        # Build invalid action with UI handling instructions
+        invalid_action = (f"❌ **Invalid or Missing Data**: If this column contains invalid data or is missing required values, "
+                         f"the system will highlight ONLY this specific column in the UI with a clear error message. "
+                         f"The error message will explain what is wrong, why this field is required, and what needs to be corrected. "
+                         f"Other columns and system functions will continue to work normally. Only dependent actions related to this column "
+                         f"will be blocked until the issue is resolved. "
+                         f"Impact: {violation_impact}")
+        
+        # Build legacy rules display for backward compatibility
         rules_list = []
         if business_rules.get("unique"):
             rules_list.append("✓ Must be UNIQUE")
@@ -1727,7 +1863,6 @@ class CoreBankingBusinessRulesEngine:
         
         if business_rules.get("allowed_values"):
             allowed_vals = business_rules["allowed_values"][:5]
-            # Convert all values to strings to avoid type errors in join()
             allowed_vals_str = [str(v) for v in allowed_vals]
             rules_list.append(f"✓ Allowed values: {', '.join(allowed_vals_str)}")
             if len(business_rules["allowed_values"]) > 5:
@@ -1735,19 +1870,16 @@ class CoreBankingBusinessRulesEngine:
         
         rules_display = "\n".join(rules_list) if rules_list else "Standard banking rules apply."
         
-        # Determine workflow role
-        workflow_role = self._determine_workflow_role(concept_match["concept"], concept_def)
-        
-        # Build business meaning - prioritize .md definition
+        # Build business meaning for backward compatibility
         if md_definition and md_definition.get("description"):
             business_meaning = md_definition["description"]
-            # Add concept context if different
             if concept_match['concept_display'].lower() not in business_meaning.lower():
                 business_meaning = f"{business_meaning} This column represents {concept_match['concept_display']} in the banking system."
         else:
             business_meaning = f"This column represents {concept_match['concept_display']} in the banking system. {business_rules.get('reason', '')}"
         
         return {
+            # Legacy fields for backward compatibility
             "business_meaning": business_meaning,
             "md_description": md_definition.get("description", "") if md_definition else "",
             "md_section": md_definition.get("section", "") if md_definition else "",
@@ -1758,8 +1890,13 @@ class CoreBankingBusinessRulesEngine:
             },
             "rules_display": rules_display,
             "why_rule_exists": business_rules.get("reason", "Standard banking business rule."),
-            "violation_impact": business_rules.get("violation_impact", "Business, financial, and compliance risks."),
-            "workflow_role": workflow_role
+            "violation_impact": violation_impact,
+            "workflow_role": workflow_role,
+            # NEW STANDARD BANKING BUSINESS RULE FORMAT
+            "definition": definition,
+            "condition": condition,
+            "valid_action": valid_action,
+            "invalid_action": invalid_action
         }
     
     def _step6_workflow_explanation(self, columns_analysis: List[Dict], df: pd.DataFrame) -> Dict[str, Any]:
