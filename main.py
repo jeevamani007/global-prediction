@@ -1589,10 +1589,30 @@ async def upload_file(file: UploadFile = File(...)):
             seen_fc.add(key)
             dedup_fallback_cols.append(c)
 
-        standard_business_rules = build_standard_business_rules(
-            banking_validator_result,
-            fallback_columns=dedup_fallback_cols or None,
-        )
+        # 🔥 DYNAMIC BUSINESS RULES FROM OBSERVED DATA (PRIMARY SOURCE - NO HARDCODED RULES)
+        standard_business_rules = None
+        try:
+            from dynamic_business_rules_from_data import generate_dynamic_business_rules
+            dynamic_rules = generate_dynamic_business_rules(file_path)
+            
+            if dynamic_rules and dynamic_rules.get('columns'):
+                # Use dynamic rules as PRIMARY source - 100% data-driven, no hardcoded templates
+                standard_business_rules = dynamic_rules
+                print(f"✅ Generated {len(dynamic_rules.get('columns', []))} dynamic business rules from observed data")
+            else:
+                print("Warning: Dynamic rules generation returned empty result")
+        except Exception as e:
+            print(f"Error: Could not generate dynamic business rules from observed data: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        # FALLBACK: Only use standard/hardcoded rules if dynamic generation completely failed
+        if not standard_business_rules or not standard_business_rules.get('columns'):
+            print("⚠️ Falling back to standard business rules (hardcoded templates)")
+            standard_business_rules = build_standard_business_rules(
+                banking_validator_result,
+                fallback_columns=dedup_fallback_cols or None,
+            )
 
         # Clean up temporary files AFTER all analysis is done
         if file_converter:
@@ -1823,6 +1843,32 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                         all_files_valid = False
                     for fc in (s.get("failed_columns") or []):
                         failed_columns_all.append({**fc, "source_file": fname})
+
+                # 🔥 DYNAMIC BUSINESS RULES FROM OBSERVED DATA (MULTI-FILE - PRIMARY SOURCE)
+                try:
+                    from dynamic_business_rules_from_data import generate_dynamic_business_rules
+                    for file_path in file_paths:
+                        try:
+                            file_key = os.path.basename(file_path)
+                            dynamic_rules = generate_dynamic_business_rules(file_path)
+                            
+                            if dynamic_rules and dynamic_rules.get('columns'):
+                                # Use dynamic rules as PRIMARY source - 100% data-driven
+                                standard_business_rules_files[file_key] = dynamic_rules
+                                print(f"✅ Generated {len(dynamic_rules.get('columns', []))} dynamic rules for {file_key}")
+                            else:
+                                # Fallback to standard rules only if dynamic generation failed
+                                if file_key not in standard_business_rules_files:
+                                    print(f"⚠️ Using fallback rules for {file_key}")
+                        except Exception as file_e:
+                            print(f"Error: Could not generate dynamic rules for {file_path}: {str(file_e)}")
+                            import traceback
+                            traceback.print_exc()
+                            # Keep existing standard rules for this file if available
+                except Exception as e:
+                    print(f"Error: Dynamic business rules generation failed for multi-file: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
 
                 standard_business_rules = {
                     "multi_file": True,

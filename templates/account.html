@@ -1251,9 +1251,22 @@
                             <h3 class="card-title">📋 Column Business Rules</h3>
                         </div>
                         <p style="color: var(--text-muted); margin-bottom: 16px;">
-                            Each column is analyzed with its Definition, Condition, and Action (why valid/invalid).
+                            Each column is analyzed with its <strong>Definition</strong>, <strong>Condition</strong>, and <strong>Action</strong> (why valid/invalid).
+                            <strong style="color: var(--primary);">All rules are dynamically generated from your uploaded file data - no hardcoded assumptions.</strong>
                             Review each rule below.
                         </p>
+                        <!-- Search and Filter Controls -->
+                        <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                            <input type="text" id="businessRulesSearch" placeholder="🔍 Search columns..." 
+                                style="flex: 1; min-width: 200px; padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                            <select id="businessRulesFilter" 
+                                style="padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; cursor: pointer;">
+                                <option value="all">All Status</option>
+                                <option value="VALID">✅ Valid</option>
+                                <option value="WARNING">⚠️ Warning</option>
+                                <option value="INVALID">🚩 Invalid</option>
+                            </select>
+                        </div>
                         <div id="businessRulesContent">
                             <!-- Dynamic business rules will be inserted here -->
                         </div>
@@ -2496,10 +2509,14 @@
                 const borderColor = status === 'VALID' ? '#10b981' : (status === 'WARNING' ? '#f59e0b' : '#ef4444');
 
                 return `
-                    <div class="column-rule-card" style="border-left: 5px solid ${borderColor}; margin-bottom: 20px;">
+                    <div class="column-rule-card ${status.toLowerCase()}" 
+                         data-status="${status}" 
+                         data-column-name="${escapeHtml(displayName.toLowerCase())}"
+                         data-field-name="${escapeHtml(field.toLowerCase())}"
+                         style="border-left: 5px solid ${borderColor}; margin-bottom: 20px;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
                             <div style="flex: 1;">
-                                <div style="font-weight: 700; color: var(--text-dark); font-size: 1.1rem; margin-bottom: 8px;">
+                                <div class="column-rule-title" style="font-weight: 700; color: var(--text-dark); font-size: 1.1rem; margin-bottom: 8px;">
                                     ${escapeHtml(displayName)}
                                 </div>
                                 <div style="font-size: 0.85rem; color: var(--text-muted);">
@@ -2625,8 +2642,16 @@
 
             container.innerHTML = html;
 
+            // Store all columns for filtering
+            window.allBusinessRuleColumns = allColumns;
+            window.allBusinessRuleCards = container.querySelectorAll('.column-rule-card');
+
+            // Add search and filter functionality
+            setupBusinessRulesSearchAndFilter();
+
             // Add "What Happens Next" section
             const nextSteps = document.createElement('div');
+            nextSteps.className = 'next-steps-section';
             nextSteps.style.marginTop = '24px';
             nextSteps.style.padding = '24px';
             nextSteps.style.background = '#f9fafb';
@@ -3811,6 +3836,86 @@
 
             return sections;
         }
+        // Business Rules Search and Filter Functionality
+        function setupBusinessRulesSearchAndFilter() {
+            const searchInput = document.getElementById('businessRulesSearch');
+            const filterSelect = document.getElementById('businessRulesFilter');
+            const container = document.getElementById('businessRulesContent');
+
+            if (!searchInput || !filterSelect || !container) return;
+
+            function filterAndSearch() {
+                const searchTerm = (searchInput.value || '').toLowerCase().trim();
+                const filterStatus = filterSelect.value || 'all';
+                const cards = container.querySelectorAll('.column-rule-card');
+
+                let visibleCount = 0;
+
+                cards.forEach(card => {
+                    // Get column name and status from the card
+                    const titleElement = card.querySelector('.column-rule-title') || 
+                                        card.querySelector('[style*="font-weight: 700"]') ||
+                                        card.firstElementChild;
+                    
+                    const columnName = titleElement ? (titleElement.textContent || '').toLowerCase() : '';
+                    const statusBadge = card.querySelector('.badge-success, .badge-warning, .badge-danger, .badge-primary');
+                    // Get status from data attribute (more reliable)
+                    const statusBadgeEl = card.querySelector('.badge-success, .badge-warning, .badge-danger, .badge-primary');
+                    const badgeStatus = statusBadgeEl ? (statusBadgeEl.textContent || '').toUpperCase().trim() : '';
+                    const cardStatus = (card.getAttribute('data-status') || badgeStatus || '').toUpperCase().trim();
+
+                    // Get column name from data attribute
+                    const dataColumnName = (card.getAttribute('data-column-name') || '').toLowerCase();
+                    const dataFieldName = (card.getAttribute('data-field-name') || '').toLowerCase();
+
+                    // Get all text content for search
+                    const allText = card.textContent || '';
+                    
+                    // Check search term match
+                    const matchesSearch = !searchTerm || 
+                        dataColumnName.includes(searchTerm) || 
+                        dataFieldName.includes(searchTerm) ||
+                        columnName.includes(searchTerm) || 
+                        allText.toLowerCase().includes(searchTerm);
+
+                    // Check status filter match
+                    const matchesFilter = filterStatus === 'all' ||
+                        (filterStatus === 'VALID' && cardStatus === 'VALID') ||
+                        (filterStatus === 'WARNING' && cardStatus === 'WARNING') ||
+                        (filterStatus === 'INVALID' && cardStatus === 'INVALID');
+
+                    if (matchesSearch && matchesFilter) {
+                        card.style.display = 'block';
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                // Show "No results" message if needed
+                let noResultsMsg = container.querySelector('.no-results-message');
+                if (visibleCount === 0 && cards.length > 0) {
+                    if (!noResultsMsg) {
+                        noResultsMsg = document.createElement('div');
+                        noResultsMsg.className = 'no-results-message';
+                        noResultsMsg.style.cssText = 'text-align: center; padding: 40px; color: var(--text-muted); background: #f9fafb; border-radius: 12px; margin: 20px 0;';
+                        container.appendChild(noResultsMsg);
+                    }
+                    noResultsMsg.innerHTML = `
+                        <div style="font-size: 3rem; margin-bottom: 16px;">🔍</div>
+                        <h3 style="color: var(--text-dark); margin-bottom: 8px;">No Matching Business Rules</h3>
+                        <p>Try adjusting your search term or filter criteria.</p>
+                    `;
+                } else if (noResultsMsg) {
+                    noResultsMsg.remove();
+                }
+            }
+
+            // Add event listeners
+            searchInput.addEventListener('input', filterAndSearch);
+            filterSelect.addEventListener('change', filterAndSearch);
+        }
+
     </script>
 </body>
 
