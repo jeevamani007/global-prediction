@@ -281,9 +281,105 @@ def generate_business_rules(col_name: str, analysis: Dict[str, Any], non_null: p
     return definition, condition, action_valid, action_invalid, issues, status
 
 
+def classify_column_importance(analysis: Dict[str, Any]) -> str:
+    """
+    Dynamically classify column importance based on validation results ONLY.
+    NO hard-coding by column name - importance comes from data observations.
+    
+    Classification criteria:
+    - CRITICAL: Blocks processing or causes failure
+    - WARNING: May affect results or reliability  
+    - SAFE: No user action required
+    """
+    status = analysis.get('status', 'UNKNOWN').upper()
+    issues = analysis.get('issues', [])
+    null_pct = analysis.get('null_percentage', 0)
+    unique_ratio = analysis.get('unique_ratio', 0)
+    pattern_consistency = analysis.get('pattern_consistency', 100)
+    
+    # CRITICAL classification based on validation results
+    if status == 'INVALID':
+        return 'CRITICAL'
+    if null_pct > 50:  # More than half the data missing
+        return 'CRITICAL'
+    if any('duplicate' in str(i).lower() and 'id' in str(i).lower() for i in issues):
+        return 'CRITICAL'
+    if any('all values are missing' in str(i).lower() for i in issues):
+        return 'CRITICAL'
+    
+    # WARNING classification based on validation results
+    if status == 'WARNING':
+        return 'WARNING'
+    if 10 < null_pct <= 50:  # Significant but not critical missing data
+        return 'WARNING'
+    if pattern_consistency < 80:  # Inconsistent data patterns
+        return 'WARNING'
+    if len(issues) > 0:  # Any issues detected
+        return 'WARNING'
+    
+    # SAFE: No issues detected
+    return 'SAFE'
+
+
+def generate_user_friendly_message(analysis: Dict[str, Any]) -> str:
+    """
+    Generate user-friendly banking language message.
+    NO technical terms - simple explanation for end users.
+    """
+    importance = analysis.get('importance', 'SAFE')
+    display_name = analysis.get('display_name', 'This field')
+    null_pct = analysis.get('null_percentage', 0)
+    issues = analysis.get('issues', [])
+    
+    if importance == 'CRITICAL':
+        if null_pct > 50:
+            return f"{display_name} has significant missing information that may prevent proper record processing."
+        if any('duplicate' in str(i).lower() for i in issues):
+            return f"{display_name} contains repeated entries that could cause identification issues."
+        return f"{display_name} requires attention before your data can be processed securely."
+    
+    if importance == 'WARNING':
+        if 10 < null_pct <= 50:
+            return f"{display_name} has some missing information that may affect reporting accuracy."
+        return f"{display_name} may benefit from review to ensure complete data quality."
+    
+    return f"{display_name} has been verified successfully."
+
+
+def generate_user_action(analysis: Dict[str, Any]) -> str:
+    """
+    Generate user-friendly action recommendation.
+    Simple, clear instructions without technical jargon.
+    """
+    importance = analysis.get('importance', 'SAFE')
+    null_pct = analysis.get('null_percentage', 0)
+    issues = analysis.get('issues', [])
+    
+    if importance == 'CRITICAL':
+        if null_pct > 50:
+            return "Please provide the missing information for this field."
+        if any('duplicate' in str(i).lower() for i in issues):
+            return "Please review and correct any repeated entries."
+        return "Please review and update this information."
+    
+    if importance == 'WARNING':
+        if null_pct > 10:
+            return "Consider filling in the missing entries if available."
+        return "Optional: Review this field for completeness."
+    
+    return "No action required."
+
+
 def generate_dynamic_business_rules(file_path: str) -> Dict[str, Any]:
     """
     Generate dynamic business rules from uploaded file.
+    
+    BANKING DOMAIN VALIDATION ENGINE:
+    - ALL columns validated internally using observed data patterns
+    - NO hard-coded column names or business rules
+    - Importance determined dynamically from validation results ONLY
+    - User-friendly banking language (NO technical terms in UI output)
+    
     Processes ALL columns in the file - 100% data-driven, no hardcoded templates.
     """
     try:
@@ -294,6 +390,14 @@ def generate_dynamic_business_rules(file_path: str) -> Dict[str, Any]:
         for col in df.columns:
             try:
                 analysis = analyze_column_data(col, df[col])
+                
+                # Dynamically classify importance based on validation results
+                analysis['importance'] = classify_column_importance(analysis)
+                
+                # Generate user-friendly messages (NO technical terms)
+                analysis['user_message'] = generate_user_friendly_message(analysis)
+                analysis['user_action'] = generate_user_action(analysis)
+                
                 columns_analysis.append(analysis)
             except Exception as col_error:
                 print(f"Warning: Could not analyze column '{col}': {str(col_error)}")
@@ -302,6 +406,7 @@ def generate_dynamic_business_rules(file_path: str) -> Dict[str, Any]:
                     'column_name': col,
                     'display_name': col.replace('_', ' ').title(),
                     'status': 'UNKNOWN',
+                    'importance': 'WARNING',
                     'definition': f"Column '{col}' found in uploaded file. Unable to analyze data patterns.",
                     'condition': "Data analysis failed for this column.",
                     'action_valid': "No action available - analysis failed.",
@@ -309,24 +414,43 @@ def generate_dynamic_business_rules(file_path: str) -> Dict[str, Any]:
                     'action_valid_points': [],
                     'action_invalid_points': [],
                     'issues': [f"Column analysis failed: {str(col_error)}"],
-                    'is_sensitive': False
+                    'is_sensitive': False,
+                    'user_message': f"{col.replace('_', ' ').title()} could not be analyzed automatically.",
+                    'user_action': "Please verify this information is correct."
                 })
         
-        # Calculate summary
+        # Calculate summary with importance-based counts
         total_columns = len(columns_analysis)
         valid_count = sum(1 for c in columns_analysis if c['status'] == 'VALID')
         warning_count = sum(1 for c in columns_analysis if c['status'] == 'WARNING')
         invalid_count = sum(1 for c in columns_analysis if c['status'] == 'INVALID')
-        all_valid = invalid_count == 0 and warning_count == 0
+        
+        # Dynamic importance counts (based on validation results, NOT column names)
+        critical_count = sum(1 for c in columns_analysis if c.get('importance') == 'CRITICAL')
+        warning_importance_count = sum(1 for c in columns_analysis if c.get('importance') == 'WARNING')
+        safe_count = sum(1 for c in columns_analysis if c.get('importance') == 'SAFE')
+        
+        all_valid = critical_count == 0
+        
+        # Separate columns by importance for UI
+        critical_columns = [c for c in columns_analysis if c.get('importance') == 'CRITICAL']
+        warning_columns = [c for c in columns_analysis if c.get('importance') == 'WARNING']
+        safe_columns = [c for c in columns_analysis if c.get('importance') == 'SAFE']
         
         return {
             'multi_file': False,
             'columns': columns_analysis,
+            'critical_columns': critical_columns,
+            'warning_columns': warning_columns,
+            'safe_columns': safe_columns,
             'summary': {
                 'total_columns': total_columns,
                 'valid_count': valid_count,
                 'warning_count': warning_count,
                 'invalid_count': invalid_count,
+                'critical_count': critical_count,
+                'warning_importance_count': warning_importance_count,
+                'safe_count': safe_count,
                 'all_valid': all_valid
             }
         }

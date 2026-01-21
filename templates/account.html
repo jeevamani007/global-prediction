@@ -3299,213 +3299,341 @@
         }
 
         /**
-         * Banking Application UI Explanation Generator
-         * Generates user-friendly UI explanations without exposing business rules
+         * Banking Domain Validation & User Explanation Engine
+         * 
+         * NON-NEGOTIABLE RULES:
+         * - ALL columns validated internally using observed banking business rules
+         * - NO hard-coded column names or business rules
+         * - Importance determined dynamically from validation results ONLY
+         * - UI shows ONLY Critical and Warning items (SAFE columns hidden)
+         * - User-friendly banking language (NO technical terms)
          */
         function loadAccountVerificationUI() {
             const standardRules = JSON.parse(sessionStorage.getItem('standardBusinessRules') || 'null');
+            const dynamicRules = JSON.parse(sessionStorage.getItem('dynamicBusinessRules') || 'null');
             const container = document.getElementById('accountVerificationContent');
 
-            if (!standardRules) {
+            if (!standardRules && !dynamicRules) {
                 container.innerHTML = `
                     <div class="empty-state" style="text-align:center; padding:48px; color: var(--text-muted);">
-                        <div style="font-size:3rem; margin-bottom:16px;">✔</div>
-                        <h3 style="color: var(--primary); margin-bottom: 8px;">Account Verification</h3>
-                        <p style="font-size:0.95rem;">Upload a banking dataset to view account verification status.</p>
+                        <div style="font-size:3rem; margin-bottom:16px;">🏦</div>
+                        <h3 style="color: var(--primary); margin-bottom: 8px;">Data Validation</h3>
+                        <p style="font-size:0.95rem;">Upload a banking dataset to view validation results.</p>
                     </div>
                 `;
                 return;
             }
 
-            const isMulti = !!standardRules.multi_file;
+            // Use dynamicRules if available, fallback to standardRules
+            const rules = dynamicRules || standardRules;
+            const isMulti = !!(rules.multi_file);
 
-            // Get all columns and their validation status
+            // ============================================================
+            // INTERNAL PROCESS: Validate ALL columns silently
+            // Apply Definition → Condition → Action for every column
+            // ============================================================
             let allColumns = [];
-            let allValid = true;
-            let failedColumns = [];
-
+            
             if (isMulti) {
-                // Multi-file mode: collect columns from all files
-                const files = standardRules.files || {};
+                const files = rules.files || {};
                 Object.keys(files).forEach(fname => {
                     const fr = files[fname] || {};
                     const cols = fr.columns || [];
                     cols.forEach(col => {
-                        const colWithFile = { ...col, source_file: fname };
-                        allColumns.push(colWithFile);
-                        const status = (col.status || 'UNKNOWN').toUpperCase();
-                        if (status === 'INVALID' || status === 'WARNING') {
-                            allValid = false;
-                            failedColumns.push(colWithFile);
-                        }
+                        allColumns.push({ ...col, source_file: fname });
                     });
                 });
-                // Also check summary failed_columns for multi-file
-                if (standardRules.summary && standardRules.summary.failed_columns) {
-                    standardRules.summary.failed_columns.forEach(fc => {
-                        // Try to find matching column in allColumns and add if not already there
-                        const existing = failedColumns.find(f =>
-                            (f.column_name || f.original_column_name || f.display_name) ===
-                            (fc.column_name || fc.original_column_name || fc.display_name)
-                        );
-                        if (!existing) {
-                            failedColumns.push(fc);
-                        }
-                    });
-                }
-                // Check summary for overall validity
-                if (standardRules.summary && !standardRules.summary.all_valid) {
-                    allValid = false;
-                }
             } else {
-                // Single-file mode
-                allColumns = standardRules.columns || [];
-                const summary = standardRules.summary || {};
-                allValid = !!(summary.all_valid);
-                failedColumns = summary.failed_columns || [];
-
-                // Also check columns directly if summary doesn't have failed_columns
-                if (failedColumns.length === 0) {
-                    allColumns.forEach(col => {
-                        const status = (col.status || 'UNKNOWN').toUpperCase();
-                        if (status === 'INVALID' || status === 'WARNING') {
-                            allValid = false;
-                            failedColumns.push(col);
-                        }
-                    });
-                }
+                allColumns = rules.columns || [];
             }
 
-            // CASE 1: ALL DETAILS ARE VALID
-            // Double-check: if we found any invalid/warning columns, override allValid
-            if (failedColumns.length > 0) {
-                allValid = false;
-            }
-            const esc = (v) => {
-                const s = String(v ?? '');
-                return s
-                    .replaceAll('&', '&amp;')
-                    .replaceAll('<', '&lt;')
-                    .replaceAll('>', '&gt;')
-                    .replaceAll('"', '&quot;')
-                    .replaceAll("'", '&#039;');
+            // ============================================================
+            // DYNAMIC IMPORTANCE DETECTION (NO HARD CODING)
+            // Classify based on validation results ONLY:
+            // - Processing failure risk
+            // - Data inconsistency 
+            // - Rule violations observed
+            // ============================================================
+            const classifyImportance = (col) => {
+                const status = (col.status || 'UNKNOWN').toUpperCase();
+                const issues = col.issues || [];
+                const nullPct = col.null_percentage || 0;
+                const uniqueRatio = col.unique_ratio || 0;
+                
+                // CRITICAL: Blocks processing or causes failure
+                if (status === 'INVALID') return 'CRITICAL';
+                if (nullPct > 50) return 'CRITICAL'; // More than half missing
+                if (issues.some(i => /duplicate.*id|missing.*required|invalid.*format/i.test(i))) return 'CRITICAL';
+                
+                // WARNING: May affect results or reliability
+                if (status === 'WARNING') return 'WARNING';
+                if (nullPct > 10 && nullPct <= 50) return 'WARNING';
+                if (issues.length > 0) return 'WARNING';
+                
+                // SAFE: No user action required
+                return 'SAFE';
             };
 
-            // CASE 2: SOME DETAILS ARE INVALID OR MISSING
-            // Get unique failed columns (avoid duplicates)
-            const uniqueFailedColumns = [];
-            const seenColumns = new Set();
+            // Classify all columns dynamically
+            const classifiedColumns = allColumns.map(col => ({
+                ...col,
+                importance: classifyImportance(col)
+            }));
 
-            failedColumns.forEach(col => {
-                const colKey = col.column_name || col.original_column_name || col.display_name || '';
-                if (colKey && !seenColumns.has(colKey)) {
-                    seenColumns.add(colKey);
-                    uniqueFailedColumns.push(col);
+            // Separate by importance
+            const criticalItems = classifiedColumns.filter(c => c.importance === 'CRITICAL');
+            const warningItems = classifiedColumns.filter(c => c.importance === 'WARNING');
+            const safeItems = classifiedColumns.filter(c => c.importance === 'SAFE');
+
+            const totalColumns = classifiedColumns.length;
+            const criticalCount = criticalItems.length;
+            const warningCount = warningItems.length;
+            const safeCount = safeItems.length;
+
+            // Helper: Escape HTML
+            const esc = (v) => {
+                const s = String(v ?? '');
+                return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+            };
+
+            // Helper: Convert technical text to user-friendly banking language
+            const toBankingLanguage = (text) => {
+                if (!text) return '';
+                return text
+                    .replace(/null|NULL/gi, 'missing information')
+                    .replace(/duplicate/gi, 'repeated entry')
+                    .replace(/unique.*ratio/gi, 'uniqueness level')
+                    .replace(/validation/gi, 'verification')
+                    .replace(/invalid/gi, 'needs attention')
+                    .replace(/pattern/gi, 'format')
+                    .replace(/regex|regexp/gi, '')
+                    .replace(/SQL|database|column|field/gi, '')
+                    .replace(/percentage|%/gi, 'portion')
+                    .replace(/integer|float|numeric/gi, 'number')
+                    .replace(/string/gi, 'text')
+                    .replace(/boolean/gi, 'yes/no value')
+                    .trim();
+            };
+
+            // Helper: Generate user-friendly impact description
+            const getBusinessImpact = (col) => {
+                const issues = col.issues || [];
+                const nullPct = col.null_percentage || 0;
+                const displayName = col.display_name || col.column_name || 'This field';
+                
+                if (col.importance === 'CRITICAL') {
+                    if (nullPct > 50) return `${displayName} has significant missing information that may prevent proper processing of your records.`;
+                    if (issues.some(i => /duplicate/i.test(i))) return `${displayName} contains repeated entries that could cause confusion in record identification.`;
+                    return `${displayName} requires correction before your data can be processed securely.`;
                 }
-            });
+                
+                if (col.importance === 'WARNING') {
+                    if (nullPct > 10) return `${displayName} has some missing information that may affect reporting accuracy.`;
+                    return `${displayName} may benefit from review to ensure complete data quality.`;
+                }
+                
+                return '';
+            };
 
-            // If no failed columns in summary, check all columns for invalid/warning status
-            if (uniqueFailedColumns.length === 0) {
-                allColumns.forEach(col => {
-                    const status = (col.status || 'UNKNOWN').toUpperCase();
-                    if (status === 'INVALID' || status === 'WARNING') {
-                        const colKey = col.column_name || col.original_column_name || col.display_name || '';
-                        if (colKey && !seenColumns.has(colKey)) {
-                            seenColumns.add(colKey);
-                            uniqueFailedColumns.push(col);
-                        }
-                    }
-                });
-            }
+            // Helper: Generate user-friendly action
+            const getUserAction = (col) => {
+                const issues = col.issues || [];
+                const nullPct = col.null_percentage || 0;
+                
+                if (col.importance === 'CRITICAL') {
+                    if (nullPct > 50) return 'Please provide the missing information for this field.';
+                    if (issues.some(i => /duplicate/i.test(i))) return 'Please review and correct any repeated entries.';
+                    return 'Please review and update this information.';
+                }
+                
+                if (col.importance === 'WARNING') {
+                    if (nullPct > 10) return 'Consider filling in the missing entries if available.';
+                    return 'Optional: Review this field for completeness.';
+                }
+                
+                return '';
+            };
 
-            if (uniqueFailedColumns.length === 0) {
-                allValid = true;
-            }
+            // ============================================================
+            // UI OUTPUT: Build the banking-grade explanation
+            // ============================================================
+            let html = '';
 
-            // Two-panel UI (matches the screenshot layout)
-            const validPanel = `
-                <div class="result-panel valid">
-                    <div class="panel-header">All Details Valid</div>
-                    <div class="panel-body">
-                        <div style="display:flex; gap:12px; align-items:flex-start;">
-                            <div style="font-size: 1.6rem; line-height: 1;">✔</div>
-                            <div>
-                                <div style="font-weight:800; font-size:1.05rem; margin-bottom:6px;">
-                                    ${allValid ? 'All details are valid and verified successfully.' : 'Some details are valid.'}
-                                </div>
-                                <div style="color: var(--text-muted); font-size: 0.95rem;">
-                                    Your verified information meets banking standards and can be used to enable services safely.
-                                </div>
-                            </div>
+            // 1. PURPOSE SECTION (Top – 2 lines)
+            html += `
+                <div style="background: linear-gradient(135deg, #1a56db 0%, #0d47a1 100%); color: white; padding: 24px 28px; border-radius: 12px; margin-bottom: 24px;">
+                    <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5rem;">🏦</span> Banking Data Verification Report
+                    </h2>
+                    <p style="font-size: 1rem; opacity: 0.95; line-height: 1.6; margin: 0;">
+                        This data helps the bank verify customer information, process transactions securely, and maintain regulatory compliance.
+                        <br>Your information is reviewed to ensure accurate record-keeping and protect your account.
+                    </p>
+                </div>
+            `;
+
+            // 2. DATA USAGE SECTION
+            html += `
+                <div style="background: #f0f5ff; border: 1px solid #c7d2fe; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px;">
+                    <h3 style="color: #3730a3; font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <span>📋</span> How Your Data Is Used
+                    </h3>
+                    <ul style="color: #1e1b4b; font-size: 0.95rem; line-height: 1.8; margin: 0; padding-left: 20px;">
+                        <li><strong>Account Management:</strong> Keeping your records accurate and up-to-date</li>
+                        <li><strong>Transaction Processing:</strong> Ensuring secure and reliable money transfers</li>
+                        <li><strong>Compliance & Security:</strong> Meeting banking regulations and protecting your account</li>
+                        <li><strong>Customer Service:</strong> Helping us serve you better with accurate information</li>
+                    </ul>
+                </div>
+            `;
+
+            // 3. SUMMARY CARD
+            html += `
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                    <h3 style="color: #1f2937; font-size: 1.15rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                        <span>📊</span> Verification Summary
+                    </h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
+                        <div style="text-align: center; padding: 16px; background: #e0e7ff; border-radius: 10px;">
+                            <div style="font-size: 2rem; font-weight: 800; color: #3730a3;">${totalColumns}</div>
+                            <div style="font-size: 0.85rem; color: #4338ca; margin-top: 4px;">Total Fields Checked</div>
                         </div>
-                        <div style="margin-top: 14px; color: var(--text-muted); font-size: 0.95rem;">
-                            <div style="font-weight:800; color: var(--text-dark); margin-bottom:6px;">What this means</div>
-                            <ul style="margin: 6px 0 0 18px; padding: 0;">
-                                <li>Verified fields can be used for KYC, security checks, and regulatory audits.</li>
-                                <li>Sensitive values remain masked while validation still works.</li>
-                                <li>${allValid ? 'No action required from your side.' : 'Only the highlighted fields need correction.'}</li>
-                            </ul>
+                        ${criticalCount > 0 ? `
+                        <div style="text-align: center; padding: 16px; background: #fee2e2; border-radius: 10px;">
+                            <div style="font-size: 2rem; font-weight: 800; color: #dc2626;">🚩 ${criticalCount}</div>
+                            <div style="font-size: 0.85rem; color: #991b1b; margin-top: 4px;">Critical Issues</div>
+                        </div>
+                        ` : ''}
+                        ${warningCount > 0 ? `
+                        <div style="text-align: center; padding: 16px; background: #fef3c7; border-radius: 10px;">
+                            <div style="font-size: 2rem; font-weight: 800; color: #d97706;">⚠️ ${warningCount}</div>
+                            <div style="font-size: 0.85rem; color: #92400e; margin-top: 4px;">Warnings</div>
+                        </div>
+                        ` : ''}
+                        <div style="text-align: center; padding: 16px; background: #d1fae5; border-radius: 10px;">
+                            <div style="font-size: 2rem; font-weight: 800; color: #059669;">✅ ${safeCount}</div>
+                            <div style="font-size: 0.85rem; color: #065f46; margin-top: 4px;">Verified Successfully</div>
                         </div>
                     </div>
                 </div>
             `;
 
-            const issuesPanel = `
-                <div class="result-panel issues">
-                    <div class="panel-header">Issues Found</div>
-                    <div class="panel-body">
-                        <div style="display:flex; gap:12px; align-items:flex-start;">
-                            <div style="font-size: 1.6rem; line-height: 1;">!</div>
-                            <div>
-                                <div style="font-weight:800; font-size:1.05rem; margin-bottom:6px; color: #7f1d1d;">
-                                    ${allValid ? 'No issues found.' : 'Please correct the highlighted fields.'}
-                                </div>
-                                <div style="color: var(--text-muted); font-size: 0.95rem;">
-                                    ${allValid ? 'Everything looks good. You can continue without changes.' : 'Fixing these will complete verification.'}
-                                </div>
-                            </div>
-                        </div>
-
-                        ${allValid ? `
-                            <div class="issue-row" style="border-color: var(--border); margin-top: 14px;">
-                                <div class="issue-title" style="color: var(--text-dark);">No corrections needed</div>
-                                <div class="issue-msg" style="color: var(--text-muted);">All checked fields passed validation.</div>
-                            </div>
-                        ` : `
-                            ${uniqueFailedColumns.map(col => {
-                const displayName = col.display_name || col.original_column_name || col.column_name || 'Field';
-                const field = col.original_column_name || col.column_name || '';
-                const sourceFile = col.source_file ? ` (${col.source_file})` : '';
-                const msg = col.ui_issue_message || 'Invalid value. Please correct this field.';
-                return `
-                                    <div class="issue-row">
-                                        <div class="issue-title">${esc(displayName)}${esc(sourceFile)}</div>
-                                        <div class="issue-msg">${esc(msg)}</div>
-                                        <div class="issue-meta">
-                                            <strong>Field:</strong> <code style="background:#f3f4f6; padding:2px 6px; border-radius:4px;">${esc(field)}</code>
+            // 4. CRITICAL ISSUES SECTION (If any)
+            if (criticalCount > 0) {
+                html += `
+                    <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="color: #991b1b; font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.4rem;">🚩</span> Action Required - Critical Issues
+                        </h3>
+                        <p style="color: #7f1d1d; font-size: 0.95rem; margin-bottom: 20px; line-height: 1.6;">
+                            The following items need your attention before processing can continue. Please review and correct them.
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            ${criticalItems.map(col => {
+                                const displayName = col.display_name || col.column_name || 'Field';
+                                const impact = getBusinessImpact(col);
+                                const action = getUserAction(col);
+                                const sourceFile = col.source_file ? ` (${esc(col.source_file)})` : '';
+                                
+                                return `
+                                    <div style="background: white; border-left: 4px solid #dc2626; border-radius: 8px; padding: 16px 20px;">
+                                        <div style="font-weight: 700; color: #1f2937; font-size: 1.05rem; margin-bottom: 8px;">
+                                            ${esc(displayName)}${sourceFile}
+                                        </div>
+                                        <div style="color: #4b5563; font-size: 0.95rem; line-height: 1.6; margin-bottom: 12px;">
+                                            ${esc(impact)}
+                                        </div>
+                                        <div style="background: #fef2f2; padding: 12px; border-radius: 6px;">
+                                            <div style="font-weight: 600; color: #991b1b; font-size: 0.9rem; margin-bottom: 4px;">What to do:</div>
+                                            <div style="color: #7f1d1d; font-size: 0.9rem;">${esc(action)}</div>
                                         </div>
                                     </div>
                                 `;
-            }).join('')}
-                        `}
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
 
-                        <div class="result-actions">
-                            <button class="submit-btn" ${allValid ? 'disabled' : ''} type="button">
-                                Submit
-                            </button>
+            // 5. WARNING SECTION (If any)
+            if (warningCount > 0) {
+                html += `
+                    <div style="background: #fffbeb; border: 2px solid #fde68a; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                        <h3 style="color: #92400e; font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.4rem;">⚠️</span> Review Recommended - Warnings
+                        </h3>
+                        <p style="color: #78350f; font-size: 0.95rem; margin-bottom: 20px; line-height: 1.6;">
+                            These items may affect data quality. Review is recommended but not required to continue.
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 14px;">
+                            ${warningItems.map(col => {
+                                const displayName = col.display_name || col.column_name || 'Field';
+                                const impact = getBusinessImpact(col);
+                                const action = getUserAction(col);
+                                const sourceFile = col.source_file ? ` (${esc(col.source_file)})` : '';
+                                
+                                return `
+                                    <div style="background: white; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 18px;">
+                                        <div style="font-weight: 700; color: #1f2937; font-size: 1rem; margin-bottom: 6px;">
+                                            ${esc(displayName)}${sourceFile}
+                                        </div>
+                                        <div style="color: #4b5563; font-size: 0.9rem; line-height: 1.5; margin-bottom: 8px;">
+                                            ${esc(impact)}
+                                        </div>
+                                        <div style="color: #92400e; font-size: 0.85rem; font-style: italic;">
+                                            ${esc(action)}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 6. FINAL CONFIRMATION
+            const allValidated = criticalCount === 0;
+            html += `
+                <div style="background: ${allValidated ? '#ecfdf5' : '#f9fafb'}; border: 1px solid ${allValidated ? '#a7f3d0' : '#e5e7eb'}; border-radius: 12px; padding: 24px; margin-bottom: 16px;">
+                    <h3 style="color: ${allValidated ? '#065f46' : '#374151'}; font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.3rem;">${allValidated ? '✅' : '📝'}</span> 
+                        ${allValidated ? 'Verification Complete' : 'Verification Status'}
+                    </h3>
+                    <div style="color: ${allValidated ? '#047857' : '#4b5563'}; font-size: 0.95rem; line-height: 1.8;">
+                        ${allValidated ? `
+                            <p style="margin-bottom: 8px;"><strong>All ${totalColumns} fields have been verified successfully.</strong></p>
+                            <p style="margin-bottom: 8px;">Your data meets banking standards and is ready for processing.</p>
+                        ` : `
+                            <p style="margin-bottom: 8px;"><strong>${safeCount} of ${totalColumns} fields verified successfully.</strong></p>
+                            <p style="margin-bottom: 8px;">Please address the critical issues above before proceeding.</p>
+                        `}
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid ${allValidated ? '#a7f3d0' : '#e5e7eb'};">
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">Background Validation:</div>
+                            <p style="color: #6b7280; margin: 0;">
+                                All fields have been validated against banking standards automatically.
+                                Only items requiring your attention are shown above.
+                                ${safeCount > 0 ? `<strong>${safeCount} additional fields</strong> passed verification and require no action.` : ''}
+                            </p>
                         </div>
                     </div>
                 </div>
             `;
 
-            container.innerHTML = `
-                <div style="max-width: 1100px; margin: 0 auto;">
-                    <div class="result-grid">
-                        ${validPanel}
-                        ${issuesPanel}
-                    </div>
+            // Action buttons
+            html += `
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+                    ${!allValidated ? `
+                        <button type="button" style="padding: 12px 24px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; color: #374151; font-size: 0.95rem; font-weight: 600; cursor: pointer;">
+                            Download Report
+                        </button>
+                    ` : ''}
+                    <button type="button" style="padding: 12px 24px; background: ${allValidated ? '#059669' : '#6b7280'}; border: none; border-radius: 8px; color: white; font-size: 0.95rem; font-weight: 600; cursor: ${allValidated ? 'pointer' : 'not-allowed'};" ${!allValidated ? 'disabled' : ''}>
+                        ${allValidated ? 'Continue Processing' : 'Fix Issues to Continue'}
+                    </button>
                 </div>
             `;
+
+            container.innerHTML = `<div style="max-width: 900px; margin: 0 auto;">${html}</div>`;
         }
 
         function loadApplicationStructure() {
