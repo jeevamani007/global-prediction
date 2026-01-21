@@ -2467,40 +2467,104 @@
                 `;
             }
 
-            // Helper function to render a single column rule card (simplified format)
+            // Helper function to render a single column rule card with full details
             const renderColumnRuleCard = (col, fileLabel) => {
                 const status = (col.status || 'UNKNOWN').toUpperCase();
                 const displayName = col.display_name || col.column_name || 'Column';
                 const field = col.original_column_name || col.column_name || '';
                 const isSensitive = !!col.is_sensitive;
                 const fieldDisplay = isSensitive ? '••••••••' : field;
+                
+                // Get definition, condition, and actions
+                const definition = col.definition || 'No definition available.';
+                const condition = col.condition || 'No condition specified.';
+                const actionValid = col.action_valid || (Array.isArray(col.action_valid_points) && col.action_valid_points.length > 0 
+                    ? col.action_valid_points.join('. ') 
+                    : 'Field is valid and ready for banking processes.');
+                const actionInvalid = col.ui_issue_message || col.action_invalid || (Array.isArray(col.action_invalid_points) && col.action_invalid_points.length > 0 
+                    ? col.action_invalid_points.join('. ') 
+                    : 'Fix this field to proceed.');
+                const actionValidPoints = Array.isArray(col.action_valid_points) && col.action_valid_points.length > 0 
+                    ? col.action_valid_points 
+                    : (actionValid ? [actionValid] : []);
+                const actionInvalidPoints = Array.isArray(col.action_invalid_points) && col.action_invalid_points.length > 0 
+                    ? col.action_invalid_points 
+                    : (actionInvalid ? [actionInvalid] : []);
+                const issues = Array.isArray(col.issues) ? col.issues.filter(Boolean) : [];
 
-                const validAction = col.action_valid || 'Ready for banking processes.';
-                const invalidAction = col.ui_issue_message || col.action_invalid || 'Fix this detail to proceed.';
+                // Determine border color based on status
+                const borderColor = status === 'VALID' ? '#10b981' : (status === 'WARNING' ? '#f59e0b' : '#ef4444');
 
                 return `
-                    <div style="padding: 16px; border-bottom: 1px solid #f3f4f6; position: relative;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                            <div>
-                                <div style="font-weight: 700; color: var(--text-dark); font-size: 1rem;">${escapeHtml(displayName)}</div>
-                                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                    <div class="column-rule-card" style="border-left: 5px solid ${borderColor}; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 700; color: var(--text-dark); font-size: 1.1rem; margin-bottom: 8px;">
+                                    ${escapeHtml(displayName)}
+                                </div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">
                                     ${fileLabel ? `<span style="margin-right: 12px;"><strong>File:</strong> ${escapeHtml(fileLabel)}</span>` : ''}
-                                    <span><strong>Field:</strong> <code style="background:#f9fafb; padding:2px 6px; border-radius:4px; font-family: monospace;">${escapeHtml(fieldDisplay)}</code></span>
-                                    ${isSensitive ? ' <span style="color: #f59e0b; margin-left: 8px;">🔒 Masked</span>' : ''}
+                                    <span><strong>Column:</strong> <code style="background:#f3f4f6; padding:2px 8px; border-radius:4px; font-family: monospace; font-size: 0.9rem;">${escapeHtml(fieldDisplay)}</code></span>
+                                    ${isSensitive ? ' <span style="color: #f59e0b; margin-left: 8px; font-weight: 600;">🔒 SENSITIVE</span>' : ''}
                                 </div>
                             </div>
-                            <div style="background: ${status === 'VALID' ? '#d1fae5' : (status === 'WARNING' ? '#fef3c7' : '#fee2e2')}; 
-                                        color: ${status === 'VALID' ? '#065f46' : (status === 'WARNING' ? '#92400e' : '#991b1b')}; 
-                                        padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
-                                ${status}
+                            <div style="margin-left: 16px;">
+                                ${statusBadge(status)}
                             </div>
                         </div>
 
-                        <div style="font-size: 0.95rem; line-height: 1.6; color: var(--text-muted);">
-                            <div style="margin-bottom: 4px;">✔ <strong>Correct Logic:</strong> ${escapeHtml(validAction)}</div>
-                            ${status !== 'VALID' ? `
-                            <div style="color: #b91c1c;">🚩 <strong>Action Needed:</strong> ${escapeHtml(invalidAction)}</div>
-                            ` : ''}
+                        <div style="font-size: 0.95rem; line-height: 1.7; color: var(--text-dark);">
+                            <!-- Definition Section -->
+                            <div style="margin-bottom: 16px; padding: 12px; background: #f9fafb; border-radius: 8px; border-left: 3px solid var(--primary);">
+                                <div style="font-weight: 700; color: var(--primary); margin-bottom: 6px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    📖 Definition
+                                </div>
+                                <div style="color: var(--text-dark);">
+                                    ${escapeHtml(definition)}
+                                </div>
+                            </div>
+
+                            <!-- Condition Section -->
+                            <div style="margin-bottom: 16px; padding: 12px; background: #f9fafb; border-radius: 8px; border-left: 3px solid #6366f1;">
+                                <div style="font-weight: 700; color: #6366f1; margin-bottom: 6px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    🔍 Condition
+                                </div>
+                                <div style="color: var(--text-dark);">
+                                    ${escapeHtml(condition)}
+                                </div>
+                            </div>
+
+                            <!-- Action: Valid Case - ALWAYS SHOWN -->
+                            <div class="action-block valid" style="margin-bottom: 16px;">
+                                <div class="label" style="font-weight: 700; color: #065f46; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    ✅ Action (Valid Case)
+                                </div>
+                                <div style="color: #064e3b; line-height: 1.7;">
+                                    ${actionValidPoints.length > 0 
+                                        ? `<ul style="margin: 0; padding-left: 20px; color: #065f46;">${actionValidPoints.map(p => `<li style="margin-bottom: 6px;">${escapeHtml(p)}</li>`).join('')}</ul>`
+                                        : `<div>${escapeHtml(actionValid)}</div>`}
+                                </div>
+                            </div>
+
+                            <!-- Action: Invalid Case - SHOWN FOR ALL STATUSES -->
+                            <div class="action-block invalid" style="margin-bottom: 12px;">
+                                <div class="label" style="font-weight: 700; color: #991b1b; margin-bottom: 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    ⚠️ Action (Invalid Case)
+                                </div>
+                                <div style="color: #7f1d1d; line-height: 1.7;">
+                                    ${actionInvalidPoints.length > 0 
+                                        ? `<ul style="margin: 0; padding-left: 20px; color: #991b1b;">${actionInvalidPoints.map(p => `<li style="margin-bottom: 6px;">${escapeHtml(p)}</li>`).join('')}</ul>`
+                                        : `<div>${escapeHtml(actionInvalid)}</div>`}
+                                </div>
+                                ${issues.length > 0 ? `
+                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #fecaca;">
+                                    <div style="font-weight: 600; color: #991b1b; margin-bottom: 6px; font-size: 0.85rem;">Issues Detected:</div>
+                                    <ul style="margin: 0; padding-left: 20px; color: #7f1d1d;">
+                                        ${issues.slice(0, 5).map(i => `<li style="margin-bottom: 4px;">${escapeHtml(i)}</li>`).join('')}
+                                    </ul>
+                                </div>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -2532,38 +2596,32 @@
                 return;
             }
 
-            // Filter: Show ONLY fields with WARNING or INVALID status
-            const issueColumns = allColumns.filter(col => {
-                const status = (col.status || 'UNKNOWN').toUpperCase();
-                return status === 'WARNING' || status === 'INVALID';
+            // Calculate summary statistics for all columns
+            const validCount = allColumns.filter(c => (c.status || '').toUpperCase() === 'VALID').length;
+            const warningCount = allColumns.filter(c => (c.status || '').toUpperCase() === 'WARNING').length;
+            const invalidCount = allColumns.filter(c => (c.status || '').toUpperCase() === 'INVALID').length;
+            const unknownCount = allColumns.filter(c => {
+                const s = (c.status || '').toUpperCase();
+                return s !== 'VALID' && s !== 'WARNING' && s !== 'INVALID';
+            }).length;
+
+            // Show summary statistics
+            html += `
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding: 16px; background: #f9fafb; border-radius: 12px; border: 1px solid var(--border);">
+                    ${validCount > 0 ? `<div style="background: #d1fae5; color: #065f46; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;"><strong>✅ ${validCount}</strong> Valid Field${validCount > 1 ? 's' : ''}</div>` : ''}
+                    ${warningCount > 0 ? `<div style="background: #fef3c7; color: #92400e; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;"><strong>⚠️ ${warningCount}</strong> Warning${warningCount > 1 ? 's' : ''}</div>` : ''}
+                    ${invalidCount > 0 ? `<div style="background: #fee2e2; color: #991b1b; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;"><strong>🚩 ${invalidCount}</strong> Critical Issue${invalidCount > 1 ? 's' : ''}</div>` : ''}
+                    ${unknownCount > 0 ? `<div style="background: #e5e7eb; color: #4b5563; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;"><strong>❓ ${unknownCount}</strong> Unknown Status</div>` : ''}
+                    <div style="background: #e0e7ff; color: #3730a3; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; margin-left: auto;">
+                        <strong>📊 Total:</strong> ${allColumns.length} Field${allColumns.length > 1 ? 's' : ''}
+                    </div>
+                </div>
+            `;
+
+            // Render ALL columns (including valid ones)
+            allColumns.forEach(col => {
+                html += renderColumnRuleCard(col, col.source_file || null);
             });
-
-            // If all fields are valid, show success message only
-            if (issueColumns.length === 0) {
-                html += `
-                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
-                        <div style="font-size: 3rem; margin-bottom: 16px;">✅</div>
-                        <h4 style="color: var(--text-dark); margin-bottom: 8px;">All ${allColumns.length} Fields Verified</h4>
-                        <p style="font-size: 0.95rem;">Your data meets all banking requirements. No corrections needed.</p>
-                    </div>
-                `;
-            } else {
-                // Show issue count summary
-                const warningCount = issueColumns.filter(c => (c.status || '').toUpperCase() === 'WARNING').length;
-                const invalidCount = issueColumns.filter(c => (c.status || '').toUpperCase() === 'INVALID').length;
-
-                html += `
-                    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-                        ${invalidCount > 0 ? `<div style="background: #fee2e2; color: #991b1b; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem;"><strong>🚩 ${invalidCount}</strong> Critical Issue${invalidCount > 1 ? 's' : ''}</div>` : ''}
-                        ${warningCount > 0 ? `<div style="background: #fef3c7; color: #92400e; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem;"><strong>⚠️ ${warningCount}</strong> Warning${warningCount > 1 ? 's' : ''}</div>` : ''}
-                    </div>
-                `;
-
-                // Render ONLY issue columns
-                issueColumns.forEach(col => {
-                    html += renderColumnRuleCard(col, col.source_file || null);
-                });
-            }
 
             container.innerHTML = html;
 
