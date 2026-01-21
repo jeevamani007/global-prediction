@@ -455,4 +455,6 @@ def generate_dynamic_business_rules(file_path: str) -> Dict[str, Any]:
             }
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise Exception(f"Error generating dynamic business rules: {str(e)}")

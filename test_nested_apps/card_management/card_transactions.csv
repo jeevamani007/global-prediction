@@ -1,0 +1,3 @@
+transaction_id,card_number,merchant,amount,transaction_date
+CT001,CC001,Amazon,5000,2024-01-01
+CT002,CC002,Flipkart,3000,2024-01-02

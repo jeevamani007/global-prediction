@@ -1,0 +1,21 @@
+branch_id,branch_name,ifsc,micr,address,city,zone_code,manager_id
+BR0001,City Branch 1,CORE0001BK,100001,462 Market Street,Singapore,ZN3,EMP228
+BR0002,City Branch 2,CORE0002BK,100002,326 Market Street,Mumbai,ZN3,EMP870
+BR0003,City Branch 3,CORE0003BK,100003,500 Market Street,Singapore,ZN1,EMP320
+BR0004,City Branch 4,CORE0004BK,100004,926 Market Street,London,ZN1,EMP125
+BR0005,City Branch 5,CORE0005BK,100005,890 Market Street,London,ZN3,EMP561
+BR0006,City Branch 6,CORE0006BK,100006,961 Market Street,Mumbai,ZN2,EMP733
+BR0007,City Branch 7,CORE0007BK,100007,342 Market Street,Singapore,ZN2,EMP761
+BR0008,City Branch 8,CORE0008BK,100008,592 Market Street,New York,ZN3,EMP812
+BR0009,City Branch 9,CORE0009BK,100009,821 Market Street,London,ZN2,EMP341
+BR0010,City Branch 10,CORE0010BK,100010,671 Market Street,Mumbai,ZN1,EMP894
+BR0011,City Branch 11,CORE0011BK,100011,860 Market Street,London,ZN1,EMP908
+BR0012,City Branch 12,CORE0012BK,100012,435 Market Street,Dubai,ZN2,EMP140
+BR0013,City Branch 13,CORE0013BK,100013,281 Market Street,Singapore,ZN1,EMP186
+BR0014,City Branch 14,CORE0014BK,100014,432 Market Street,Singapore,ZN1,EMP675
+BR0015,City Branch 15,CORE0015BK,100015,503 Market Street,Singapore,ZN1,EMP150
+BR0016,City Branch 16,CORE0016BK,100016,987 Market Street,London,ZN2,EMP414
+BR0017,City Branch 17,CORE0017BK,100017,820 Market Street,Singapore,ZN1,EMP478
+BR0018,City Branch 18,CORE0018BK,100018,114 Market Street,Singapore,ZN3,EMP334
+BR0019,City Branch 19,CORE0019BK,100019,932 Market Street,Mumbai,ZN3,EMP154
+BR0020,City Branch 20,CORE0020BK,100020,691 Market Street,Mumbai,ZN1,EMP145

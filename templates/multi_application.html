@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Application Analysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a56db;
+            --success: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --text-dark: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --bg-light: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            min-height: 100vh;
+            color: var(--text-dark);
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+            margin-bottom: 8px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .application-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .app-header {
+            background: linear-gradient(135deg, #1976D2 0%, #0D47A1 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .confidence-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .confidence-high {
+            background: rgba(5, 150, 105, 0.2);
+            color: #ecfdf5;
+        }
+
+        .confidence-medium {
+            background: rgba(217, 119, 6, 0.2);
+            color: #fef3c7;
+        }
+
+        .confidence-low {
+            background: rgba(220, 38, 38, 0.2);
+            color: #fee2e2;
+        }
+
+        .app-body {
+            padding: 32px;
+        }
+
+        .section {
+            margin-bottom: 28px;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .file-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .file-role {
+            display: inline-block;
+            background: #dbeafe;
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .relationship-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+            border: 1px solid #90caf9;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 12px;
+        }
+
+        .relationship-arrow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.95rem;
+            flex-wrap: wrap;
+        }
+
+        .table-box {
+            background: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .arrow {
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .info-item {
+            padding: 12px;
+            background: var(--bg-light);
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background: #d1fae5;
+            color: var(--success);
+        }
+
+        .status-warning {
+            background: #fef3c7;
+            color: var(--warning);
+        }
+
+        .status-error {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Multi-Application Analysis</h1>
+            <p>Intelligent Folder-Based Application Classification</p>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="summary-stats" id="summary-stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total-folders">0</div>
+                <div class="stat-label">Applications Analyzed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="total-files">0</div>
+                <div class="stat-label">Total CSV Files</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="total-relationships">0</div>
+                <div class="stat-label">Relationships Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avg-confidence">0%</div>
+                <div class="stat-label">Avg Confidence</div>
+            </div>
+        </div>
+
+        <!-- Applications Container -->
+        <div id="applications-container"></div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="empty-state">
+            <div class="empty-state-icon">📁</div>
+            <h3>No Analysis Data</h3>
+            <p>Upload folders via the API endpoint to see results here</p>
+        </div>
+    </div>
+
+    <script>
+        // Load analysis data from sessionStorage or API
+        function loadAnalysisData() {
+            // Try to load from sessionStorage (if redirected from upload)
+            const data = sessionStorage.getItem('multi_folder_analysis');
+
+            if (data) {
+                displayResults(JSON.parse(data));
+            } else {
+                // Check if there's data in URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                const dataParam = urlParams.get('data');
+
+                if (dataParam) {
+                    try {
+                        displayResults(JSON.parse(decodeURIComponent(dataParam)));
+                    } catch (e) {
+                        console.error('Error parsing URL data:', e);
+                    }
+                }
+            }
+        }
+
+        // Load analysis data from URL parameter
+        // Load analysis data from URL parameter or sessionStorage
+        function loadAnalysisData() {
+            console.log('Loading analysis data...');
+
+            let data = null;
+
+            // 1. Try URL parameter first
+            const urlParams = new URLSearchParams(window.location.search);
+            const analysisDataParam = urlParams.get('data');
+
+            if (analysisDataParam) {
+                try {
+                    data = JSON.parse(decodeURIComponent(analysisDataParam));
+                    console.log('Loaded data from URL parameter');
+                } catch (error) {
+                    console.error('Error parsing data from URL:', error);
+                }
+            }
+
+            // 2. Fallback to sessionStorage
+            if (!data) {
+                const sessionData = sessionStorage.getItem('multi_folder_analysis');
+                if (sessionData) {
+                    try {
+                        data = JSON.parse(sessionData);
+                        console.log('Loaded data from sessionStorage');
+                    } catch (error) {
+                        console.error('Error parsing data from sessionStorage:', error);
+                    }
+                }
+            }
+
+            // 3. Display or show empty state
+            if (data) {
+                displayResults(data);
+            } else {
+                console.warn('No analysis data found in URL or sessionStorage');
+                document.getElementById('empty-state').style.display = 'block';
+                document.getElementById('empty-state').querySelector('p').textContent =
+                    'No analysis data found. Please upload folders from the home page.';
+            }
+        }
+
+        function displayResults(data) {
+            console.log('=== MULTI-FOLDER ANALYSIS DATA ===');
+            console.log('Full data object:', data);
+            console.log('Has folders:', !!data.folders);
+            console.log('Folders keys:', data.folders ? Object.keys(data.folders) : 'none');
+
+            if (!data || !data.folders || Object.keys(data.folders).length === 0) {
+                console.warn('No folder data to display');
+                return;
+            }
+
+            // Hide empty state
+            document.getElementById('empty-state').style.display = 'none';
+
+            // Update summary stats
+            const folders = data.folders;
+            const folderCount = Object.keys(folders).length;
+            let totalFiles = 0;
+            let totalRelationships = 0;
+            let totalConfidence = 0;
+
+            Object.values(folders).forEach(folder => {
+                console.log('Processing folder:', folder.folder_name);
+                console.log('  CSV files:', folder.csv_files?.length || 0);
+                console.log('  Relationships:', folder.file_relationships?.length || 0);
+                console.log('  Application type:', folder.application_type);
+                console.log('  Confidence value:', folder.application_type?.confidence);
+                console.log('  Confidence type:', typeof folder.application_type?.confidence);
+
+                totalFiles += folder.csv_files?.length || 0;
+                totalRelationships += folder.file_relationships?.length || 0;
+                totalConfidence += folder.application_type?.confidence || 0;
+            });
+
+            const avgConfidence = folderCount > 0 ? Math.round(totalConfidence / folderCount) : 0;
+
+            console.log('\nSummary Stats:');
+            console.log('  Total folders:', folderCount);
+            console.log('  Total files:', totalFiles);
+            console.log('  Total relationships:', totalRelationships);
+            console.log('  Total confidence sum:', totalConfidence);
+            console.log('  Average confidence:', avgConfidence);
+
+            document.getElementById('total-folders').textContent = folderCount;
+            document.getElementById('total-files').textContent = totalFiles;
+            document.getElementById('total-relationships').textContent = totalRelationships;
+            document.getElementById('avg-confidence').textContent = avgConfidence + '%';
+
+            // Display each application
+            const container = document.getElementById('applications-container');
+            container.innerHTML = '';
+
+            Object.entries(folders).forEach(([folderName, folderData]) => {
+                container.appendChild(createApplicationCard(folderName, folderData));
+            });
+        }
+
+        function createApplicationCard(folderName, data) {
+            const section = document.createElement('div');
+            section.className = 'application-section';
+
+            const appType = data.application_type || {};
+            const confidence = appType.confidence || 0;
+            const confidenceLevel = appType.confidence_level || 'Low';
+            const confidenceClass = confidence >= 80 ? 'confidence-high' :
+                confidence >= 60 ? 'confidence-medium' : 'confidence-low';
+
+            section.innerHTML = `
+                <div class="app-header">
+                    <div>
+                        <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 4px;">APPLICATION</div>
+                        <div class="app-title">${appType.application_type || 'Unknown'}</div>
+                        <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 4px;">📁 ${folderName}</div>
+                    </div>
+                    <div class="confidence-badge ${confidenceClass}">
+                        ${confidence}% Confidence
+                    </div>
+                </div>
+
+                <div class="app-body">
+                    <!-- Status -->
+                    <div class="section">
+                        <div class="section-title">📋 Status</div>
+                        <span class="status-badge ${getStatusClass(data.status || 'success')}">
+                            ${(data.status || 'success').toUpperCase()}
+                        </span>
+                    </div>
+
+                    <!-- CSV Files -->
+                    <div class="section">
+                        <div class="section-title">📄 CSV Files (${data.csv_files?.length || 0})</div>
+                        <div class="files-grid">
+                            ${(data.csv_files || []).map(file => `
+                                <div class="file-card">
+                                    <div class="file-name">${file}</div>
+                                    <span class="file-role">${data.file_roles?.[file] || 'Data File'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- File Relationships -->
+                    ${(data.file_relationships && data.file_relationships.length > 0) ? `
+                        <div class="section">
+                            <div class="section-title">🔗 File Relationships (${data.file_relationships.length})</div>
+                            ${data.file_relationships.map(rel => `
+                                <div class="relationship-box">
+                                    <div class="relationship-arrow">
+                                        <span class="table-box">${rel.file1 || rel.parent_file}</span>
+                                        <span class="arrow">↔</span>
+                                        <span class="table-box">${rel.file2 || rel.child_file}</span>
+                                    </div>
+                                    <div style="margin-top: 12px; font-size: 0.9rem; color: var(--text-muted);">
+                                        <strong>Column:</strong> ${rel.column || rel.parent_pk_column} | 
+                                        <strong>Type:</strong> ${rel.relationship_type} | 
+                                        <strong>Overlap:</strong> ${rel.overlap_percentage || 0}%
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    <!-- Application Info -->
+                    <div class="section">
+                        <div class="section-title">ℹ️ Application Information</div>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Total Rows</div>
+                                <div class="info-value">${(data.total_rows || 0).toLocaleString()}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Total Columns</div>
+                                <div class="info-value">${data.total_columns || 0}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Unique Columns</div>
+                                <div class="info-value">${data.unique_column_count || 0}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Issues Found</div>
+                                <div class="info-value">${data.issues?.length || 0}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Patterns Detected -->
+                    ${(appType.patterns_detected && appType.patterns_detected.length > 0) ? `
+                        <div class="section">
+                            <div class="section-title">🎯 Patterns Detected</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                ${appType.patterns_detected.map(pattern => `
+                                    <span style="background: #dbeafe; color: var(--primary); padding: 6px 14px; border-radius: 16px; font-size: 0.85rem; font-weight: 600;">
+                                        ${pattern}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- 🎯 Application Purpose -->
+                    ${(data.application_purpose) ? `
+                        <div class="section">
+                            <div class="section-title">🎯 Application Purpose Analysis</div>
+                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px;">
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    ${(() => {
+                        const purpose = data.application_purpose;
+                        const points = purpose.explanation_points;
+
+                        // Debug logging
+                        console.log('Application Purpose for folder:', folderName);
+                        console.log('  - Has explanation_points:', !!points);
+                        console.log('  - Points array:', points);
+                        console.log('  - Line1:', purpose.line1);
+                        console.log('  - Line2:', purpose.line2);
+
+                        // Check if explanation_points exists and is an array
+                        if (points && Array.isArray(points) && points.length > 0) {
+                            return points.map(point => `
+                                                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                                                    ${point}
+                                                </div>
+                                            `).join('');
+                        } else if (purpose.line1 || purpose.line2) {
+                            // Fallback: use line1 and line2 if explanation_points not available
+                            const lines = [];
+                            if (purpose.line1) lines.push(purpose.line1);
+                            if (purpose.line2) lines.push(purpose.line2);
+                            return lines.map(line => `
+                                                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                                                    ${line}
+                                                </div>
+                                            `).join('');
+                        } else {
+                            return `<div style="color: var(--text-muted);">Application purpose analysis not available for this folder.</div>`;
+                        }
+                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- 📏 Business Rules Summary -->
+                    ${(data.business_rules_summaries && Object.keys(data.business_rules_summaries).length > 0) ? `
+                        <div class="section">
+                            <div class="section-title">📏 Observed Business Rules</div>
+                            ${(() => {
+                        const summaries = data.business_rules_summaries;
+                        console.log('Business Rules Summaries for folder:', folderName);
+                        console.log('  - Number of files:', Object.keys(summaries).length);
+                        console.log('  - Files:', Object.keys(summaries));
+
+                        return Object.entries(summaries).map(([filename, summary]) => {
+                            console.log(`  - Processing ${filename}:`, summary);
+
+                            if (!summary || typeof summary !== 'object') {
+                                console.warn(`    Warning: Invalid summary for ${filename}`);
+                                return '';
+                            }
+
+                            const criticalCols = summary.critical_columns || [];
+                            const warningCols = summary.warning_columns || [];
+                            const safeCount = summary.safe_count || summary.total_columns || 0;
+                            const totalCols = summary.total_columns || 0;
+
+                            console.log(`    Critical: ${criticalCols.length}, Warning: ${warningCols.length}, Safe: ${safeCount}`);
+
+                            return `
+                                        <div style="margin-bottom: 20px;">
+                                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-dark);">
+                                                📄 ${filename} <span style="font-weight: 400; color: var(--text-muted);">(${totalCols} columns)</span>
+                                            </div>
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+                                                ${criticalCols.map(col => `
+                                                    <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 6px; padding: 12px;">
+                                                        <div style="font-size: 0.85rem; font-weight: 700; color: #be123c; margin-bottom: 4px;">CRITICAL: ${col.display_name || col.column_name || 'Unknown'}</div>
+                                                        <div style="font-size: 0.8em; color: #881337;">${col.user_message || 'Attention required'}</div>
+                                                    </div>
+                                                `).join('')}
+                                                ${warningCols.map(col => `
+                                                    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px;">
+                                                        <div style="font-size: 0.85rem; font-weight: 700; color: #b45309; margin-bottom: 4px;">WARNING: ${col.display_name || col.column_name || 'Unknown'}</div>
+                                                        <div style="font-size: 0.8em; color: #78350f;">${col.user_message || 'Review suggested'}</div>
+                                                    </div>
+                                                `).join('')}
+                                                ${(criticalCols.length === 0 && warningCols.length === 0) ? `
+                                                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px; grid-column: 1 / -1;">
+                                                        <div style="font-size: 0.85rem; font-weight: 600; color: #15803d;">✅ All ${safeCount} fields verified successfully</div>
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                    `;
+                        }).join('');
+                    })()}
+                        </div>
+                    ` : `
+                        <div class="section">
+                            <div class="section-title">📏 Observed Business Rules</div>
+                            <div style="color: var(--text-muted); padding: 20px; background: var(--bg-light); border-radius: 8px;">
+                                Business rules analysis not available for this folder.
+                            </div>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            return section;
+        }
+
+        function getStatusClass(status) {
+            const statusLower = status.toLowerCase();
+            if (statusLower === 'success') return 'status-success';
+            if (statusLower === 'warning') return 'status-warning';
+            if (statusLower === 'error') return 'status-error';
+            return 'status-success';
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', loadAnalysisData);
+    </script>
+</body>
+
+</html>

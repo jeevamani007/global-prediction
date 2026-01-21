@@ -273,6 +273,30 @@ class ApplicationPurposeAnalyzer:
                 return "Loan data structure supports loan origination tracking, repayment schedule management, interest calculations, and loan portfolio analysis."
             else:
                 return "The data fields are organized to support banking operations through structured relationships and validation rules."
+
+    def _generate_detailed_explanation(self, line1: str, line2: str, file_count: int, total_columns: int, 
+                                     has_relationships: bool, pattern_matches: Dict[str, int]) -> List[str]:
+        """Generate a detailed 4-5 line explanation for the UI."""
+        points = []
+        
+        # Point 1: Core Purpose (from Line 1)
+        points.append(f"<strong>🎯 Application Purpose:</strong> {line1}")
+        
+        # Point 2: Connection Pattern (from Line 2)
+        points.append(f"<strong>🔗 Connection Pattern:</strong> {line2}")
+        
+        # Point 3: Data Composition & Scale
+        domain_types = [k.replace('_', ' ').title() for k in pattern_matches.keys()]
+        domain_str = ", ".join(domain_types[:3]) if domain_types else "General Banking"
+        points.append(f"<strong>📊 Data Composition:</strong> Analyzed {file_count} file(s) containing {total_columns} columns across {domain_str} domains.")
+        
+        # Point 4: Operational Capability
+        if has_relationships:
+            points.append("<strong>🚀 Operational Capability:</strong> The interconnected data structure supports advanced cross-file validation, drill-down analysis, and holistic risk assessment.")
+        else:
+            points.append("<strong>🚀 Operational Capability:</strong> The independent datasets support focused, file-specific validation and isolated operational reporting.")
+            
+        return points
     
     def analyze_single_file(self, file_path: str, df: Optional[pd.DataFrame] = None) -> Dict[str, str]:
         """
@@ -461,9 +485,14 @@ class ApplicationPurposeAnalyzer:
                                                 actual_columns=columns, relationships=relationships,
                                                 file_purposes=file_purposes)
             
+            # Generate detailed points
+            explanation_points = self._generate_detailed_explanation(line1, line2, file_count, total_columns, 
+                                                                   has_relationships, pattern_matches)
+            
             return {
                 'line1': line1,
                 'line2': line2,
+                'explanation_points': explanation_points,
                 'detected_purposes': list(pattern_matches.keys()),
                 'total_columns': total_columns,
                 'file_count': file_count,

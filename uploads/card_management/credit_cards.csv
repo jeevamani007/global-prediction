@@ -1,0 +1,3 @@
+card_number,customer_id,card_type,credit_limit,card_status
+CC001,1,Platinum,200000,Active
+CC002,2,Gold,150000,Active

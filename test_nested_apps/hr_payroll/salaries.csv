@@ -1,0 +1,3 @@
+employee_id,month,basic_salary,allowances,deductions,net_salary
+E001,2024-01,80000,10000,5000,85000
+E002,2024-01,60000,8000,3000,65000

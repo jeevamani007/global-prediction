@@ -1,0 +1,6 @@
+transaction_id,account_id,transaction_date,transaction_type,amount
+OT9001,OA1001,2012-06-10,Debit,500
+OT9002,OA1002,2010-01-05,Debit,2000
+OT9003,OA1003,2016-03-12,Credit,150000
+OT9004,OA1004,2013-02-18,Debit,300
+OT9005,OA1005,2011-08-30,Debit,10000

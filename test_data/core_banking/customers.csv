@@ -1,0 +1,5 @@
+customer_id,customer_name,email,phone,address
+CUST001,John Doe,john@example.com,1234567890,123 Main St
+CUST002,Jane Smith,jane@example.com,2345678901,456 Oak Ave
+CUST003,Bob Johnson,bob@example.com,3456789012,789 Pine Rd
+CUST004,Alice Williams,alice@example.com,4567890123,321 Elm St

@@ -1,0 +1,188 @@
+{
+  "message": "Folders analyzed successfully",
+  "multi_folder_mode": true,
+  "total_folders": 3,
+  "folders": {
+    "core_banking": {
+      "folder_name": "core_banking",
+      "application_type": {
+        "application_type": "Core Banking",
+        "confidence": 60.0,
+        "confidence_level": "Medium",
+        "patterns_detected": [
+          "Account Number",
+          "Customer Id",
+          "Opening Balance",
+          "Account Type",
+          "Branch Code"
+        ],
+        "evidence": {
+          "column_matches": 11,
+          "relationship_matches": 0,
+          "data_pattern_matches": 3,
+          "total_columns_analyzed": 20
+        },
+        "alternative_types": [
+          {
+            "type": "CRM",
+            "confidence": 20.0
+          },
+          {
+            "type": "Payments",
+            "confidence": 15.0
+          },
+          {
+            "type": "Deposits",
+            "confidence": 15.0
+          }
+        ],
+        "explanation": "Detected as Core Banking with 60.0% confidence. Found 11 matching column patterns out of 20 total columns analyzed. "
+      },
+      "csv_files": [
+        "accounts.csv",
+        "customers.csv",
+        "transactions.csv"
+      ],
+      "file_roles": {
+        "accounts.csv": "Transaction Data",
+        "customers.csv": "Master Data",
+        "transactions.csv": "Transaction Data"
+      },
+      "file_relationships": [
+        {
+          "file1": "accounts.csv",
+          "file2": "customers.csv",
+          "column": "customer_id",
+          "relationship_type": "Many-to-Many",
+          "overlap_count": 4,
+          "overlap_percentage": 100.0,
+          "file1_unique_count": 4,
+          "file2_unique_count": 4,
+          "explanation": "The 'customer_id' column connects accounts.csv and customers.csv with 100.0% data overlap. This suggests a Many-to-Many relationship, where records from both files can be linked using this common identifier."
+        },
+        {
+          "file1": "accounts.csv",
+          "file2": "transactions.csv",
+          "column": "account_number",
+          "relationship_type": "Many-to-One (Detail-Master)",
+          "overlap_count": 3,
+          "overlap_percentage": 60.0,
+          "file1_unique_count": 5,
+          "file2_unique_count": 3,
+          "explanation": "The 'account_number' column connects accounts.csv and transactions.csv with 60.0% data overlap. This suggests a Many-to-One (Detail-Master) relationship, where records from both files can be linked using this common identifier."
+        }
+      ],
+      "total_files": 3,
+      "total_rows": 29,
+      "total_columns": 20,
+      "unique_column_count": 18,
+      "status": "success"
+    },
+    "loan_management": {
+      "folder_name": "loan_management",
+      "application_type": {
+        "application_type": "Loan Management",
+        "confidence": 50.0,
+        "confidence_level": "Low",
+        "patterns_detected": [
+          "Loan Id",
+          "Principal",
+          "Emi Id",
+          "Interest Rate",
+          "Tenure"
+        ],
+        "evidence": {
+          "column_matches": 8,
+          "relationship_matches": 0,
+          "data_pattern_matches": 3,
+          "total_columns_analyzed": 18
+        },
+        "alternative_types": [
+          {
+            "type": "Deposits",
+            "confidence": 30.0
+          },
+          {
+            "type": "CRM",
+            "confidence": 20.0
+          },
+          {
+            "type": "Payments",
+            "confidence": 15.0
+          }
+        ],
+        "explanation": "Detected as Loan Management with 50.0% confidence. Found 8 matching column patterns out of 18 total columns analyzed. "
+      },
+      "csv_files": [
+        "emi_schedule.csv",
+        "loans.csv"
+      ],
+      "file_roles": {
+        "emi_schedule.csv": "Transaction Data",
+        "loans.csv": "Master Data"
+      },
+      "file_relationships": [
+        {
+          "file1": "emi_schedule.csv",
+          "file2": "loans.csv",
+          "column": "loan_id",
+          "relationship_type": "Many-to-Many",
+          "overlap_count": 4,
+          "overlap_percentage": 100.0,
+          "file1_unique_count": 4,
+          "file2_unique_count": 4,
+          "explanation": "The 'loan_id' column connects emi_schedule.csv and loans.csv with 100.0% data overlap. This suggests a Many-to-Many relationship, where records from both files can be linked using this common identifier."
+        }
+      ],
+      "total_files": 2,
+      "total_rows": 20,
+      "total_columns": 18,
+      "unique_column_count": 17,
+      "status": "success"
+    },
+    "payments": {
+      "folder_name": "payments",
+      "application_type": {
+        "application_type": "Payments",
+        "confidence": 50.0,
+        "confidence_level": "Low",
+        "patterns_detected": [
+          "Payment Id",
+          "Payment Amount",
+          "Payment Date",
+          "Payment Status",
+          "Payment Mode"
+        ],
+        "evidence": {
+          "column_matches": 8,
+          "relationship_matches": 0,
+          "data_pattern_matches": 3,
+          "total_columns_analyzed": 9
+        },
+        "alternative_types": [
+          {
+            "type": "CRM",
+            "confidence": 15.0
+          },
+          {
+            "type": "Insurance",
+            "confidence": 15.0
+          }
+        ],
+        "explanation": "Detected as Payments with 50.0% confidence. Found 8 matching column patterns out of 9 total columns analyzed. "
+      },
+      "csv_files": [
+        "payments.csv"
+      ],
+      "file_roles": {
+        "payments.csv": "Transaction Data"
+      },
+      "file_relationships": [],
+      "total_files": 1,
+      "total_rows": 10,
+      "total_columns": 9,
+      "unique_column_count": 9,
+      "status": "success"
+    }
+  }
+}

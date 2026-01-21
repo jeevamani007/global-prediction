@@ -1,0 +1,6 @@
+account_id,customer_id,account_type,account_status,open_date,last_activity_date,balance
+OA1001,OC001,Savings,Inactive,2008-04-15,2012-06-10,1200
+OA1002,OC002,Current,Closed,2005-09-20,2010-01-05,0
+OA1003,OC003,FD,Matured,2011-03-12,2016-03-12,0
+OA1004,OC004,Savings,Inactive,2009-11-01,2013-02-18,500
+OA1005,OC005,Loan,Closed,2007-07-25,2011-08-30,0

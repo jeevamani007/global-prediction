@@ -1,0 +1,3 @@
+loan_id,emi_number,emi_amount,due_date
+L001,1,10000,2024-02-01
+L001,2,10000,2024-03-01

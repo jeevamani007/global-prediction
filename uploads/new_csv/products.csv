@@ -1,0 +1,6 @@
+product_code,product_name,product_type,min_balance,currency
+SB001,Regular Savings,SAVINGS,1000,USD
+SB002,Premium Savings,SAVINGS,10000,USD
+CA001,Current Business,CURRENT,5000,USD
+TD001,Fixed Deposit,TERM_DEPOSIT,5000,USD
+LN001,Home Loan,LOAN,0,USD

@@ -1,0 +1,2 @@
+loan_id,customer_id,loan_amount,emi_amount,loan_status
+1001,1,50000,1500,ACTIVE

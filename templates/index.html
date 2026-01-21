@@ -71,6 +71,42 @@
             margin: 0 auto;
         }
 
+        /* Upload Mode Toggle */
+        .upload-mode-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px 0;
+            padding: 4px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .mode-btn {
+            padding: 10px 24px;
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+        }
+
+        .mode-btn:hover {
+            color: #374151;
+        }
+
+        .mode-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
         .upload-zone {
             border: 3px dashed var(--primary-light);
             padding: 60px 40px;
@@ -517,10 +553,16 @@
                 detect column relationships.</p>
         </div>
 
+        <!-- Upload Mode Toggle -->
+        <div class="upload-mode-toggle">
+            <button class="mode-btn active" id="filesModeBtn" onclick="switchMode('files')">📄 Upload Files</button>
+            <button class="mode-btn" id="foldersModeBtn" onclick="switchMode('folders')">📁 Upload Folders</button>
+        </div>
+
         <div class="upload-zone" id="uploadZone">
-            <div class="icon">📁</div>
-            <h3>Click or Drag & Drop Files</h3>
-            <p>Upload multiple files for multi-file relationship analysis</p>
+            <div class="icon" id="uploadIcon">📁</div>
+            <h3 id="uploadTitle">Click or Drag & Drop Files</h3>
+            <p id="uploadDescription">Upload multiple files for multi-file relationship analysis</p>
             <div class="file-types">
                 <span class="file-type-badge">.CSV</span>
                 <span class="file-type-badge">.XLSX</span>
@@ -529,7 +571,8 @@
             </div>
         </div>
 
-        <input type="file" id="fileInput" accept=".sql,.csv,.xlsx,.xls" multiple>
+        <input type="file" id="fileInput" accept=".sql,.csv,.xlsx,.xls" multiple webkitdirectory="" directory=""
+            style="display:none">
 
         <div class="file-list" id="fileList">
             <h4>📄 Selected Files</h4>
@@ -581,6 +624,41 @@
 
         let selectedFiles = [];
         let domainChart = null;
+        let uploadMode = 'files'; // 'files' or 'folders'
+
+        // Switch upload mode
+        function switchMode(mode) {
+            uploadMode = mode;
+            const filesModeBtn = document.getElementById('filesModeBtn');
+            const foldersModeBtn = document.getElementById('foldersModeBtn');
+            const uploadIcon = document.getElementById('uploadIcon');
+            const uploadTitle = document.getElementById('uploadTitle');
+            const uploadDescription = document.getElementById('uploadDescription');
+
+            if (mode === 'files') {
+                filesModeBtn.classList.add('active');
+                foldersModeBtn.classList.remove('active');
+                uploadIcon.textContent = '📁';
+                uploadTitle.textContent = 'Click or Drag & Drop Files';
+                uploadDescription.textContent = 'Upload multiple files for multi-file relationship analysis';
+                fileInput.removeAttribute('webkitdirectory');
+                fileInput.removeAttribute('directory');
+            } else {
+                filesModeBtn.classList.remove('active');
+                foldersModeBtn.classList.add('active');
+                uploadIcon.textContent = '📂';
+                uploadTitle.textContent = 'Click or Drag & Drop Folders';
+                uploadDescription.textContent = 'Upload folders - each folder represents one application';
+                fileInput.setAttribute('webkitdirectory', '');
+                fileInput.setAttribute('directory', '');
+            }
+
+            // Reset selection
+            selectedFiles = [];
+            fileItems.innerHTML = '';
+            fileList.classList.remove('show');
+            uploadBtn.classList.remove('show');
+        }
 
         // Upload Zone Events
         uploadZone.onclick = () => fileInput.click();
@@ -594,11 +672,55 @@
 
         uploadZone.ondragleave = () => uploadZone.classList.remove('dragover');
 
-        uploadZone.ondrop = e => {
+        // Advanced file handling with folder support
+        uploadZone.ondrop = async e => {
             e.preventDefault();
             uploadZone.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
+
+            const items = e.dataTransfer.items;
+            if (items) {
+                // Use DataTransferItemList interface to access the file(s)
+                const files = [];
+                const queue = [];
+
+                for (let i = 0; i < items.length; i++) {
+                    const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                    if (entry) queue.push(entry);
+                }
+
+                await processQueue(queue, files);
+                handleFiles(files);
+            } else {
+                // Use DataTransfer interface to access the file(s)
+                handleFiles(e.dataTransfer.files);
+            }
         };
+
+        async function processQueue(queue, fileList) {
+            while (queue.length > 0) {
+                const entry = queue.shift();
+                if (entry.isFile) {
+                    await new Promise(resolve => {
+                        entry.file(file => {
+                            // Add webkitRelativePath for folder structure preservation
+                            if (!file.webkitRelativePath && entry.fullPath) {
+                                Object.defineProperty(file, 'webkitRelativePath', {
+                                    value: entry.fullPath.substring(1) // remove leading /
+                                });
+                            }
+                            fileList.push(file);
+                            resolve();
+                        });
+                    });
+                } else if (entry.isDirectory) {
+                    const reader = entry.createReader();
+                    const entries = await new Promise(resolve => {
+                        reader.readEntries(resolve);
+                    });
+                    entries.forEach(e => queue.push(e));
+                }
+            }
+        }
 
         function handleFiles(files) {
             if (!files || files.length === 0) return;
@@ -610,11 +732,20 @@
                 <div class="file-item">
                     <span class="name">📄 ${f.name}</span>
                     <span class="size">${formatSize(f.size)}</span>
+                    ${f.webkitRelativePath ? `<span style="font-size:0.8em;color:#888;margin-left:10px">(${f.webkitRelativePath})</span>` : ''}
                 </div>
             `).join('');
 
             fileList.classList.add('show');
             uploadBtn.classList.add('show');
+
+            // Update summary
+            if (selectedFiles.length > 0) {
+                const folderCount = new Set(selectedFiles.map(f => f.webkitRelativePath ? f.webkitRelativePath.split('/')[0] : 'root')).size;
+                if (uploadMode === 'folders') {
+                    showAlert(`Ready to analyze ${selectedFiles.length} files across ${folderCount} detected folders.`, 'success');
+                }
+            }
         }
 
         function formatSize(bytes) {
@@ -632,13 +763,32 @@
         uploadBtn.onclick = async () => {
             const formData = new FormData();
             const isMulti = selectedFiles.length > 1;
-            // Use relative URLs to work with any host/port
-            const endpoint = isMulti ? "/upload-multiple" : "/upload";
 
-            if (isMulti) {
-                selectedFiles.forEach(f => formData.append("files", f));
+            // Determine endpoint based on upload mode
+            let endpoint;
+            if (uploadMode === 'folders') {
+                endpoint = "/upload-folders";
+                // For folders, add files with folder structure in filename
+                const filesByFolder = {};
+                selectedFiles.forEach(file => {
+                    if (file.webkitRelativePath) {
+                        // Use the full relative path to preserve nested folder structure
+                        // e.g., "parent/app1/file.csv" will remain as is
+                        const newFile = new File([file], file.webkitRelativePath, { type: file.type });
+                        formData.append("files", newFile);
+                    } else {
+                        // Fallback if no relative path (shouldn't happen in folder mode)
+                        formData.append("files", file);
+                    }
+                });
             } else {
-                formData.append("file", selectedFiles[0]);
+                endpoint = isMulti ? "/upload-multiple" : "/upload";
+
+                if (isMulti) {
+                    selectedFiles.forEach(f => formData.append("files", f));
+                } else {
+                    formData.append("file", selectedFiles[0]);
+                }
             }
 
             uploadBtn.disabled = true;
@@ -660,6 +810,16 @@
                 }
 
                 const data = await res.json();
+
+                // Handle folder-based response differently
+                if (data.multi_folder_mode) {
+                    showAlert('✅ Folder Analysis Complete!', 'success');
+                    // Store folder data and redirect to multi-application page
+                    sessionStorage.setItem('multi_folder_analysis', JSON.stringify(data));
+                    window.location.href = '/multi-analysis';
+                    return;
+                }
+
                 showAlert('✅ Analysis Complete!', 'success');
 
                 // Store all data in sessionStorage
@@ -694,7 +854,7 @@
 
             // Store Business Rules Summary (High-Level Executive Summary)
             if (data.business_rules_summary) sessionStorage.setItem('businessRulesSummary', JSON.stringify(data.business_rules_summary));
-            
+
             // Store Application Purpose Explanation (2 lines based on observed patterns)
             if (data.application_purpose) sessionStorage.setItem('applicationPurpose', JSON.stringify(data.application_purpose));
 
@@ -735,7 +895,7 @@
                 sessionStorage.setItem('multiFileMode', 'true');
                 // Store the full result for multi-file (needed for business rules summary)
                 sessionStorage.setItem('multiFileResult', JSON.stringify(data));
-                
+
                 // Store Core Banking Business Rules for multi-file (per-file results)
                 if (data.core_banking_business_rules) {
                     // Combine all file results into one structure for UI

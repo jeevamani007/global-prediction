@@ -1,0 +1,2 @@
+customer_id,customer_name,email,phone,account_status
+1,John Doe,john@example.com,1234567890,ACTIVE

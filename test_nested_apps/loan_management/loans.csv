@@ -1,0 +1,3 @@
+loan_id,customer_id,loan_amount,interest_rate,tenure
+L001,1,500000,8.5,60
+L002,2,1000000,7.5,120

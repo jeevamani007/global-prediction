@@ -1,0 +1,6 @@
+rate_code,product_code,effective_date,rate_percentage,min_tenure_days,max_tenure_days
+RT_SB001,SB001,2024-01-01,11.98,7,3650
+RT_SB002,SB002,2024-01-01,10.84,7,3650
+RT_CA001,CA001,2024-01-01,3.22,7,3650
+RT_TD001,TD001,2024-01-01,5.6,7,3650
+RT_LN001,LN001,2024-01-01,4.36,7,3650

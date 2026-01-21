@@ -1,0 +1,3 @@
+account_number,customer_id,account_type,balance
+ACC001,1,Savings,50000
+ACC002,2,Current,75000

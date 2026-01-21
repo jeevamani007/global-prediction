@@ -514,7 +514,7 @@ class BankingBusinessRulesSummarizer:
         
         # Sort rules by criticality (critical first, then warning, then safe)
         def sort_key(rule):
-            impact = rule.get('impact', '')
+            impact = rule.get('impact') or ''
             if 'CRITICAL' in impact:
                 return (0, rule['critical_issues_count'])
             elif impact:

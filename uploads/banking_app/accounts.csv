@@ -1,0 +1,2 @@
+account_number,customer_id,account_type,balance,account_status
+100001,1,SAVINGS,5000.50,ACTIVE
