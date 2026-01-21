@@ -1591,6 +1591,7 @@ async def upload_file(file: UploadFile = File(...)):
 
         # 🔥 DYNAMIC BUSINESS RULES FROM OBSERVED DATA (PRIMARY SOURCE - NO HARDCODED RULES)
         standard_business_rules = None
+        business_rules_summary = None
         try:
             from dynamic_business_rules_from_data import generate_dynamic_business_rules
             dynamic_rules = generate_dynamic_business_rules(file_path)
@@ -1599,6 +1600,16 @@ async def upload_file(file: UploadFile = File(...)):
                 # Use dynamic rules as PRIMARY source - 100% data-driven, no hardcoded templates
                 standard_business_rules = dynamic_rules
                 print(f"✅ Generated {len(dynamic_rules.get('columns', []))} dynamic business rules from observed data")
+                
+                # 🔥 GENERATE HIGH-LEVEL BUSINESS RULES SUMMARY (FOR EXECUTIVES/STAKEHOLDERS)
+                try:
+                    from banking_business_rules_summarizer import summarize_banking_business_rules
+                    business_rules_summary = summarize_banking_business_rules(dynamic_rules)
+                    print(f"✅ Generated {business_rules_summary.get('summary', {}).get('total_rules', 0)} high-level business rules across {business_rules_summary.get('summary', {}).get('themes_covered', 0)} themes")
+                except Exception as summary_e:
+                    print(f"Warning: Could not generate business rules summary: {str(summary_e)}")
+                    import traceback
+                    traceback.print_exc()
             else:
                 print("Warning: Dynamic rules generation returned empty result")
         except Exception as e:
@@ -1689,6 +1700,9 @@ async def upload_file(file: UploadFile = File(...)):
 
                 # 🔥 STANDARDIZED BUSINESS RULES FOR UI (Definition / Condition / Action)
                 "standard_business_rules": standard_business_rules,
+                
+                # 🔥 HIGH-LEVEL BUSINESS RULES SUMMARY (FOR EXECUTIVES/STAKEHOLDERS)
+                "business_rules_summary": business_rules_summary,
                 
                 # 🔥 BANKING APPLICATION TYPE PREDICTION (NEW)
                 "banking_application_type": banking_result.get("banking_application_type"),
@@ -1845,8 +1859,11 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                         failed_columns_all.append({**fc, "source_file": fname})
 
                 # 🔥 DYNAMIC BUSINESS RULES FROM OBSERVED DATA (MULTI-FILE - PRIMARY SOURCE)
+                business_rules_summaries = {}
                 try:
                     from dynamic_business_rules_from_data import generate_dynamic_business_rules
+                    from banking_business_rules_summarizer import summarize_banking_business_rules
+                    
                     for file_path in file_paths:
                         try:
                             file_key = os.path.basename(file_path)
@@ -1856,6 +1873,14 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                                 # Use dynamic rules as PRIMARY source - 100% data-driven
                                 standard_business_rules_files[file_key] = dynamic_rules
                                 print(f"✅ Generated {len(dynamic_rules.get('columns', []))} dynamic rules for {file_key}")
+                                
+                                # Generate high-level business rules summary for this file
+                                try:
+                                    file_summary = summarize_banking_business_rules(dynamic_rules)
+                                    business_rules_summaries[file_key] = file_summary
+                                    print(f"✅ Generated {file_summary.get('summary', {}).get('total_rules', 0)} business rules for {file_key}")
+                                except Exception as summary_e:
+                                    print(f"Warning: Could not generate summary for {file_key}: {str(summary_e)}")
                             else:
                                 # Fallback to standard rules only if dynamic generation failed
                                 if file_key not in standard_business_rules_files:
@@ -1895,6 +1920,9 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     "core_banking_validator": core_banking_validator_result,
                     # 🔥 STANDARDIZED BUSINESS RULES FOR UI (Definition / Condition / Action)
                     "standard_business_rules": standard_business_rules,
+                    
+                    # 🔥 HIGH-LEVEL BUSINESS RULES SUMMARY (FOR EXECUTIVES/STAKEHOLDERS) - MULTI-FILE
+                    "business_rules_summary": business_rules_summaries if business_rules_summaries else None,
                     "banking_blueprint": result.get("banking_blueprint"),
                     "application_structure": result.get("application_structure"),  # New: Application structure
                     "domain_detection": result.get("domain_detection"),

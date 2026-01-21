@@ -692,6 +692,9 @@
             // Store new standardized business rules (Definition / Condition / Action per column)
             if (data.standard_business_rules) sessionStorage.setItem('standardBusinessRules', JSON.stringify(data.standard_business_rules));
 
+            // Store Business Rules Summary (High-Level Executive Summary)
+            if (data.business_rules_summary) sessionStorage.setItem('businessRulesSummary', JSON.stringify(data.business_rules_summary));
+
             // Store dynamic business rules and application type prediction
             if (data.dynamic_business_rules) sessionStorage.setItem('dynamicBusinessRules', JSON.stringify(data.dynamic_business_rules));
             if (data.application_type_prediction) sessionStorage.setItem('applicationTypePrediction', JSON.stringify(data.application_type_prediction));
@@ -727,6 +730,9 @@
 
             if (data.multi_file_mode) {
                 sessionStorage.setItem('multiFileMode', 'true');
+                // Store the full result for multi-file (needed for business rules summary)
+                sessionStorage.setItem('multiFileResult', JSON.stringify(data));
+                
                 // Store Core Banking Business Rules for multi-file (per-file results)
                 if (data.core_banking_business_rules) {
                     // Combine all file results into one structure for UI
@@ -746,6 +752,8 @@
                 if (data.comprehensive_analysis) sessionStorage.setItem('comprehensiveAnalysis', JSON.stringify(data.comprehensive_analysis));
             } else {
                 sessionStorage.setItem('multiFileMode', 'false');
+                // Store the full result for single file (needed for business rules summary)
+                sessionStorage.setItem('uploadResult', JSON.stringify(data));
             }
 
             // Store all domain results

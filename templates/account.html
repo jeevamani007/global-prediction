@@ -1242,6 +1242,22 @@
                 <!-- Will be populated by JavaScript -->
             </div>
 
+            <!-- Business Rules Summary Section (Top, Full Width) -->
+            <div class="card" style="margin-bottom: 16px; background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); border: 2px solid var(--primary-light);">
+                <div class="card-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;">
+                    <h3 class="card-title" style="color: white; margin: 0;">📊 High-Level Business Rules Summary</h3>
+                    <p style="color: rgba(255,255,255,0.9); font-size: 0.9rem; margin: 8px 0 0 0; font-weight: 400;">
+                        Executive summary of business rules grouped by themes. All rules are dynamically inferred from observed data patterns.
+                    </p>
+                </div>
+                <div id="businessRulesSummaryContent" style="padding: 20px;">
+                    <div class="empty-state" style="padding: 20px;">
+                        <div class="icon" style="font-size: 2rem;">📊</div>
+                        <p style="font-size: 0.9rem;">Loading business rules summary...</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Main Content Area -->
             <div style="display: grid; grid-template-columns: 1fr 420px; gap: 16px; align-items: start;">
                 <!-- Left: Column Business Rules (One by One) -->
@@ -1478,6 +1494,17 @@
         // Load data on page load
         document.addEventListener('DOMContentLoaded', function () {
             loadAnalysisData();
+            
+            // Also try to load business rules summary after a short delay to ensure everything is ready
+            setTimeout(() => {
+                try {
+                    if (typeof loadBusinessRulesSummary === 'function') {
+                        loadBusinessRulesSummary();
+                    }
+                } catch (error) {
+                    console.error('Error loading business rules summary on page load:', error);
+                }
+            }, 500);
         });
 
         function loadAnalysisData() {
@@ -2305,6 +2332,16 @@
             // Load Application Type Banner at top
             loadBusinessRulesAppType();
 
+            // Load Business Rules Summary (NEW - High-Level Summary)
+            // Use setTimeout to ensure DOM is ready
+            setTimeout(() => {
+                try {
+                    loadBusinessRulesSummary();
+                } catch (error) {
+                    console.error('Error loading business rules summary:', error);
+                }
+            }, 100);
+
             // Load compact panels
             loadBusinessRulesPrimaryDomainDetails();
             loadBusinessRulesAppStructure();
@@ -2720,6 +2757,407 @@
                             <div class="confidence-value">${confidence}%</div>
                             <div class="confidence-label">Confidence</div>
                         </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Helper function to load Business Rules Summary (High-Level Executive Summary)
+        function loadBusinessRulesSummary() {
+            const container = document.getElementById('businessRulesSummaryContent');
+            if (!container) {
+                console.warn('Business Rules Summary container not found');
+                return;
+            }
+
+            try {
+                // Debug: Log all sessionStorage keys related to business rules
+                const allKeys = Object.keys(sessionStorage);
+                const relevantKeys = allKeys.filter(k => 
+                    k.toLowerCase().includes('business') || 
+                    k.toLowerCase().includes('rule') || 
+                    k.toLowerCase().includes('dynamic') ||
+                    k.toLowerCase().includes('standard') ||
+                    k.toLowerCase().includes('upload') ||
+                    k.toLowerCase().includes('result')
+                );
+                console.log('Relevant sessionStorage keys:', relevantKeys);
+                
+                // Try multiple sources for business rules summary
+                let summary = null;
+                
+                // Source 1: Direct sessionStorage key
+                const directStorage = sessionStorage.getItem('businessRulesSummary');
+                if (directStorage) {
+                    try {
+                        summary = JSON.parse(directStorage);
+                        console.log('✅ Found business rules summary in direct storage:', summary);
+                    } catch (e) {
+                        console.warn('Failed to parse businessRulesSummary from direct storage:', e);
+                    }
+                } else {
+                    console.log('❌ No businessRulesSummary in direct storage');
+                }
+                
+                // Source 2: Check if we can generate from dynamic rules
+                if (!summary || !summary.business_rules || summary.business_rules.length === 0) {
+                    const dynamicRules = JSON.parse(sessionStorage.getItem('dynamicBusinessRules') || 'null');
+                    const standardRules = JSON.parse(sessionStorage.getItem('standardBusinessRules') || 'null');
+                    
+                    // Try to use dynamic rules to generate summary
+                    if (dynamicRules && dynamicRules.columns && dynamicRules.columns.length > 0) {
+                        console.log('Attempting to generate summary from dynamic rules');
+                        // We could generate summary here, but for now let's check other sources first
+                    }
+                }
+                
+                // Source 3: Check upload result (single file)
+                if (!summary || !summary.business_rules || summary.business_rules.length === 0) {
+                    // Check if there's a stored upload result
+                    const allKeys = Object.keys(sessionStorage);
+                    for (let key of allKeys) {
+                        if (key.includes('upload') || key.includes('result')) {
+                            try {
+                                const data = JSON.parse(sessionStorage.getItem(key));
+                                if (data && data.business_rules_summary) {
+                                    summary = data.business_rules_summary;
+                                    console.log('Found business rules summary in', key);
+                                    break;
+                                }
+                            } catch (e) {
+                                // Skip invalid JSON
+                            }
+                        }
+                    }
+                }
+                
+                // Source 4: Check multi-file result
+                if (!summary || !summary.business_rules || summary.business_rules.length === 0) {
+                    const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
+                    if (isMultiFile) {
+                        const multiFileResult = sessionStorage.getItem('multiFileResult');
+                        if (multiFileResult) {
+                            try {
+                                const data = JSON.parse(multiFileResult);
+                                if (data && data.business_rules_summary) {
+                                    summary = data.business_rules_summary;
+                                    console.log('Found business rules summary in multiFileResult');
+                                }
+                            } catch (e) {
+                                console.warn('Failed to parse multiFileResult:', e);
+                            }
+                        }
+                    }
+                }
+
+                // Debug: Log what we found
+                console.log('Business Rules Summary found:', summary);
+                
+                // If no summary found, try to generate from dynamic rules as fallback
+                if (!summary || !summary.business_rules || summary.business_rules.length === 0) {
+                    console.log('No summary found, attempting to generate from dynamic rules...');
+                    console.log('Available sessionStorage keys:', Object.keys(sessionStorage).filter(k => k.includes('business') || k.includes('rule') || k.includes('dynamic')));
+                    
+                    const dynamicRules = JSON.parse(sessionStorage.getItem('dynamicBusinessRules') || 'null');
+                    const standardRules = JSON.parse(sessionStorage.getItem('standardBusinessRules') || 'null');
+                    
+                    // Debug: Log the actual structure
+                    console.log('Dynamic rules structure:', dynamicRules ? Object.keys(dynamicRules) : 'null');
+                    console.log('Standard rules structure:', standardRules ? Object.keys(standardRules) : 'null');
+                    if (standardRules) {
+                        console.log('Standard rules sample:', JSON.stringify(standardRules).substring(0, 500));
+                    }
+                    
+                    // Extract columns from different possible structures
+                    let columns = [];
+                    
+                    // Try dynamic rules first
+                    if (dynamicRules) {
+                        if (dynamicRules.columns && Array.isArray(dynamicRules.columns)) {
+                            columns = dynamicRules.columns;
+                            console.log('Found columns in dynamicRules.columns:', columns.length);
+                        } else if (dynamicRules.files && typeof dynamicRules.files === 'object') {
+                            // Multi-file: collect columns from all files
+                            Object.values(dynamicRules.files).forEach(fileData => {
+                                if (fileData && fileData.columns && Array.isArray(fileData.columns)) {
+                                    columns = columns.concat(fileData.columns);
+                                }
+                            });
+                            console.log('Found columns in dynamicRules.files:', columns.length);
+                        }
+                    }
+                    
+                    // Try standard rules if no columns found yet
+                    if (columns.length === 0 && standardRules) {
+                        if (standardRules.columns && Array.isArray(standardRules.columns)) {
+                            columns = standardRules.columns;
+                            console.log('Found columns in standardRules.columns:', columns.length);
+                        } else if (standardRules.files && typeof standardRules.files === 'object') {
+                            // Multi-file: collect columns from all files
+                            Object.values(standardRules.files).forEach(fileData => {
+                                if (fileData && fileData.columns && Array.isArray(fileData.columns)) {
+                                    columns = columns.concat(fileData.columns);
+                                }
+                            });
+                            console.log('Found columns in standardRules.files:', columns.length);
+                        } else if (Array.isArray(standardRules)) {
+                            // If standardRules is directly an array
+                            columns = standardRules;
+                            console.log('Found columns as direct array:', columns.length);
+                        }
+                    }
+                    
+                    console.log('Total columns extracted:', columns.length);
+                    
+                    if (columns && columns.length > 0) {
+                        console.log('Generating summary from available rules data...');
+                        // Use the extracted columns
+                        const criticalCount = columns.filter(c => c.importance === 'CRITICAL' || c.status === 'INVALID').length;
+                        const warningCount = columns.filter(c => c.importance === 'WARNING' || c.status === 'WARNING').length;
+                        const safeCount = columns.filter(c => (c.importance === 'SAFE' && c.status === 'VALID') || (!c.importance && c.status === 'VALID')).length;
+                        
+                        // Group by themes based on column names and definitions
+                        const themeGroups = {};
+                        columns.forEach(col => {
+                            const colName = (col.column_name || col.name || '').toLowerCase();
+                            const definition = (col.definition || '').toLowerCase();
+                            const combined = colName + ' ' + definition;
+                            
+                            let theme = 'General Data Quality';
+                            
+                            // Determine theme based on column name patterns
+                            if (colName.includes('account') && (colName.includes('number') || colName.includes('id') || colName.includes('type') || colName.includes('status'))) {
+                                theme = 'Account Design';
+                            } else if (colName.includes('customer') && (colName.includes('id') || colName.includes('name') || colName.includes('kyc'))) {
+                                theme = 'Customer Identity Management';
+                            } else if (colName.includes('transaction') || colName.includes('amount') || colName.includes('debit') || colName.includes('credit')) {
+                                theme = 'Transaction Controls';
+                            } else if (colName.includes('otp') || colName.includes('login') || colName.includes('device') || colName.includes('ip')) {
+                                theme = 'Security & Access Controls';
+                            } else if (colName.includes('risk') || colName.includes('aml') || colName.includes('suspicious') || colName.includes('limit')) {
+                                theme = 'Risk Management & Compliance';
+                            } else if (colName.includes('email') || colName.includes('phone') || colName.includes('mobile') || colName.includes('notification')) {
+                                theme = 'Communication & Notifications';
+                            } else if (colName.includes('charge') || colName.includes('tax') || colName.includes('interest') || colName.includes('fee')) {
+                                theme = 'Operational Controls';
+                            } else if (colName.includes('nominee') || colName.includes('branch')) {
+                                theme = 'Relationship Management';
+                            } else if (col.issues && col.issues.length > 0 && (col.issues.some(i => i.includes('duplicate')) || col.issues.some(i => i.includes('missing')))) {
+                                theme = 'Data Integrity';
+                            }
+                            
+                            if (!themeGroups[theme]) {
+                                themeGroups[theme] = [];
+                            }
+                            themeGroups[theme].push(col);
+                        });
+                        
+                        // Create simplified business rules
+                        const simplifiedRules = Object.keys(themeGroups).map(theme => {
+                            const themeCols = themeGroups[theme];
+                            const criticalIssues = themeCols.filter(c => c.importance === 'CRITICAL' || c.status === 'INVALID').length;
+                            const warningIssues = themeCols.filter(c => c.importance === 'WARNING' || c.status === 'WARNING').length;
+                            
+                            // Generate title and interpretation based on theme
+                            let title = theme;
+                            let interpretation = '';
+                            
+                            if (theme === 'Account Design') {
+                                title = 'Account Identification and Lifecycle Management';
+                                interpretation = `Analysis of ${themeCols.length} account-related columns. ${criticalIssues > 0 ? criticalIssues + ' critical issues detected that may prevent account processing.' : warningIssues > 0 ? warningIssues + ' warnings found that may affect account operations.' : 'All account fields validated successfully.'}`;
+                            } else if (theme === 'Customer Identity Management') {
+                                title = 'Customer Identity Verification and KYC Compliance';
+                                interpretation = `Analysis of ${themeCols.length} customer identification columns. ${criticalIssues > 0 ? criticalIssues + ' critical issues detected that may prevent customer identification.' : warningIssues > 0 ? warningIssues + ' warnings found that may affect KYC compliance.' : 'All customer identification fields validated successfully.'}`;
+                            } else if (theme === 'Transaction Controls') {
+                                title = 'Transaction Processing and Settlement Controls';
+                                interpretation = `Analysis of ${themeCols.length} transaction-related columns. ${criticalIssues > 0 ? criticalIssues + ' critical issues detected that may prevent transaction processing.' : warningIssues > 0 ? warningIssues + ' warnings found that may affect transaction settlement.' : 'All transaction fields validated successfully.'}`;
+                            } else {
+                                interpretation = `Analysis of ${themeCols.length} related columns. ${criticalIssues > 0 ? criticalIssues + ' critical issues detected.' : warningIssues > 0 ? warningIssues + ' warnings found.' : 'All columns validated successfully.'}`;
+                            }
+                            
+                            return {
+                                theme: theme,
+                                title: title,
+                                interpretation: interpretation,
+                                impact: criticalIssues > 0 ? 'CRITICAL: ' + criticalIssues + ' critical issues require immediate attention.' : warningIssues > 0 ? 'WARNING: ' + warningIssues + ' warnings should be reviewed.' : null,
+                                column_count: themeCols.length,
+                                critical_issues_count: criticalIssues,
+                                warning_issues_count: warningIssues
+                            };
+                        });
+                        
+                        summary = {
+                            business_rules: simplifiedRules,
+                            summary: {
+                                total_rules: simplifiedRules.length,
+                                critical_rules: simplifiedRules.filter(r => r.critical_issues_count > 0).length,
+                                warning_rules: simplifiedRules.filter(r => r.warning_issues_count > 0).length,
+                                safe_rules: simplifiedRules.filter(r => !r.impact).length,
+                                total_columns_analyzed: columns.length,
+                                themes_covered: simplifiedRules.length
+                            }
+                        };
+                        console.log('✅ Generated fallback summary:', summary);
+                    } else {
+                        console.warn('❌ No columns found to generate summary');
+                        console.log('Columns array length:', columns.length);
+                        console.log('Available data structures:', {
+                            dynamicRules: !!dynamicRules,
+                            standardRules: !!standardRules,
+                            dynamicColumns: dynamicRules?.columns?.length || 0,
+                            standardColumns: standardRules?.columns?.length || 0,
+                            dynamicFiles: dynamicRules?.files ? Object.keys(dynamicRules.files).length : 0,
+                            standardFiles: standardRules?.files ? Object.keys(standardRules.files).length : 0
+                        });
+                    }
+                }
+                
+                if (!summary || !summary.business_rules || summary.business_rules.length === 0) {
+                    console.warn('⚠️ No summary available after all attempts');
+                    console.log('Summary object:', summary);
+                    
+                    // Show helpful message with debug info
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+                            <div style="font-size: 1.5rem; margin-bottom: 8px;">📊</div>
+                            <p style="font-size: 0.9rem; margin: 0; font-weight: 500;">Business rules summary will be generated after file analysis.</p>
+                            <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-muted); opacity: 0.7;">
+                                Please upload a file and wait for analysis to complete.
+                            </p>
+                            <p style="font-size: 0.75rem; margin-top: 12px; color: var(--text-muted); opacity: 0.6; font-style: italic;">
+                                Check browser console (F12) for debugging information.
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                console.log('✅ Summary ready to display:', {
+                    total_rules: summary.business_rules?.length || 0,
+                    summary_stats: summary.summary
+                });
+
+                const rules = summary.business_rules || [];
+                const summaryStats = summary.summary || {};
+
+                // Build HTML - Compact, line-by-line format, no gaps
+                let html = '';
+
+                // Summary Statistics (Compact)
+                if (summaryStats.total_rules > 0) {
+                    html += `
+                        <div style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 2px solid var(--border);">
+                            <div style="flex: 1; min-width: 120px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${summaryStats.total_rules}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Total Rules</div>
+                            </div>
+                            ${summaryStats.critical_rules > 0 ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger);">${summaryStats.critical_rules}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Critical Issues</div>
+                            </div>
+                            ` : ''}
+                            ${summaryStats.warning_rules > 0 ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--warning);">${summaryStats.warning_rules}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Warnings</div>
+                            </div>
+                            ` : ''}
+                            ${summaryStats.safe_rules > 0 ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${summaryStats.safe_rules}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Safe Rules</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                // Business Rules List - Line by line, connected format
+                if (rules.length > 0) {
+                    html += '<div style="display: flex; flex-direction: column; gap: 0;">';
+                    
+                    rules.forEach((rule, index) => {
+                        const hasImpact = rule.impact && rule.impact.trim() !== '';
+                        const isCritical = hasImpact && rule.impact.includes('CRITICAL');
+                        const isWarning = hasImpact && rule.impact.includes('WARNING') && !isCritical;
+                        
+                        // Determine border color based on impact
+                        let borderColor = 'var(--border)';
+                        let bgColor = '#ffffff';
+                        if (isCritical) {
+                            borderColor = 'var(--danger)';
+                            bgColor = '#fef2f2';
+                        } else if (isWarning) {
+                            borderColor = 'var(--warning)';
+                            bgColor = '#fffbeb';
+                        }
+
+                        // Compact card - no gaps between items
+                        html += `
+                            <div style="
+                                border-left: 4px solid ${borderColor};
+                                background: ${bgColor};
+                                padding: 16px 20px;
+                                margin-bottom: ${index < rules.length - 1 ? '0' : '0'};
+                                border-top: ${index === 0 ? '1px solid var(--border)' : 'none'};
+                                border-bottom: 1px solid var(--border);
+                                border-right: 1px solid var(--border);
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'">
+                                <div style="display: flex; align-items: flex-start; gap: 12px;">
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                            <span style="font-size: 1.1rem;">${isCritical ? '🚨' : isWarning ? '⚠️' : '✅'}</span>
+                                            <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600; color: var(--text-dark); line-height: 1.3;">
+                                                ${rule.title || 'Business Rule'}
+                                            </h4>
+                                        </div>
+                                        <div style="font-size: 0.9rem; color: var(--text-dark); line-height: 1.6; margin-bottom: ${hasImpact ? '8px' : '0'};">
+                                            ${rule.interpretation || 'No interpretation available.'}
+                                        </div>
+                                        ${hasImpact ? `
+                                        <div style="
+                                            margin-top: 8px;
+                                            padding: 10px 12px;
+                                            background: ${isCritical ? '#fee2e2' : '#fef3c7'};
+                                            border-left: 3px solid ${isCritical ? 'var(--danger)' : 'var(--warning)'};
+                                            border-radius: 4px;
+                                            font-size: 0.85rem;
+                                            color: ${isCritical ? '#991b1b' : '#92400e'};
+                                            line-height: 1.5;
+                                        ">
+                                            <strong>Business Impact:</strong> ${rule.impact}
+                                        </div>
+                                        ` : ''}
+                                        <div style="margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted);">
+                                            <span><strong>Theme:</strong> ${rule.theme || 'N/A'}</span>
+                                            ${rule.column_count ? `<span><strong>Columns:</strong> ${rule.column_count}</span>` : ''}
+                                            ${rule.critical_issues_count > 0 ? `<span style="color: var(--danger);"><strong>Critical Issues:</strong> ${rule.critical_issues_count}</span>` : ''}
+                                            ${rule.warning_issues_count > 0 ? `<span style="color: var(--warning);"><strong>Warnings:</strong> ${rule.warning_issues_count}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                } else {
+                    html += `
+                        <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+                            <p style="font-size: 0.9rem; margin: 0;">No business rules available.</p>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading business rules summary:', error);
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: var(--danger);">
+                        <div style="font-size: 1.5rem; margin-bottom: 8px;">⚠️</div>
+                        <p style="font-size: 0.9rem; margin: 0;">Error loading business rules summary: ${error.message}</p>
                     </div>
                 `;
             }
