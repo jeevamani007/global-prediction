@@ -785,57 +785,146 @@
 
         function renderRulesTab(folderData) {
             const rulesEl = document.getElementById('rules-content');
+            const businessRules = folderData.business_rules || {};
             const summaries = folderData.business_rules_summaries || {};
 
-            if (Object.keys(summaries).length === 0) {
+            // Try to use detailed business_rules first, fall back to summaries
+            if (Object.keys(businessRules).length === 0 && Object.keys(summaries).length === 0) {
                 rulesEl.innerHTML = '<div style="color: var(--text-muted); padding: 20px;">Business rules analysis not available.</div>';
                 return;
             }
 
             let html = '';
-            Object.entries(summaries).forEach(([filename, summary]) => {
-                if (!summary || typeof summary !== 'object') return;
 
-                const criticalCols = summary.critical_columns || [];
-                const warningCols = summary.warning_columns || [];
-                const safeCount = summary.safe_count || summary.total_columns || 0;
-                const totalCols = summary.total_columns || 0;
+            // Iterate through each file's business rules
+            const files = Object.keys(businessRules).length > 0 ? businessRules : summaries;
+
+            Object.entries(files).forEach(([filename, fileRules]) => {
+                if (!fileRules || typeof fileRules !== 'object') return;
+
+                // Get columns array - different structures possible
+                const columns = fileRules.columns || fileRules.critical_columns || [];
+                const criticalCols = fileRules.critical_columns || [];
+                const warningCols = fileRules.warning_columns || [];
+                const safeCols = fileRules.safe_columns || [];
+                const allCols = [...criticalCols, ...warningCols, ...safeCols];
+                const totalCols = fileRules.summary?.total_columns || columns.length || allCols.length || 0;
 
                 html += `
-                    <div class="rules-file-section">
-                        <div class="rules-file-header">📄 ${filename} <span style="font-weight: 400; color: var(--text-muted);">(${totalCols} columns)</span></div>
+                    <div class="rules-file-section" style="margin-bottom: 24px;">
+                        <div class="rules-file-header" style="background: linear-gradient(135deg, #1976D2 0%, #0D47A1 100%); color: white; padding: 12px 16px; border-radius: 8px 8px 0 0;">
+                            📄 ${filename} <span style="opacity: 0.8;">(${totalCols} columns analyzed)</span>
+                        </div>
+                        <div style="border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; padding: 16px;">
                 `;
 
-                criticalCols.forEach(col => {
-                    html += `
-                        <div class="rule-item critical">
-                            <div class="rule-label critical">Critical: ${col.display_name || col.column_name || 'Unknown'}</div>
-                            <div class="rule-message">${col.user_message || 'Attention required'}</div>
-                        </div>
-                    `;
-                });
+                // Render Critical Issues
+                if (criticalCols.length > 0) {
+                    html += '<div style="margin-bottom: 16px;"><strong style="color: #be123c;">⚠️ Critical Issues:</strong></div>';
+                    criticalCols.forEach(col => {
+                        html += renderColumnCard(col, 'critical');
+                    });
+                }
 
-                warningCols.forEach(col => {
-                    html += `
-                        <div class="rule-item warning">
-                            <div class="rule-label warning">Warning: ${col.display_name || col.column_name || 'Unknown'}</div>
-                            <div class="rule-message">${col.user_message || 'Review suggested'}</div>
-                        </div>
-                    `;
-                });
+                // Render Warnings
+                if (warningCols.length > 0) {
+                    html += '<div style="margin-bottom: 16px; margin-top: 16px;"><strong style="color: #b45309;">⚡ Warnings:</strong></div>';
+                    warningCols.forEach(col => {
+                        html += renderColumnCard(col, 'warning');
+                    });
+                }
 
-                if (criticalCols.length === 0 && warningCols.length === 0) {
+                // Render Safe Columns Summary
+                if (safeCols.length > 0) {
                     html += `
-                        <div class="rule-item safe">
-                            <div class="rule-label safe">✅ All ${safeCount} fields verified successfully</div>
+                        <div style="margin-top: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px;">
+                            <div style="color: #15803d; font-weight: 600;">✅ ${safeCols.length} Columns Verified Successfully</div>
+                            <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                                ${safeCols.slice(0, 10).map(col => `<span style="background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">${col.display_name || col.column_name}</span>`).join('')}
+                                ${safeCols.length > 10 ? `<span style="color: #166534; font-size: 0.8rem;">+${safeCols.length - 10} more</span>` : ''}
+                            </div>
                         </div>
                     `;
                 }
 
-                html += '</div>';
+                // If using columns array directly (from business_rules), show all
+                if (columns.length > 0 && criticalCols.length === 0 && warningCols.length === 0) {
+                    columns.forEach(col => {
+                        const importance = col.importance || col.status || 'SAFE';
+                        const colClass = importance === 'CRITICAL' ? 'critical' : importance === 'WARNING' ? 'warning' : 'safe';
+                        html += renderColumnCard(col, colClass);
+                    });
+                }
+
+                // If no columns found, show summary message
+                if (columns.length === 0 && criticalCols.length === 0 && warningCols.length === 0 && safeCols.length === 0) {
+                    const safeCount = fileRules.safe_count || fileRules.summary?.safe_count || totalCols;
+                    html += `
+                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px;">
+                            <div style="color: #15803d; font-weight: 600;">✅ All ${safeCount} fields verified successfully</div>
+                            <div style="color: #166534; font-size: 0.85rem; margin-top: 6px;">No critical issues or warnings detected in this file.</div>
+                        </div>
+                    `;
+                }
+
+                html += '</div></div>';
             });
 
             rulesEl.innerHTML = html || '<div style="color: var(--text-muted); padding: 20px;">Business rules analysis not available.</div>';
+        }
+
+        function renderColumnCard(col, type) {
+            const name = col.display_name || col.column_name || 'Unknown Column';
+            const definition = col.definition || '';
+            const condition = col.condition || '';
+            const userMessage = col.user_message || col.action_invalid || '';
+            const issues = col.issues || [];
+
+            const bgColors = {
+                critical: '#fff1f2',
+                warning: '#fffbeb',
+                safe: '#f0fdf4'
+            };
+            const borderColors = {
+                critical: '#fecdd3',
+                warning: '#fde68a',
+                safe: '#bbf7d0'
+            };
+            const labelColors = {
+                critical: '#be123c',
+                warning: '#b45309',
+                safe: '#15803d'
+            };
+
+            let html = `
+                <div style="background: ${bgColors[type]}; border: 1px solid ${borderColors[type]}; border-radius: 8px; padding: 14px; margin-bottom: 10px;">
+                    <div style="font-weight: 600; color: ${labelColors[type]}; margin-bottom: 8px; font-size: 0.95rem;">
+                        ${type === 'critical' ? '🚨' : type === 'warning' ? '⚠️' : '✅'} ${name}
+                    </div>
+            `;
+
+            if (definition) {
+                html += `<div style="font-size: 0.85rem; color: var(--text-dark); margin-bottom: 6px;"><strong>What:</strong> ${definition}</div>`;
+            }
+
+            if (condition) {
+                html += `<div style="font-size: 0.85rem; color: var(--text-dark); margin-bottom: 6px;"><strong>Rule:</strong> ${condition}</div>`;
+            }
+
+            if (userMessage) {
+                html += `<div style="font-size: 0.85rem; color: ${labelColors[type]}; margin-top: 8px; padding: 8px; background: white; border-radius: 4px;"><strong>Issue:</strong> ${userMessage}</div>`;
+            }
+
+            if (issues.length > 0) {
+                html += `<div style="font-size: 0.8rem; color: ${labelColors[type]}; margin-top: 6px;">`;
+                issues.forEach(issue => {
+                    html += `<div style="margin-top: 4px;">• ${issue}</div>`;
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+            return html;
         }
 
         function switchTab(tabId) {

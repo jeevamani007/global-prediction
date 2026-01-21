@@ -435,10 +435,17 @@ class BankingBusinessRulesSummarizer:
         if not dynamic_rules_result or not isinstance(dynamic_rules_result, dict):
             return {
                 'business_rules': [],
+                'critical_columns': [],
+                'warning_columns': [],
+                'safe_columns': [],
                 'summary': {
                     'total_rules': 0,
                     'critical_rules': 0,
-                    'warning_rules': 0
+                    'warning_rules': 0,
+                    'total_columns': 0,
+                    'critical_count': 0,
+                    'warning_count': 0,
+                    'safe_count': 0
                 }
             }
         
@@ -446,10 +453,17 @@ class BankingBusinessRulesSummarizer:
         if not columns:
             return {
                 'business_rules': [],
+                'critical_columns': [],
+                'warning_columns': [],
+                'safe_columns': [],
                 'summary': {
                     'total_rules': 0,
                     'critical_rules': 0,
-                    'warning_rules': 0
+                    'warning_rules': 0,
+                    'total_columns': 0,
+                    'critical_count': 0,
+                    'warning_count': 0,
+                    'safe_count': 0
                 }
             }
         
@@ -524,13 +538,55 @@ class BankingBusinessRulesSummarizer:
         
         business_rules.sort(key=sort_key)
         
+        # Separate columns by status for UI rendering
+        critical_columns = []
+        warning_columns = []
+        safe_columns = []
+        
+        for col in columns:
+            importance = col.get('importance', 'SAFE')
+            status = col.get('status', 'VALID')
+            
+            # Build UI-friendly column object with all details
+            col_detail = {
+                'column_name': col.get('column_name', ''),
+                'display_name': col.get('display_name', col.get('column_name', '')),
+                'definition': col.get('definition', ''),
+                'condition': col.get('condition', ''),
+                'user_message': col.get('action_invalid', '') if status in ['INVALID', 'WARNING'] else col.get('action_valid', ''),
+                'action_valid': col.get('action_valid', ''),
+                'action_invalid': col.get('action_invalid', ''),
+                'issues': col.get('issues', []),
+                'status': status,
+                'importance': importance,
+                'null_percentage': col.get('null_percentage', 0),
+                'unique_ratio': col.get('unique_ratio', 1.0),
+                'unique_count': col.get('unique_count', 0),
+                'total_records': col.get('total_records', 0),
+                'sample_values': col.get('sample_values', [])
+            }
+            
+            if importance == 'CRITICAL' or status == 'INVALID':
+                critical_columns.append(col_detail)
+            elif importance == 'WARNING' or status == 'WARNING':
+                warning_columns.append(col_detail)
+            else:
+                safe_columns.append(col_detail)
+        
         return {
             'business_rules': business_rules,
+            'critical_columns': critical_columns,
+            'warning_columns': warning_columns,
+            'safe_columns': safe_columns,
             'summary': {
                 'total_rules': len(business_rules),
                 'critical_rules': critical_count,
                 'warning_rules': warning_count,
                 'safe_rules': len(business_rules) - critical_count - warning_count,
+                'total_columns': len(columns),
+                'critical_count': len(critical_columns),
+                'warning_count': len(warning_columns),
+                'safe_count': len(safe_columns),
                 'total_columns_analyzed': len(columns),
                 'themes_covered': len(set(r['theme'] for r in business_rules))
             }
