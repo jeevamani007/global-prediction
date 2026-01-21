@@ -448,7 +448,25 @@ class FileRelationshipAnalyzer:
             business_impact = "This connection enables data linking and referential integrity between the two files."
             connection_details = f"Values in {child_file}.{child_fk_col} must exist in {parent_file}.{parent_pk_col}."
         
-        # Build full explanation paragraph
+        # Build dynamic 2-line short explanation based on observed data (not hardcoded)
+        overlap_count = overlap_info.get('overlap_count', 0)
+        overlap_pct = overlap_info.get('overlap_ratio', 0) * 100
+        unique_parent = overlap_info.get('total_unique_file1', 0)
+        unique_child = overlap_info.get('total_unique_file2', 0)
+        
+        # Line 1: What connects them (data-driven)
+        short_line1 = f"Found {overlap_count} matching '{parent_pk_col}' values linking {parent_file_display} to {child_file_display} ({overlap_pct:.0f}% overlap)."
+        
+        # Line 2: Why it matters (data-driven inference)
+        if unique_parent > 0 and unique_child > unique_parent:
+            ratio_desc = f"Each {parent_entity} record links to ~{unique_child // max(1, unique_parent)} {child_entity} records on average."
+        else:
+            ratio_desc = f"This connection allows linking {parent_entity} data with related {child_entity} records."
+        short_line2 = ratio_desc
+        
+        short_explanation = f"{short_line1} {short_line2}"
+        
+        # Build full explanation paragraph (kept for detailed view)
         full_explanation = f"""
         <strong>Connection Detected:</strong> {parent_file_display} (contains {parent_entity} data) ↔ {child_file_display} (contains {child_entity} data)<br><br>
         
@@ -457,7 +475,7 @@ class FileRelationshipAnalyzer:
         
         <strong>Technical Details:</strong><br>
         {connection_details} The connection is established through the column {parent_pk_col} in {parent_file_display} and {child_fk_col} in {child_file_display}. 
-        Analysis shows {overlap_info['overlap_count']} matching values between the two files, with an overlap ratio of {(overlap_info['overlap_ratio'] * 100):.1f}%.<br><br>
+        Analysis shows {overlap_info['overlap_count']} matching values between the two files, with an overlap ratio of {overlap_pct:.1f}%.<br><br>
         
         <strong>Business Purpose:</strong><br>
         {business_impact}<br><br>
@@ -477,6 +495,7 @@ class FileRelationshipAnalyzer:
             "child_column_type": "FOREIGN_KEY",
             "relationship_type": relationship_key or f"{parent_entity} → {child_entity}",
             "overlap_info": overlap_info,
+            "short_explanation": short_explanation,
             "detailed_explanation": full_explanation,
             "purpose": explanation,
             "business_impact": business_impact,

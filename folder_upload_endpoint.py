@@ -126,6 +126,7 @@ async def upload_folders(files: List[UploadFile] = File(...)):
                 # 4. Analyze file relationships with detailed explanations
                 relationship_analyzer = FileRelationshipAnalyzer()
                 detailed_relationships = relationship_analyzer.analyze_file_relationships(csv_files_data)
+                # detailed_relationships is a list of relationship dicts
                 
                 # 5. Generate application purpose explanation
                 application_purpose = None
@@ -136,7 +137,7 @@ async def upload_folders(files: List[UploadFile] = File(...)):
                     }
                     application_purpose = purpose_analyzer.analyze_from_rules_data(
                         combined_rules,
-                        relationships=detailed_relationships.get('relationships', [])
+                        relationships=detailed_relationships  # Pass the list directly
                     )
                 except Exception as e:
                     print(f"Warning: Could not generate application purpose for {folder_name}: {str(e)}")
@@ -178,7 +179,7 @@ async def upload_folders(files: List[UploadFile] = File(...)):
                     'application_type': app_type_result,
                     'csv_files': folder_analysis['csv_files'],
                     'file_roles': folder_analysis.get('file_roles', {}),
-                    'file_relationships': detailed_relationships.get('relationships', []),
+                    'file_relationships': detailed_relationships,  # already a list
                     'cross_file_relationships': cross_file_relationships,
                     'business_rules': business_rules_per_file,
                     'business_rules_summaries': business_rules_summaries,

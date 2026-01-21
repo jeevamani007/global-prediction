@@ -9,6 +9,7 @@
     <style>
         :root {
             --primary: #1a56db;
+            --primary-light: #3b82f6;
             --success: #059669;
             --warning: #d97706;
             --danger: #dc2626;
@@ -16,6 +17,7 @@
             --text-muted: #6b7280;
             --border: #e5e7eb;
             --bg-light: #f8fafc;
+            --sidebar-width: 280px;
         }
 
         * {
@@ -29,115 +31,257 @@
             background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
             min-height: 100vh;
             color: var(--text-dark);
-            padding: 24px;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
+        /* Two-Column Layout: Sidebar + Main Content */
+        .layout-wrapper {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        .header {
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
             background: white;
-            padding: 32px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            margin-bottom: 24px;
-            text-align: center;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
         }
 
-        .header h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-
-            margin-bottom: 8px;
-        }
-
-        .summary-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: white;
+        .sidebar-header {
             padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-            text-align: center;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
 
-        .stat-value {
-            font-size: 2rem;
+        .sidebar-header h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .sidebar-header p {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .sidebar-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mini-stat {
+            text-align: center;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+        }
+
+        .mini-stat-value {
+            font-size: 1.2rem;
             font-weight: 700;
             color: var(--primary);
         }
 
-        .stat-label {
+        .mini-stat-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .app-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .app-list-item {
+            padding: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 6px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .app-list-item:hover {
+            background: var(--bg-light);
+            border-color: var(--border);
+        }
+
+        .app-list-item.active {
+            background: #eff6ff;
+            border-color: var(--primary);
+        }
+
+        .app-list-item-name {
+            font-weight: 600;
             font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .app-list-item-type {
+            font-size: 0.75rem;
             color: var(--text-muted);
             margin-top: 4px;
         }
 
-        .application-section {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            margin-bottom: 24px;
-            overflow: hidden;
+        .app-list-item-confidence {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-top: 6px;
         }
 
-        .app-header {
-            background: linear-gradient(135deg, #1976D2 0%, #0D47A1 100%);
-            color: white;
-            padding: 24px 32px;
+        .conf-high {
+            background: #d1fae5;
+            color: var(--success);
+        }
+
+        .conf-medium {
+            background: #fef3c7;
+            color: var(--warning);
+        }
+
+        .conf-low {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.success {
+            background: var(--success);
+        }
+
+        .status-dot.warning {
+            background: var(--warning);
+        }
+
+        .status-dot.error {
+            background: var(--danger);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .content-header {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 16px;
         }
 
-        .app-title {
+        .content-header h1 {
             font-size: 1.5rem;
             font-weight: 700;
+            color: var(--primary);
+        }
+
+        .content-header-meta {
+            font-size: 0.9rem;
+            color: var(--text-muted);
         }
 
         .confidence-badge {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 20px;
+            padding: 8px 16px;
             border-radius: 20px;
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1rem;
         }
 
         .confidence-high {
-            background: rgba(5, 150, 105, 0.2);
-            color: #ecfdf5;
+            background: #d1fae5;
+            color: var(--success);
         }
 
         .confidence-medium {
-            background: rgba(217, 119, 6, 0.2);
-            color: #fef3c7;
+            background: #fef3c7;
+            color: var(--warning);
         }
 
         .confidence-low {
-            background: rgba(220, 38, 38, 0.2);
-            color: #fee2e2;
+            background: #fee2e2;
+            color: var(--danger);
         }
 
-        .app-body {
-            padding: 32px;
+        /* Tabs */
+        .content-tabs {
+            display: flex;
+            gap: 4px;
+            background: white;
+            padding: 8px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         }
 
-        .section {
-            margin-bottom: 28px;
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 6px;
+            color: var(--text-muted);
+            transition: all 0.2s;
         }
 
-        .section-title {
-            font-size: 1.2rem;
+        .tab-btn:hover {
+            background: var(--bg-light);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Content Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1rem;
             font-weight: 600;
             color: var(--primary);
             margin-bottom: 16px;
@@ -146,9 +290,10 @@
             gap: 8px;
         }
 
+        /* Files Grid */
         .files-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 12px;
         }
 
@@ -156,101 +301,156 @@
             background: var(--bg-light);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 16px;
+            padding: 14px;
             border-left: 4px solid var(--primary);
         }
 
         .file-name {
             font-weight: 600;
-            margin-bottom: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+            word-break: break-all;
         }
 
         .file-role {
             display: inline-block;
             background: #dbeafe;
             color: var(--primary);
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.85rem;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.75rem;
             font-weight: 600;
         }
 
-        .relationship-box {
+        /* Relationship Cards */
+        .relationship-card {
             background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
             border: 1px solid #90caf9;
             border-radius: 10px;
-            padding: 20px;
+            padding: 18px;
+            margin-bottom: 14px;
+        }
+
+        .rel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
             margin-bottom: 12px;
         }
 
-        .relationship-arrow {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 0.95rem;
-            flex-wrap: wrap;
-        }
-
-        .table-box {
+        .rel-table {
             background: white;
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 6px;
             font-weight: 600;
             border: 2px solid var(--primary);
             color: var(--primary);
-        }
-
-        .arrow {
-            color: var(--primary);
-            font-size: 1.2rem;
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-        }
-
-        .info-item {
-            padding: 12px;
-            background: var(--bg-light);
-            border-radius: 8px;
-        }
-
-        .info-label {
             font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 4px;
         }
 
-        .info-value {
-            font-weight: 600;
+        .rel-arrow {
+            color: var(--primary);
             font-size: 1.1rem;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.85rem;
+        .rel-explanation {
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            line-height: 1.6;
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid var(--primary-light);
+        }
+
+        .rel-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 10px;
+        }
+
+        /* Business Rules */
+        .rules-file-section {
+            margin-bottom: 20px;
+        }
+
+        .rules-file-header {
             font-weight: 600;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: var(--bg-light);
+            border-radius: 6px;
         }
 
-        .status-success {
-            background: #d1fae5;
-            color: var(--success);
+        .rule-item {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
         }
 
-        .status-warning {
-            background: #fef3c7;
-            color: var(--warning);
+        .rule-item.critical {
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
         }
 
-        .status-error {
-            background: #fee2e2;
-            color: var(--danger);
+        .rule-item.warning {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
         }
 
+        .rule-item.safe {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+        }
+
+        .rule-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .rule-label.critical {
+            color: #be123c;
+        }
+
+        .rule-label.warning {
+            color: #b45309;
+        }
+
+        .rule-label.safe {
+            color: #15803d;
+        }
+
+        .rule-message {
+            font-size: 0.85rem;
+        }
+
+        /* Purpose Section */
+        .purpose-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .purpose-point {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .purpose-point::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+        }
+
+        /* Empty States */
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -258,82 +458,136 @@
         }
 
         .empty-state-icon {
-            font-size: 4rem;
-            margin-bottom: 16px;
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .no-selection {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>📊 Multi-Application Analysis</h1>
-            <p>Intelligent Folder-Based Application Classification</p>
+    <div class="layout-wrapper">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>📊 Multi-App Analysis</h2>
+                <p>Select an application to view details</p>
+            </div>
+            <div class="sidebar-stats">
+                <div class="mini-stat">
+                    <div class="mini-stat-value" id="total-folders">0</div>
+                    <div class="mini-stat-label">Apps</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="mini-stat-value" id="total-files">0</div>
+                    <div class="mini-stat-label">Files</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="mini-stat-value" id="total-relationships">0</div>
+                    <div class="mini-stat-label">Relations</div>
+                </div>
+                <div class="mini-stat">
+                    <div class="mini-stat-value" id="avg-confidence">0%</div>
+                    <div class="mini-stat-label">Avg Conf</div>
+                </div>
+            </div>
+            <div class="app-list" id="app-list">
+                <!-- App list items will be inserted here -->
+            </div>
         </div>
 
-        <!-- Summary Statistics -->
-        <div class="summary-stats" id="summary-stats">
-            <div class="stat-card">
-                <div class="stat-value" id="total-folders">0</div>
-                <div class="stat-label">Applications Analyzed</div>
+        <!-- Main Content -->
+        <div class="main-content" id="main-content">
+            <div class="no-selection" id="no-selection">
+                <div>
+                    <div class="empty-state-icon">📁</div>
+                    <h3>Select an Application</h3>
+                    <p>Choose a folder from the sidebar to view its analysis.</p>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-files">0</div>
-                <div class="stat-label">Total CSV Files</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="total-relationships">0</div>
-                <div class="stat-label">Relationships Found</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avg-confidence">0%</div>
-                <div class="stat-label">Avg Confidence</div>
-            </div>
-        </div>
 
-        <!-- Applications Container -->
-        <div id="applications-container"></div>
+            <div id="app-detail" style="display: none;">
+                <!-- Content Header -->
+                <div class="content-header">
+                    <div>
+                        <h1 id="detail-app-type">Application Type</h1>
+                        <div class="content-header-meta" id="detail-folder-name">Folder: folder_name</div>
+                    </div>
+                    <div class="confidence-badge" id="detail-confidence">0% Confidence</div>
+                </div>
 
-        <!-- Empty State -->
-        <div class="empty-state" id="empty-state">
-            <div class="empty-state-icon">📁</div>
-            <h3>No Analysis Data</h3>
-            <p>Upload folders via the API endpoint to see results here</p>
+                <!-- Tabs -->
+                <div class="content-tabs">
+                    <button class="tab-btn active" data-tab="overview">Overview</button>
+                    <button class="tab-btn" data-tab="files">Files</button>
+                    <button class="tab-btn" data-tab="relationships">Relationships</button>
+                    <button class="tab-btn" data-tab="rules">Business Rules</button>
+                </div>
+
+                <!-- Tab Contents -->
+                <div id="tab-overview" class="tab-content active">
+                    <!-- Purpose Card -->
+                    <div class="card">
+                        <div class="card-title">🎯 Application Purpose</div>
+                        <div class="purpose-box" id="purpose-content">
+                            <div class="purpose-point">No purpose analysis available.</div>
+                        </div>
+                    </div>
+                    <!-- Patterns Card -->
+                    <div class="card">
+                        <div class="card-title">🔍 Patterns Detected</div>
+                        <div id="patterns-content" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            <span style="color: var(--text-muted);">No patterns detected.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-files" class="tab-content">
+                    <div class="card">
+                        <div class="card-title">📄 CSV Files</div>
+                        <div class="files-grid" id="files-content">
+                            <!-- File cards -->
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-relationships" class="tab-content">
+                    <div class="card">
+                        <div class="card-title">🔗 File Relationships</div>
+                        <div id="relationships-content">
+                            <div style="color: var(--text-muted);">No relationships detected.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-rules" class="tab-content">
+                    <div class="card">
+                        <div class="card-title">📏 Observed Business Rules</div>
+                        <div id="rules-content">
+                            <div style="color: var(--text-muted);">No business rules available.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // Load analysis data from sessionStorage or API
-        function loadAnalysisData() {
-            // Try to load from sessionStorage (if redirected from upload)
-            const data = sessionStorage.getItem('multi_folder_analysis');
+        let analysisData = null;
+        let selectedFolder = null;
 
-            if (data) {
-                displayResults(JSON.parse(data));
-            } else {
-                // Check if there's data in URL parameters
-                const urlParams = new URLSearchParams(window.location.search);
-                const dataParam = urlParams.get('data');
-
-                if (dataParam) {
-                    try {
-                        displayResults(JSON.parse(decodeURIComponent(dataParam)));
-                    } catch (e) {
-                        console.error('Error parsing URL data:', e);
-                    }
-                }
-            }
-        }
-
-        // Load analysis data from URL parameter
-        // Load analysis data from URL parameter or sessionStorage
         function loadAnalysisData() {
             console.log('Loading analysis data...');
-
             let data = null;
 
-            // 1. Try URL parameter first
             const urlParams = new URLSearchParams(window.location.search);
             const analysisDataParam = urlParams.get('data');
 
@@ -346,7 +600,6 @@
                 }
             }
 
-            // 2. Fallback to sessionStorage
             if (!data) {
                 const sessionData = sessionStorage.getItem('multi_folder_analysis');
                 if (sessionData) {
@@ -359,296 +612,246 @@
                 }
             }
 
-            // 3. Display or show empty state
-            if (data) {
-                displayResults(data);
+            if (data && data.folders && Object.keys(data.folders).length > 0) {
+                analysisData = data;
+                renderSidebar();
+                // Auto-select first folder
+                const firstFolder = Object.keys(data.folders)[0];
+                selectFolder(firstFolder);
             } else {
-                console.warn('No analysis data found in URL or sessionStorage');
-                document.getElementById('empty-state').style.display = 'block';
-                document.getElementById('empty-state').querySelector('p').textContent =
-                    'No analysis data found. Please upload folders from the home page.';
+                console.warn('No analysis data found');
             }
         }
 
-        function displayResults(data) {
-            console.log('=== MULTI-FOLDER ANALYSIS DATA ===');
-            console.log('Full data object:', data);
-            console.log('Has folders:', !!data.folders);
-            console.log('Folders keys:', data.folders ? Object.keys(data.folders) : 'none');
-
-            if (!data || !data.folders || Object.keys(data.folders).length === 0) {
-                console.warn('No folder data to display');
-                return;
-            }
-
-            // Hide empty state
-            document.getElementById('empty-state').style.display = 'none';
-
-            // Update summary stats
-            const folders = data.folders;
+        function renderSidebar() {
+            const folders = analysisData.folders;
             const folderCount = Object.keys(folders).length;
-            let totalFiles = 0;
-            let totalRelationships = 0;
-            let totalConfidence = 0;
+            let totalFiles = 0, totalRelationships = 0, totalConfidence = 0;
 
-            Object.values(folders).forEach(folder => {
-                console.log('Processing folder:', folder.folder_name);
-                console.log('  CSV files:', folder.csv_files?.length || 0);
-                console.log('  Relationships:', folder.file_relationships?.length || 0);
-                console.log('  Application type:', folder.application_type);
-                console.log('  Confidence value:', folder.application_type?.confidence);
-                console.log('  Confidence type:', typeof folder.application_type?.confidence);
-
-                totalFiles += folder.csv_files?.length || 0;
-                totalRelationships += folder.file_relationships?.length || 0;
-                totalConfidence += folder.application_type?.confidence || 0;
+            Object.values(folders).forEach(f => {
+                totalFiles += f.csv_files?.length || 0;
+                totalRelationships += f.file_relationships?.length || 0;
+                totalConfidence += f.application_type?.confidence || 0;
             });
 
             const avgConfidence = folderCount > 0 ? Math.round(totalConfidence / folderCount) : 0;
-
-            console.log('\nSummary Stats:');
-            console.log('  Total folders:', folderCount);
-            console.log('  Total files:', totalFiles);
-            console.log('  Total relationships:', totalRelationships);
-            console.log('  Total confidence sum:', totalConfidence);
-            console.log('  Average confidence:', avgConfidence);
 
             document.getElementById('total-folders').textContent = folderCount;
             document.getElementById('total-files').textContent = totalFiles;
             document.getElementById('total-relationships').textContent = totalRelationships;
             document.getElementById('avg-confidence').textContent = avgConfidence + '%';
 
-            // Display each application
-            const container = document.getElementById('applications-container');
-            container.innerHTML = '';
+            const appList = document.getElementById('app-list');
+            appList.innerHTML = '';
 
             Object.entries(folders).forEach(([folderName, folderData]) => {
-                container.appendChild(createApplicationCard(folderName, folderData));
+                const appType = folderData.application_type || {};
+                const confidence = appType.confidence || 0;
+                const confClass = confidence >= 80 ? 'conf-high' : confidence >= 60 ? 'conf-medium' : 'conf-low';
+                const statusClass = (folderData.status || 'success') === 'success' ? 'success' : 'warning';
+
+                const item = document.createElement('div');
+                item.className = 'app-list-item';
+                item.dataset.folder = folderName;
+                item.innerHTML = `
+                    <div class="app-list-item-name">
+                        <span class="status-dot ${statusClass}"></span>
+                        ${folderName}
+                    </div>
+                    <div class="app-list-item-type">${appType.application_type || 'Unknown'}</div>
+                    <span class="app-list-item-confidence ${confClass}">${confidence}%</span>
+                `;
+                item.onclick = () => selectFolder(folderName);
+                appList.appendChild(item);
             });
         }
 
-        function createApplicationCard(folderName, data) {
-            const section = document.createElement('div');
-            section.className = 'application-section';
+        function selectFolder(folderName) {
+            selectedFolder = folderName;
+            const folderData = analysisData.folders[folderName];
+            if (!folderData) return;
 
-            const appType = data.application_type || {};
+            // Update sidebar active state
+            document.querySelectorAll('.app-list-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.folder === folderName);
+            });
+
+            // Show detail panel
+            document.getElementById('no-selection').style.display = 'none';
+            document.getElementById('app-detail').style.display = 'block';
+
+            const appType = folderData.application_type || {};
             const confidence = appType.confidence || 0;
-            const confidenceLevel = appType.confidence_level || 'Low';
-            const confidenceClass = confidence >= 80 ? 'confidence-high' :
-                confidence >= 60 ? 'confidence-medium' : 'confidence-low';
+            const confClass = confidence >= 80 ? 'confidence-high' : confidence >= 60 ? 'confidence-medium' : 'confidence-low';
 
-            section.innerHTML = `
-                <div class="app-header">
-                    <div>
-                        <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 4px;">APPLICATION</div>
-                        <div class="app-title">${appType.application_type || 'Unknown'}</div>
-                        <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 4px;">📁 ${folderName}</div>
-                    </div>
-                    <div class="confidence-badge ${confidenceClass}">
-                        ${confidence}% Confidence
-                    </div>
-                </div>
+            document.getElementById('detail-app-type').textContent = appType.application_type || 'Unknown Application';
+            document.getElementById('detail-folder-name').textContent = '📁 ' + folderName;
+            const confBadge = document.getElementById('detail-confidence');
+            confBadge.textContent = confidence + '% Confidence';
+            confBadge.className = 'confidence-badge ' + confClass;
 
-                <div class="app-body">
-                    <!-- Status -->
-                    <div class="section">
-                        <div class="section-title">📋 Status</div>
-                        <span class="status-badge ${getStatusClass(data.status || 'success')}">
-                            ${(data.status || 'success').toUpperCase()}
-                        </span>
-                    </div>
+            // Render tabs content
+            renderOverviewTab(folderData, appType);
+            renderFilesTab(folderData);
+            renderRelationshipsTab(folderData);
+            renderRulesTab(folderData);
 
-                    <!-- CSV Files -->
-                    <div class="section">
-                        <div class="section-title">📄 CSV Files (${data.csv_files?.length || 0})</div>
-                        <div class="files-grid">
-                            ${(data.csv_files || []).map(file => `
-                                <div class="file-card">
-                                    <div class="file-name">${file}</div>
-                                    <span class="file-role">${data.file_roles?.[file] || 'Data File'}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <!-- File Relationships -->
-                    ${(data.file_relationships && data.file_relationships.length > 0) ? `
-                        <div class="section">
-                            <div class="section-title">🔗 File Relationships (${data.file_relationships.length})</div>
-                            ${data.file_relationships.map(rel => `
-                                <div class="relationship-box">
-                                    <div class="relationship-arrow">
-                                        <span class="table-box">${rel.file1 || rel.parent_file}</span>
-                                        <span class="arrow">↔</span>
-                                        <span class="table-box">${rel.file2 || rel.child_file}</span>
-                                    </div>
-                                    <div style="margin-top: 12px; font-size: 0.9rem; color: var(--text-muted);">
-                                        <strong>Column:</strong> ${rel.column || rel.parent_pk_column} | 
-                                        <strong>Type:</strong> ${rel.relationship_type} | 
-                                        <strong>Overlap:</strong> ${rel.overlap_percentage || 0}%
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-
-                    <!-- Application Info -->
-                    <div class="section">
-                        <div class="section-title">ℹ️ Application Information</div>
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <div class="info-label">Total Rows</div>
-                                <div class="info-value">${(data.total_rows || 0).toLocaleString()}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Total Columns</div>
-                                <div class="info-value">${data.total_columns || 0}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Unique Columns</div>
-                                <div class="info-value">${data.unique_column_count || 0}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Issues Found</div>
-                                <div class="info-value">${data.issues?.length || 0}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Patterns Detected -->
-                    ${(appType.patterns_detected && appType.patterns_detected.length > 0) ? `
-                        <div class="section">
-                            <div class="section-title">🎯 Patterns Detected</div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                ${appType.patterns_detected.map(pattern => `
-                                    <span style="background: #dbeafe; color: var(--primary); padding: 6px 14px; border-radius: 16px; font-size: 0.85rem; font-weight: 600;">
-                                        ${pattern}
-                                    </span>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-
-                    <!-- 🎯 Application Purpose -->
-                    ${(data.application_purpose) ? `
-                        <div class="section">
-                            <div class="section-title">🎯 Application Purpose Analysis</div>
-                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px;">
-                                <div style="display: flex; flex-direction: column; gap: 12px;">
-                                    ${(() => {
-                        const purpose = data.application_purpose;
-                        const points = purpose.explanation_points;
-
-                        // Debug logging
-                        console.log('Application Purpose for folder:', folderName);
-                        console.log('  - Has explanation_points:', !!points);
-                        console.log('  - Points array:', points);
-                        console.log('  - Line1:', purpose.line1);
-                        console.log('  - Line2:', purpose.line2);
-
-                        // Check if explanation_points exists and is an array
-                        if (points && Array.isArray(points) && points.length > 0) {
-                            return points.map(point => `
-                                                <div style="display: flex; gap: 12px; align-items: flex-start;">
-                                                    ${point}
-                                                </div>
-                                            `).join('');
-                        } else if (purpose.line1 || purpose.line2) {
-                            // Fallback: use line1 and line2 if explanation_points not available
-                            const lines = [];
-                            if (purpose.line1) lines.push(purpose.line1);
-                            if (purpose.line2) lines.push(purpose.line2);
-                            return lines.map(line => `
-                                                <div style="display: flex; gap: 12px; align-items: flex-start;">
-                                                    ${line}
-                                                </div>
-                                            `).join('');
-                        } else {
-                            return `<div style="color: var(--text-muted);">Application purpose analysis not available for this folder.</div>`;
-                        }
-                    })()}
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
-
-                    <!-- 📏 Business Rules Summary -->
-                    ${(data.business_rules_summaries && Object.keys(data.business_rules_summaries).length > 0) ? `
-                        <div class="section">
-                            <div class="section-title">📏 Observed Business Rules</div>
-                            ${(() => {
-                        const summaries = data.business_rules_summaries;
-                        console.log('Business Rules Summaries for folder:', folderName);
-                        console.log('  - Number of files:', Object.keys(summaries).length);
-                        console.log('  - Files:', Object.keys(summaries));
-
-                        return Object.entries(summaries).map(([filename, summary]) => {
-                            console.log(`  - Processing ${filename}:`, summary);
-
-                            if (!summary || typeof summary !== 'object') {
-                                console.warn(`    Warning: Invalid summary for ${filename}`);
-                                return '';
-                            }
-
-                            const criticalCols = summary.critical_columns || [];
-                            const warningCols = summary.warning_columns || [];
-                            const safeCount = summary.safe_count || summary.total_columns || 0;
-                            const totalCols = summary.total_columns || 0;
-
-                            console.log(`    Critical: ${criticalCols.length}, Warning: ${warningCols.length}, Safe: ${safeCount}`);
-
-                            return `
-                                        <div style="margin-bottom: 20px;">
-                                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-dark);">
-                                                📄 ${filename} <span style="font-weight: 400; color: var(--text-muted);">(${totalCols} columns)</span>
-                                            </div>
-                                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
-                                                ${criticalCols.map(col => `
-                                                    <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 6px; padding: 12px;">
-                                                        <div style="font-size: 0.85rem; font-weight: 700; color: #be123c; margin-bottom: 4px;">CRITICAL: ${col.display_name || col.column_name || 'Unknown'}</div>
-                                                        <div style="font-size: 0.8em; color: #881337;">${col.user_message || 'Attention required'}</div>
-                                                    </div>
-                                                `).join('')}
-                                                ${warningCols.map(col => `
-                                                    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px;">
-                                                        <div style="font-size: 0.85rem; font-weight: 700; color: #b45309; margin-bottom: 4px;">WARNING: ${col.display_name || col.column_name || 'Unknown'}</div>
-                                                        <div style="font-size: 0.8em; color: #78350f;">${col.user_message || 'Review suggested'}</div>
-                                                    </div>
-                                                `).join('')}
-                                                ${(criticalCols.length === 0 && warningCols.length === 0) ? `
-                                                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px; grid-column: 1 / -1;">
-                                                        <div style="font-size: 0.85rem; font-weight: 600; color: #15803d;">✅ All ${safeCount} fields verified successfully</div>
-                                                    </div>
-                                                ` : ''}
-                                            </div>
-                                        </div>
-                                    `;
-                        }).join('');
-                    })()}
-                        </div>
-                    ` : `
-                        <div class="section">
-                            <div class="section-title">📏 Observed Business Rules</div>
-                            <div style="color: var(--text-muted); padding: 20px; background: var(--bg-light); border-radius: 8px;">
-                                Business rules analysis not available for this folder.
-                            </div>
-                        </div>
-                    `}
-                </div>
-            `;
-
-            return section;
+            // Reset to overview tab
+            switchTab('overview');
         }
 
-        function getStatusClass(status) {
-            const statusLower = status.toLowerCase();
-            if (statusLower === 'success') return 'status-success';
-            if (statusLower === 'warning') return 'status-warning';
-            if (statusLower === 'error') return 'status-error';
-            return 'status-success';
+        function renderOverviewTab(folderData, appType) {
+            // Purpose
+            const purposeEl = document.getElementById('purpose-content');
+            const purpose = folderData.application_purpose;
+            if (purpose) {
+                const points = purpose.explanation_points || [];
+                if (points.length > 0) {
+                    purposeEl.innerHTML = points.map(p => `<div class="purpose-point">${p}</div>`).join('');
+                } else if (purpose.line1 || purpose.line2) {
+                    let html = '';
+                    if (purpose.line1) html += `<div class="purpose-point">${purpose.line1}</div>`;
+                    if (purpose.line2) html += `<div class="purpose-point">${purpose.line2}</div>`;
+                    purposeEl.innerHTML = html;
+                } else {
+                    purposeEl.innerHTML = '<div class="purpose-point">Application purpose analysis not available.</div>';
+                }
+            } else {
+                purposeEl.innerHTML = '<div class="purpose-point">Application purpose analysis not available.</div>';
+            }
+
+            // Patterns
+            const patternsEl = document.getElementById('patterns-content');
+            const patterns = appType.patterns_detected || [];
+            if (patterns.length > 0) {
+                patternsEl.innerHTML = patterns.map(p =>
+                    `<span style="background: #dbeafe; color: var(--primary); padding: 6px 14px; border-radius: 16px; font-size: 0.85rem; font-weight: 600;">${p}</span>`
+                ).join('');
+            } else {
+                patternsEl.innerHTML = '<span style="color: var(--text-muted);">No patterns detected.</span>';
+            }
         }
 
-        // Load data on page load
+        function renderFilesTab(folderData) {
+            const filesEl = document.getElementById('files-content');
+            const files = folderData.csv_files || [];
+            const roles = folderData.file_roles || {};
+
+            if (files.length === 0) {
+                filesEl.innerHTML = '<div style="color: var(--text-muted);">No CSV files found.</div>';
+                return;
+            }
+
+            filesEl.innerHTML = files.map(f => `
+                <div class="file-card">
+                    <div class="file-name">${f}</div>
+                    <span class="file-role">${roles[f] || 'Data File'}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderRelationshipsTab(folderData) {
+            const relEl = document.getElementById('relationships-content');
+            const rels = folderData.file_relationships || [];
+
+            if (rels.length === 0) {
+                relEl.innerHTML = '<div style="color: var(--text-muted); padding: 20px;">No relationships detected between files.</div>';
+                return;
+            }
+
+            relEl.innerHTML = rels.map(rel => {
+                const file1 = rel.parent_file || rel.file1 || 'File A';
+                const file2 = rel.child_file || rel.file2 || 'File B';
+                const col1 = rel.parent_column || rel.column || '';
+                const col2 = rel.child_column || rel.column || '';
+                const shortExp = rel.short_explanation || `${file1}.${col1} links to ${file2}.${col2}`;
+                const overlap = rel.overlap_info?.overlap_percentage || (rel.overlap_info?.overlap_ratio ? Math.round(rel.overlap_info.overlap_ratio * 100) : 0);
+
+                return `
+                    <div class="relationship-card">
+                        <div class="rel-header">
+                            <span class="rel-table">${file1}</span>
+                            <span class="rel-arrow">↔</span>
+                            <span class="rel-table">${file2}</span>
+                        </div>
+                        <div class="rel-explanation">${shortExp}</div>
+                        <div class="rel-meta">
+                            Column: <strong>${col1}</strong> | Type: ${rel.relationship_type || 'Linked'} | Overlap: ${overlap}%
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderRulesTab(folderData) {
+            const rulesEl = document.getElementById('rules-content');
+            const summaries = folderData.business_rules_summaries || {};
+
+            if (Object.keys(summaries).length === 0) {
+                rulesEl.innerHTML = '<div style="color: var(--text-muted); padding: 20px;">Business rules analysis not available.</div>';
+                return;
+            }
+
+            let html = '';
+            Object.entries(summaries).forEach(([filename, summary]) => {
+                if (!summary || typeof summary !== 'object') return;
+
+                const criticalCols = summary.critical_columns || [];
+                const warningCols = summary.warning_columns || [];
+                const safeCount = summary.safe_count || summary.total_columns || 0;
+                const totalCols = summary.total_columns || 0;
+
+                html += `
+                    <div class="rules-file-section">
+                        <div class="rules-file-header">📄 ${filename} <span style="font-weight: 400; color: var(--text-muted);">(${totalCols} columns)</span></div>
+                `;
+
+                criticalCols.forEach(col => {
+                    html += `
+                        <div class="rule-item critical">
+                            <div class="rule-label critical">Critical: ${col.display_name || col.column_name || 'Unknown'}</div>
+                            <div class="rule-message">${col.user_message || 'Attention required'}</div>
+                        </div>
+                    `;
+                });
+
+                warningCols.forEach(col => {
+                    html += `
+                        <div class="rule-item warning">
+                            <div class="rule-label warning">Warning: ${col.display_name || col.column_name || 'Unknown'}</div>
+                            <div class="rule-message">${col.user_message || 'Review suggested'}</div>
+                        </div>
+                    `;
+                });
+
+                if (criticalCols.length === 0 && warningCols.length === 0) {
+                    html += `
+                        <div class="rule-item safe">
+                            <div class="rule-label safe">✅ All ${safeCount} fields verified successfully</div>
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+            });
+
+            rulesEl.innerHTML = html || '<div style="color: var(--text-muted); padding: 20px;">Business rules analysis not available.</div>';
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tabId);
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.toggle('active', content.id === 'tab-' + tabId);
+            });
+        }
+
+        // Tab click handlers
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+
         document.addEventListener('DOMContentLoaded', loadAnalysisData);
     </script>
 </body>
