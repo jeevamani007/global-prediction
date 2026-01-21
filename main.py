@@ -1610,6 +1610,20 @@ async def upload_file(file: UploadFile = File(...)):
                     print(f"Warning: Could not generate business rules summary: {str(summary_e)}")
                     import traceback
                     traceback.print_exc()
+                
+                # 🔥 GENERATE APPLICATION PURPOSE EXPLANATION (2 LINES BASED ON OBSERVED PATTERNS)
+                application_purpose = None
+                try:
+                    from application_purpose_analyzer import generate_application_purpose
+                    # Get relationships from column relationship analysis
+                    relationships_list = column_relationship_analysis.get('column_relationships', []) or []
+                    application_purpose = generate_application_purpose(dynamic_rules, relationships=relationships_list)
+                    print(f"✅ Generated application purpose explanation: {application_purpose.get('line1', '')[:50]}...")
+                    print(f"   Line 2: {application_purpose.get('line2', '')[:50]}...")
+                except Exception as purpose_e:
+                    print(f"Warning: Could not generate application purpose: {str(purpose_e)}")
+                    import traceback
+                    traceback.print_exc()
             else:
                 print("Warning: Dynamic rules generation returned empty result")
         except Exception as e:
@@ -1703,6 +1717,9 @@ async def upload_file(file: UploadFile = File(...)):
                 
                 # 🔥 HIGH-LEVEL BUSINESS RULES SUMMARY (FOR EXECUTIVES/STAKEHOLDERS)
                 "business_rules_summary": business_rules_summary,
+                
+                # 🔥 APPLICATION PURPOSE EXPLANATION (2 LINES BASED ON OBSERVED PATTERNS)
+                "application_purpose": application_purpose,
                 
                 # 🔥 BANKING APPLICATION TYPE PREDICTION (NEW)
                 "banking_application_type": banking_result.get("banking_application_type"),
@@ -1860,9 +1877,12 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
 
                 # 🔥 DYNAMIC BUSINESS RULES FROM OBSERVED DATA (MULTI-FILE - PRIMARY SOURCE)
                 business_rules_summaries = {}
+                application_purpose_multi = None
+                all_dynamic_rules = {}
                 try:
                     from dynamic_business_rules_from_data import generate_dynamic_business_rules
                     from banking_business_rules_summarizer import summarize_banking_business_rules
+                    from application_purpose_analyzer import ApplicationPurposeAnalyzer
                     
                     for file_path in file_paths:
                         try:
@@ -1890,6 +1910,23 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                             import traceback
                             traceback.print_exc()
                             # Keep existing standard rules for this file if available
+                    
+                    # Generate application purpose for multi-file
+                    if all_dynamic_rules:
+                        try:
+                            # Combine all files into multi-file structure
+                            combined_rules = {
+                                'multi_file': True,
+                                'files': all_dynamic_rules
+                            }
+                            analyzer = ApplicationPurposeAnalyzer()
+                            application_purpose_multi = analyzer.analyze_from_rules_data(
+                                combined_rules, 
+                                relationships=result.get('file_relationships', [])
+                            )
+                            print(f"✅ Generated application purpose for multi-file: {application_purpose_multi.get('line1', '')[:50]}...")
+                        except Exception as purpose_e:
+                            print(f"Warning: Could not generate application purpose for multi-file: {str(purpose_e)}")
                 except Exception as e:
                     print(f"Error: Dynamic business rules generation failed for multi-file: {str(e)}")
                     import traceback
@@ -1923,6 +1960,9 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
                     
                     # 🔥 HIGH-LEVEL BUSINESS RULES SUMMARY (FOR EXECUTIVES/STAKEHOLDERS) - MULTI-FILE
                     "business_rules_summary": business_rules_summaries if business_rules_summaries else None,
+                    
+                    # 🔥 APPLICATION PURPOSE EXPLANATION (2 LINES BASED ON OBSERVED PATTERNS) - MULTI-FILE
+                    "application_purpose": application_purpose_multi,
                     "banking_blueprint": result.get("banking_blueprint"),
                     "application_structure": result.get("application_structure"),  # New: Application structure
                     "domain_detection": result.get("domain_detection"),

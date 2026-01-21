@@ -694,6 +694,9 @@
 
             // Store Business Rules Summary (High-Level Executive Summary)
             if (data.business_rules_summary) sessionStorage.setItem('businessRulesSummary', JSON.stringify(data.business_rules_summary));
+            
+            // Store Application Purpose Explanation (2 lines based on observed patterns)
+            if (data.application_purpose) sessionStorage.setItem('applicationPurpose', JSON.stringify(data.application_purpose));
 
             // Store dynamic business rules and application type prediction
             if (data.dynamic_business_rules) sessionStorage.setItem('dynamicBusinessRules', JSON.stringify(data.dynamic_business_rules));

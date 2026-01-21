@@ -1242,6 +1242,29 @@
                 <!-- Will be populated by JavaScript -->
             </div>
 
+            <!-- Application Purpose Explanation Section (Top, Full Width) -->
+            <div class="card" style="margin-bottom: 16px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 2px solid var(--primary-light);">
+                <div class="card-header" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.5rem;">🎯</span>
+                        <h3 class="card-title" style="color: white; margin: 0;">Application Purpose (Based on Observed Data Patterns)</h3>
+                    </div>
+                    <p style="color: rgba(255,255,255,0.9); font-size: 0.9rem; margin: 8px 0 0 0; font-weight: 400;">
+                        Purpose explanation generated from your uploaded files' column patterns and file connections. 100% data-driven analysis.
+                    </p>
+                </div>
+                <div id="applicationPurposeContent" style="padding: 20px;">
+                    <div style="padding: 16px; background: white; border-left: 4px solid #0284c7; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                        <p id="purposeLine1" style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 500; color: var(--text-dark); line-height: 1.6;">
+                            Analyzing your uploaded files to identify column patterns...
+                        </p>
+                        <p id="purposeLine2" style="margin: 0; font-size: 0.95rem; color: var(--text-muted); line-height: 1.6;">
+                            Detecting file connections and relationships...
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Business Rules Summary Section (Top, Full Width) -->
             <div class="card" style="margin-bottom: 16px; background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); border: 2px solid var(--primary-light);">
                 <div class="card-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;">
@@ -1495,14 +1518,17 @@
         document.addEventListener('DOMContentLoaded', function () {
             loadAnalysisData();
             
-            // Also try to load business rules summary after a short delay to ensure everything is ready
+            // Also try to load application purpose and business rules summary after a short delay to ensure everything is ready
             setTimeout(() => {
                 try {
+                    if (typeof loadApplicationPurpose === 'function') {
+                        loadApplicationPurpose();
+                    }
                     if (typeof loadBusinessRulesSummary === 'function') {
                         loadBusinessRulesSummary();
                     }
                 } catch (error) {
-                    console.error('Error loading business rules summary on page load:', error);
+                    console.error('Error loading application purpose or business rules summary on page load:', error);
                 }
             }, 500);
         });
@@ -2332,6 +2358,9 @@
             // Load Application Type Banner at top
             loadBusinessRulesAppType();
 
+            // Load Application Purpose Explanation (NEW - 2 Lines Based on Observed Patterns)
+            loadApplicationPurpose();
+
             // Load Business Rules Summary (NEW - High-Level Summary)
             // Use setTimeout to ensure DOM is ready
             setTimeout(() => {
@@ -2759,6 +2788,263 @@
                         </div>
                     </div>
                 `;
+            }
+        }
+
+        // Helper function to load Application Purpose Explanation (2 Lines Based on Observed Patterns)
+        function loadApplicationPurpose() {
+            const line1El = document.getElementById('purposeLine1');
+            const line2El = document.getElementById('purposeLine2');
+            const container = document.getElementById('applicationPurposeContent');
+            
+            if (!line1El || !line2El || !container) {
+                console.warn('Application Purpose elements not found');
+                return;
+            }
+            
+            try {
+                // Get application purpose from sessionStorage
+                const purposeStr = sessionStorage.getItem('applicationPurpose');
+                let purpose = null;
+                
+                console.log('🔍 Looking for application purpose...');
+                console.log('Direct storage:', purposeStr ? 'Found' : 'Not found');
+                
+                if (purposeStr) {
+                    try {
+                        purpose = JSON.parse(purposeStr);
+                        console.log('✅ Found application purpose in direct storage:', purpose);
+                    } catch (e) {
+                        console.warn('Failed to parse applicationPurpose:', e);
+                    }
+                }
+                
+                // Fallback: Try to get from upload/multi-file results
+                if (!purpose || !purpose.line1) {
+                    const uploadResult = JSON.parse(sessionStorage.getItem('uploadResult') || 'null');
+                    const multiFileResult = JSON.parse(sessionStorage.getItem('multiFileResult') || 'null');
+                    const isMultiFile = sessionStorage.getItem('multiFileMode') === 'true';
+                    
+                    console.log('Checking upload/multi-file results:', {
+                        isMultiFile,
+                        hasUploadResult: !!uploadResult,
+                        hasMultiFileResult: !!multiFileResult,
+                        uploadPurpose: uploadResult?.application_purpose ? 'Found' : 'Not found',
+                        multiFilePurpose: multiFileResult?.application_purpose ? 'Found' : 'Not found'
+                    });
+                    
+                    if (isMultiFile && multiFileResult && multiFileResult.application_purpose) {
+                        purpose = multiFileResult.application_purpose;
+                        console.log('✅ Found application purpose in multiFileResult:', purpose);
+                    } else if (uploadResult && uploadResult.application_purpose) {
+                        purpose = uploadResult.application_purpose;
+                        console.log('✅ Found application purpose in uploadResult:', purpose);
+                    }
+                }
+                
+                // Fallback: Generate from available data using pattern analysis
+                if (!purpose || !purpose.line1) {
+                    console.log('No purpose found, attempting to generate from rules data using pattern analysis...');
+                    const dynamicRules = JSON.parse(sessionStorage.getItem('dynamicBusinessRules') || 'null');
+                    const standardRules = JSON.parse(sessionStorage.getItem('standardBusinessRules') || 'null');
+                    const relationships = JSON.parse(sessionStorage.getItem('multiFileRelationships') || 'null') || 
+                                        JSON.parse(sessionStorage.getItem('fileRelationships') || 'null') || [];
+                    
+                    // Extract columns to generate purpose
+                    let columns = [];
+                    let fileCount = 1;
+                    let filePurposes = {};
+                    
+                    if (dynamicRules && dynamicRules.columns) {
+                        columns = dynamicRules.columns.map(c => c.column_name || c.name || '').filter(Boolean);
+                    } else if (standardRules && standardRules.columns) {
+                        columns = standardRules.columns.map(c => c.column_name || c.name || '').filter(Boolean);
+                    } else if (standardRules && standardRules.files) {
+                        // Multi-file: collect all columns and analyze each file
+                        fileCount = Object.keys(standardRules.files).length;
+                        Object.entries(standardRules.files).forEach(([fileName, fileData]) => {
+                            if (fileData && fileData.columns) {
+                                const fileCols = fileData.columns.map(c => c.column_name || c.name || '').filter(Boolean);
+                                columns = columns.concat(fileCols);
+                                
+                                // Detect purpose for this file
+                                const filePatterns = [];
+                                const fileColsLower = fileCols.join(' ').toLowerCase();
+                                if (/account.*(number|id|identifier|type|status)/.test(fileColsLower)) filePatterns.push('account_management');
+                                if (/customer.*(id|identifier|name|kyc)/.test(fileColsLower)) filePatterns.push('customer_management');
+                                if (/transaction|amount|debit|credit/.test(fileColsLower)) filePatterns.push('transaction_processing');
+                                if (/loan|emi|interest.*rate/.test(fileColsLower)) filePatterns.push('loan_management');
+                                if (/risk|aml|suspicious|fraud/.test(fileColsLower)) filePatterns.push('risk_compliance');
+                                if (filePatterns.length > 0) {
+                                    filePurposes[fileName] = filePatterns;
+                                }
+                            }
+                        });
+                    }
+                    
+                    if (columns.length > 0) {
+                        // Analyze column patterns to detect purposes
+                        const patternMatches = {};
+                        const colLower = columns.join(' ').toLowerCase();
+                        
+                        // Detect patterns
+                        if (/account.*(number|id|identifier|type|status)/.test(colLower)) {
+                            patternMatches['account_management'] = (colLower.match(/account/g) || []).length;
+                        }
+                        if (/customer.*(id|identifier|name|kyc)/.test(colLower)) {
+                            patternMatches['customer_management'] = (colLower.match(/customer/g) || []).length;
+                        }
+                        if (/transaction|amount|debit|credit/.test(colLower)) {
+                            patternMatches['transaction_processing'] = (colLower.match(/transaction|amount|debit|credit/g) || []).length;
+                        }
+                        if (/loan|emi|interest.*rate/.test(colLower)) {
+                            patternMatches['loan_management'] = (colLower.match(/loan|emi/g) || []).length;
+                        }
+                        if (/risk|aml|suspicious|fraud/.test(colLower)) {
+                            patternMatches['risk_compliance'] = (colLower.match(/risk|aml|suspicious|fraud/g) || []).length;
+                        }
+                        
+                        // Generate Line 1 based on detected patterns
+                        let line1 = '';
+                        const totalColumns = new Set(columns).size;
+                        
+                        if (fileCount > 1) {
+                            if (Object.keys(filePurposes).length > 0) {
+                                const purposeDescs = {
+                                    'account_management': 'account information',
+                                    'customer_management': 'customer records',
+                                    'transaction_processing': 'transaction data',
+                                    'loan_management': 'loan records',
+                                    'risk_compliance': 'risk data',
+                                    'reporting_analytics': 'analytical data'
+                                };
+                                const uniquePurposes = [...new Set(Object.values(filePurposes).flat())];
+                                const descriptions = uniquePurposes.slice(0, 3).map(p => purposeDescs[p] || p.replace('_', ' '));
+                                
+                                if (descriptions.length === 1) {
+                                    line1 = `Your uploaded files contain ${fileCount} datasets with ${descriptions[0]} - enabling comprehensive banking data analysis.`;
+                                } else if (descriptions.length === 2) {
+                                    line1 = `Your uploaded files contain ${fileCount} datasets covering ${descriptions[0]} and ${descriptions[1]} - providing a complete view of banking operations.`;
+                                } else {
+                                    line1 = `Your uploaded files contain ${fileCount} datasets covering ${descriptions[0]}, ${descriptions[1]}, and ${descriptions[2] || 'more'} - enabling comprehensive banking analysis.`;
+                                }
+                            } else if (Object.keys(patternMatches).length > 0) {
+                                const sorted = Object.entries(patternMatches).sort((a, b) => b[1] - a[1]).slice(0, 2);
+                                const purposeNames = {
+                                    'account_management': 'account records',
+                                    'customer_management': 'customer information',
+                                    'transaction_processing': 'transaction history',
+                                    'loan_management': 'loan data',
+                                    'risk_compliance': 'risk assessments'
+                                };
+                                const purposesText = sorted.map(p => purposeNames[p[0]] || p[0].replace('_', ' ')).join(' and ');
+                                line1 = `Your uploaded files contain ${fileCount} datasets covering ${purposesText} - providing a complete view of banking operations.`;
+                            } else {
+                                line1 = `Your uploaded files contain ${fileCount} banking datasets with ${totalColumns} unique data fields covering multiple operational areas.`;
+                            }
+                        } else {
+                            // Single file
+                            const detectedAreas = [];
+                            if (/customer.*(id|name)/.test(colLower)) detectedAreas.push('customer information');
+                            if (/account/.test(colLower)) detectedAreas.push('account details');
+                            if (/transaction|amount|debit|credit/.test(colLower)) detectedAreas.push('transaction records');
+                            if (/loan|emi/.test(colLower)) detectedAreas.push('loan information');
+                            if (/balance/.test(colLower)) detectedAreas.push('balance information');
+                            
+                            if (detectedAreas.length > 0) {
+                                const areasText = detectedAreas.slice(0, 3).join(' and ');
+                                line1 = `This dataset contains ${areasText} with ${totalColumns} fields - supporting banking operations and customer management.`;
+                            } else if (Object.keys(patternMatches).length > 0) {
+                                const topPurpose = Object.entries(patternMatches).sort((a, b) => b[1] - a[1])[0][0];
+                                const purposeDescs = {
+                                    'account_management': `account management data with ${totalColumns} fields`,
+                                    'customer_management': `customer relationship data with ${totalColumns} fields`,
+                                    'transaction_processing': `transaction processing records with ${totalColumns} fields`,
+                                    'loan_management': `loan management data with ${totalColumns} fields`,
+                                    'risk_compliance': `risk and compliance data with ${totalColumns} fields`
+                                };
+                                line1 = `This dataset contains ${purposeDescs[topPurpose] || 'banking data'} - enabling operational analysis and reporting.`;
+                            } else {
+                                line1 = `This dataset contains ${totalColumns} banking data fields organized to support core banking operations.`;
+                            }
+                        }
+                        
+                        // Generate Line 2 based on relationships and column patterns
+                        let line2 = '';
+                        const hasRelationships = relationships && relationships.length > 0;
+                        
+                        if (fileCount > 1) {
+                            if (hasRelationships) {
+                                // Analyze actual relationships
+                                const connectionTypes = new Set();
+                                relationships.slice(0, 10).forEach(rel => {
+                                    const col1 = (rel.file1_column || rel.child_column || '').toLowerCase();
+                                    const col2 = (rel.file2_column || rel.parent_column || '').toLowerCase();
+                                    if (/customer.*id/.test(col1) || /customer.*id/.test(col2)) connectionTypes.add('customer identifiers');
+                                    if (/account.*(number|id)/.test(col1) || /account.*(number|id)/.test(col2)) connectionTypes.add('account numbers');
+                                    if (/transaction/.test(col1) || /transaction/.test(col2)) connectionTypes.add('transaction references');
+                                });
+                                
+                                if (connectionTypes.size > 0) {
+                                    const connectionsText = Array.from(connectionTypes).slice(0, 2).join(', ');
+                                    line2 = `Files are linked through ${connectionsText} - allowing you to track customer activities across accounts, analyze transaction flows, and generate comprehensive reports.`;
+                                } else {
+                                    line2 = `Files are connected through shared identifiers - enabling cross-file analysis to track customer activities, account relationships, and transaction patterns.`;
+                                }
+                            } else {
+                                // Detect potential connections from column patterns
+                                if (/customer.*id/.test(colLower) && /account.*(number|id)/.test(colLower)) {
+                                    line2 = `Files share customer identifiers and account numbers - enabling you to link customer records with account transactions, track payment flows, and generate unified banking reports.`;
+                                } else if (/customer/.test(colLower) && /account/.test(colLower)) {
+                                    line2 = `Files contain customer and account data - enabling you to link customer records with their accounts, track account activities, and analyze customer banking relationships.`;
+                                } else if (/account/.test(colLower) && /transaction|amount/.test(colLower)) {
+                                    line2 = `Files contain account and transaction data - enabling you to link accounts with transaction history, track payment flows, and analyze account activities.`;
+                                } else {
+                                    line2 = `Each file contains specialized banking data that can be analyzed independently or combined to understand complete customer journeys and account activities.`;
+                                }
+                            }
+                        } else {
+                            // Single file
+                            if (/customer/.test(colLower) && /account/.test(colLower) && /transaction|amount/.test(colLower)) {
+                                line2 = `The data structure links customers to their accounts and transactions - enabling you to track individual customer activities, analyze spending patterns, and manage account relationships.`;
+                            } else if (/customer/.test(colLower) && /account/.test(colLower)) {
+                                line2 = `The data structure connects customer information with account details - enabling customer relationship management, account ownership tracking, and personalized banking services.`;
+                            } else if (/account/.test(colLower) && /transaction|amount/.test(colLower)) {
+                                if (/balance/.test(colLower)) {
+                                    line2 = `The data structure links accounts with transactions and balances - enabling transaction processing, balance updates, payment tracking, and financial reporting.`;
+                                } else {
+                                    line2 = `The data structure connects accounts with transaction records - enabling payment processing, transaction history tracking, and financial activity analysis.`;
+                                }
+                            } else if (/transaction|amount/.test(colLower)) {
+                                line2 = `Transaction data is organized to support payment processing, transaction reconciliation, balance calculations, and financial reporting.`;
+                            } else if (/loan/.test(colLower)) {
+                                line2 = `Loan data structure supports loan origination tracking, repayment schedule management, interest calculations, and loan portfolio analysis.`;
+                            } else {
+                                line2 = `The data fields are organized to support banking operations through structured relationships and validation rules.`;
+                            }
+                        }
+                        
+                        purpose = {
+                            line1: line1,
+                            line2: line2
+                        };
+                        console.log('✅ Generated data-driven purpose from column patterns:', purpose);
+                    }
+                }
+                
+                // Display purpose
+                if (purpose && purpose.line1) {
+                    line1El.textContent = purpose.line1;
+                    line2El.textContent = purpose.line2 || 'The data structure enables banking operations through organized field relationships.';
+                    container.style.display = 'block';
+                } else {
+                    line1El.textContent = 'This banking system processes banking data to support core operations.';
+                    line2El.textContent = 'The data structure enables banking operations through organized field relationships.';
+                }
+            } catch (error) {
+                console.error('Error loading application purpose:', error);
+                line1El.textContent = 'This banking system processes banking data to support core operations.';
+                line2El.textContent = 'The data structure enables banking operations through organized field relationships.';
             }
         }
 
