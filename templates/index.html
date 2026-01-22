@@ -814,8 +814,18 @@
                 // Handle folder-based response differently
                 if (data.multi_folder_mode) {
                     showAlert('✅ Folder Analysis Complete!', 'success');
-                    // Store folder data and redirect to multi-application page
-                    sessionStorage.setItem('multi_folder_analysis', JSON.stringify(data));
+                    
+                    // Store ONLY the analysis ID to avoid QuotaExceededError
+                    if (data.analysis_id) {
+                        sessionStorage.setItem('current_analysis_id', data.analysis_id);
+                        // Clear any old heavy data
+                        sessionStorage.removeItem('multi_folder_analysis');
+                        console.log('Stored analysis ID:', data.analysis_id);
+                    } else {
+                        // Fallback for smaller uploads if ID is missing (should not happen with new backend)
+                        sessionStorage.setItem('multi_folder_analysis', JSON.stringify(data));
+                    }
+                    
                     window.location.href = '/multi-analysis';
                     return;
                 }

@@ -7,6 +7,8 @@ from financial import FinancialDomainDetector
 import human_resource
 from insurence import InsuranceDomainDetector
 import os
+import uuid
+import json
 from government import GovernmentDomainDetector
 from bank import BankingDomainDetector  # your banking domain detector class
 from banking_dataset_validator import BankingDatasetValidator  # Banking Dataset Validator
@@ -23,6 +25,28 @@ from complete_banking_validator import CompleteBankingValidator
 from multi_file_processor import MultiFileProcessor
 from application_structure import BankingApplicationStructureGenerator
 
+
+# In-memory storage for analysis results (backed by file)
+# Format: { "analysis_id": { ...analysis_data... } }
+ANALYSIS_STORE_FILE = "analysis_store.json"
+ANALYSIS_STORE = {}
+
+# Load existing data from file if present
+if os.path.exists(ANALYSIS_STORE_FILE):
+    try:
+        with open(ANALYSIS_STORE_FILE, "r") as f:
+            ANALYSIS_STORE = json.load(f)
+        print(f"✅ Loaded {len(ANALYSIS_STORE)} analysis sessions from disk.")
+    except Exception as e:
+        print(f"⚠️ Could not load analysis store: {e}")
+
+def save_analysis_store():
+    """Save the current analysis store to disk."""
+    try:
+        with open(ANALYSIS_STORE_FILE, "w") as f:
+            json.dump(ANALYSIS_STORE, f)
+    except Exception as e:
+        print(f"⚠️ Could not save analysis store: {e}")
 
 app = FastAPI(title="Domain Detection API")
 
@@ -2334,8 +2358,18 @@ async def upload_folders(files: List[UploadFile] = File(...)):
             'message': 'Folders analyzed successfully',
             'multi_folder_mode': True,
             'total_folders': len(folders_results),
-            'folders': folders_results
+            # 'folders': folders_results  <-- REMOVED: Too large for LocalStorage
         }
+
+        # Store result in memory and disk
+        analysis_id = str(uuid.uuid4())
+        ANALYSIS_STORE[analysis_id] = folders_results
+        save_analysis_store()
+        
+        # Add ID to response
+        response['analysis_id'] = analysis_id
+        
+        print(f"✅ Stored analysis results with ID: {analysis_id}")
         
         return JSONResponse(content=response)
         
@@ -2344,7 +2378,22 @@ async def upload_folders(files: List[UploadFile] = File(...)):
     except Exception as e:
         import traceback
         traceback.print_exc()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+@app.get("/get-analysis-results/{analysis_id}")
+async def get_analysis_results(analysis_id: str):
+    """
+    Retrieve stored analysis results by ID.
+    Used to bypass LocalStorage quota limits for large datasets.
+    """
+    if analysis_id not in ANALYSIS_STORE:
+        raise HTTPException(status_code=404, detail="Analysis results not found or expired")
+    
+    return JSONResponse(content={"folders": ANALYSIS_STORE[analysis_id]})
 
 
 @app.get("/health")
